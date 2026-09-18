@@ -1,3 +1,7 @@
 psycopg2-binary
 pandas
 sqlalchemy
+fastapi
+uvicorn[standard]
+requests
+PyJWT
