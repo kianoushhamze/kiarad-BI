@@ -15,7 +15,7 @@ from sqlalchemy.exc import SQLAlchemyError
 
 from db import engine
 from assistant_engine import router as assistant_router
-from operations import require_manager, router as operations_router
+from operations import current_user, require_manager, router as operations_router
 from treasury import router as treasury_router
 from catalog import router as catalog_router
 from holoo_router import router as holoo_router

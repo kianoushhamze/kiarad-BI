@@ -83,7 +83,7 @@ class LiquidityActionExecute(BaseModel):
 
 
 def normalize_text(value) -> str:
-    return re.sub(r"\s+", " ", str(value or "").replace("ظٹ", "غŒ").replace("ظƒ", "ع©")).strip()
+    return re.sub(r"\s+", " ", str(value or "").replace("ي", "ی").replace("ك", "ک")).strip()
 
 
 def parse_jalali_date(value: str) -> tuple[Optional[str], Optional[date]]:
@@ -146,11 +146,11 @@ def read_xlsx_cells(contents: bytes):
             }
             first_sheet = workbook_root.find(f"{{{main_ns}}}sheets/{{{main_ns}}}sheet")
             if first_sheet is None:
-                raise ValueError("ظپط§غŒظ„ ظ‡غŒع† ط´غŒطھغŒ ظ†ط¯ط§ط±ط¯.")
+                raise ValueError("فایل هیچ شیتی ندارد.")
             relation_id = first_sheet.attrib.get(f"{{{rel_ns}}}id")
             target = relations.get(relation_id or "")
             if not target:
-                raise ValueError("ظ…ط³غŒط± ط´غŒطھ ط§طµظ„غŒ ظ¾غŒط¯ط§ ظ†ط´ط¯.")
+                raise ValueError("مسیر شیت اصلی پیدا نشد.")
             sheet_path = target.lstrip("/") if target.startswith("/xl/") else posixpath.normpath(posixpath.join("xl", target))
 
             shared_strings = []
@@ -190,7 +190,7 @@ def read_xlsx_cells(contents: bytes):
                     values[column] = value
                 rows[row_number] = values
     except (BadZipFile, KeyError, ET.ParseError, ValueError) as exc:
-        raise HTTPException(status_code=422, detail=f"ط³ط§ط®طھط§ط± ظپط§غŒظ„ Excel ظ…ط¹طھط¨ط± ظ†غŒط³طھ: {exc}")
+        raise HTTPException(status_code=422, detail=f"ساختار فایل Excel معتبر نیست: {exc}")
     return rows, max(rows, default=0), max_column
 
 
@@ -203,14 +203,14 @@ def parse_debtors_workbook(contents: bytes):
     share_column = None
     for row_number in range(1, min(max_row, 40) + 1):
         headings = {normalize_text(get_value(row_number, column)): column for column in range(1, min(max_column, 30) + 1)}
-        if "ط³ط±ظپطµظ„" in headings and "ظ…ط§ظ†ط¯ظ‡" in headings:
+        if "سرفصل" in headings and "مانده" in headings:
             header_row = row_number
-            name_column = headings["ط³ط±ظپطµظ„"]
-            balance_column = headings["ظ…ط§ظ†ط¯ظ‡"]
-            share_column = headings.get("ط¯ط±طµط¯ ط§ط² ع©ظ„")
+            name_column = headings["سرفصل"]
+            balance_column = headings["مانده"]
+            share_column = headings.get("درصد از کل")
             break
     if not header_row or not name_column or not balance_column:
-        raise HTTPException(status_code=422, detail="ط³طھظˆظ†â€Œظ‡ط§غŒ آ«ط³ط±ظپطµظ„آ» ظˆ آ«ظ…ط§ظ†ط¯ظ‡آ» ط¯ط± ظپط§غŒظ„ ظ¾غŒط¯ط§ ظ†ط´ط¯.")
+        raise HTTPException(status_code=422, detail="ستون‌های «سرفصل» و «مانده» در فایل پیدا نشد.")
 
     period_dates = []
     for row_number in range(1, header_row):
@@ -228,24 +228,24 @@ def parse_debtors_workbook(contents: bytes):
         counterparty = normalize_text(get_value(row_number, name_column))
         if not counterparty:
             continue
-        if counterparty in {"ط¬ظ…ط¹", "ظ…ط¬ظ…ظˆط¹"}:
+        if counterparty in {"جمع", "مجموع"}:
             break
         normalized_counterparty = normalize_text(counterparty)
         raw_balance = get_value(row_number, balance_column)
         try:
             balance = float(str(raw_balance).replace(",", "").translate(PERSIAN_DIGITS))
         except (TypeError, ValueError):
-            warnings.append(f"ط±ط¯غŒظپ {row_number}: ظ…ط§ظ†ط¯ظ‡ ظ…ط¹طھط¨ط± ظ†غŒط³طھ.")
+            warnings.append(f"ردیف {row_number}: مانده معتبر نیست.")
             continue
         if balance <= 0:
-            warnings.append(f"ط±ط¯غŒظپ {row_number}: ظ…ط§ظ†ط¯ظ‡ طµظپط± غŒط§ ظ…ظ†ظپغŒ ظ†ط§ط¯غŒط¯ظ‡ ع¯ط±ظپطھظ‡ ط´ط¯.")
+            warnings.append(f"ردیف {row_number}: مانده صفر یا منفی نادیده گرفته شد.")
             continue
         raw_share = get_value(row_number, share_column) if share_column else None
         try:
             share = float(str(raw_share).replace("%", "").replace(",", ".").translate(PERSIAN_DIGITS)) if raw_share not in (None, "") else None
         except (TypeError, ValueError):
             share = None
-            warnings.append(f"ط±ط¯غŒظپ {row_number}: ط¯ط±طµط¯ ظ†ط§ظ…ط¹طھط¨ط± ط¨ظˆط¯ ظˆ ط®ط§ظ„غŒ ط«ط¨طھ ط´ط¯.")
+            warnings.append(f"ردیف {row_number}: درصد نامعتبر بود و خالی ثبت شد.")
         if normalized_counterparty in seen:
             existing = rows[seen[normalized_counterparty]]
             existing["balance"] += balance
@@ -253,7 +253,7 @@ def parse_debtors_workbook(contents: bytes):
                 (existing["share_percent"] or 0) + (share or 0)
                 if existing["share_percent"] is not None or share is not None else None
             )
-            warnings.append(f"ط±ط¯غŒظپ {row_number}: ظ…ط§ظ†ط¯ظ‡ ظ†ط§ظ… طھع©ط±ط§ط±غŒ آ«{counterparty}آ» طھط¬ظ…غŒط¹ ط´ط¯.")
+            warnings.append(f"ردیف {row_number}: مانده نام تکراری «{counterparty}» تجمیع شد.")
             continue
         rows.append({
             "counterparty": counterparty,
@@ -263,7 +263,7 @@ def parse_debtors_workbook(contents: bytes):
         })
         seen[normalized_counterparty] = len(rows) - 1
     if not rows:
-        raise HTTPException(status_code=422, detail="ظ‡غŒع† ط±ط¯غŒظپ ط¨ط¯ظ‡ع©ط§ط±غŒ ظ…ط¹طھط¨ط± ط¯ط± ظپط§غŒظ„ ظ¾غŒط¯ط§ ظ†ط´ط¯.")
+        raise HTTPException(status_code=422, detail="هیچ ردیف بدهکاری معتبر در فایل پیدا نشد.")
     return {
         "rows": rows,
         "report_from_text": report_from_text,
@@ -335,12 +335,12 @@ async def import_debtors_excel(
 ):
     filename = unquote(x_file_name or "debtors.xlsx")
     if not filename.lower().endswith(".xlsx"):
-        raise HTTPException(status_code=422, detail="ظپظ‚ط· ظپط§غŒظ„ xlsx ظ¾ط°غŒط±ظپطھظ‡ ظ…غŒâ€Œط´ظˆط¯.")
+        raise HTTPException(status_code=422, detail="فقط فایل xlsx پذیرفته می‌شود.")
     contents = await request.body()
     if not contents:
-        raise HTTPException(status_code=422, detail="ظپط§غŒظ„ ط®ط§ظ„غŒ ط§ط³طھ.")
+        raise HTTPException(status_code=422, detail="فایل خالی است.")
     if len(contents) > 10 * 1024 * 1024:
-        raise HTTPException(status_code=413, detail="ط­ط¬ظ… ظپط§غŒظ„ ظ†ط¨ط§غŒط¯ ط¨غŒط´طھط± ط§ط² غ±غ° ظ…ع¯ط§ط¨ط§غŒطھ ط¨ط§ط´ط¯.")
+        raise HTTPException(status_code=413, detail="حجم فایل نباید بیشتر از ۱۰ مگابایت باشد.")
     file_hash = hashlib.sha256(contents).hexdigest()
     parsed = parse_debtors_workbook(contents)
     with engine.begin() as conn:
@@ -349,7 +349,7 @@ async def import_debtors_excel(
             {"hash": file_hash},
         ).first()
         if duplicate:
-            raise HTTPException(status_code=409, detail="ط§غŒظ† ظپط§غŒظ„ ظ‚ط¨ظ„ط§ظ‹ ظˆط§ط±ط¯ ط´ط¯ظ‡ ط§ط³طھ.")
+            raise HTTPException(status_code=409, detail="این فایل قبلاً وارد شده است.")
         customer_rows = conn.execute(text("SELECT id, name FROM customers")).mappings().all()
         customer_map = {normalize_text(row["name"]): row["id"] for row in customer_rows}
         total_amount = sum(row["balance"] for row in parsed["rows"])
@@ -449,7 +449,7 @@ def delete_debtors_snapshot(snapshot_id: int, _: dict = Depends(require_treasury
             text("SELECT id FROM receivable_snapshots WHERE id=:id"), {"id": snapshot_id}
         ).first()
         if not exists:
-            raise HTTPException(status_code=404, detail="ع¯ط²ط§ط±ط´ ط¨ط¯ظ‡ع©ط§ط±ط§ظ† ظ¾غŒط¯ط§ ظ†ط´ط¯.")
+            raise HTTPException(status_code=404, detail="گزارش بدهکاران پیدا نشد.")
         conn.execute(text("DELETE FROM receivable_balances WHERE snapshot_id=:id"), {"id": snapshot_id})
         conn.execute(text("DELETE FROM receivable_snapshots WHERE id=:id"), {"id": snapshot_id})
     return {"status": "deleted", "snapshot_id": snapshot_id}
@@ -562,7 +562,7 @@ def execute_liquidity_action(
                 "status": "already_exists",
                 "task_id": existing["id"],
                 "assigned_to": existing["assigned_to"],
-                "message": "ط§غŒظ† ظ¾غŒط´ظ†ظ‡ط§ط¯ ظ‚ط¨ظ„ط§ظ‹ ط¨ظ‡ طھط³ع© ط¹ظ…ظ„غŒط§طھغŒ طھط¨ط¯غŒظ„ ط´ط¯ظ‡ ط§ط³طھ.",
+                "message": "این پیشنهاد قبلاً به تسک عملیاتی تبدیل شده است.",
             }
         assignee = conn.execute(text("""
             SELECT u.id
@@ -585,7 +585,7 @@ def execute_liquidity_action(
             RETURNING id, assigned_to
         """), {
             "title": data.title,
-            "description": f"ظ‡ط¯ظپ ظ…ط§ظ„غŒ: {data.target_amount:,.0f} ط±غŒط§ظ„\n{data.reason}",
+            "description": f"هدف مالی: {data.target_amount:,.0f} ریال\n{data.reason}",
             "assigned_to": assigned_to,
             "created_by": user["id"],
             "customer_id": data.customer_id,
@@ -595,7 +595,7 @@ def execute_liquidity_action(
         "status": "task_created",
         "task_id": task["id"],
         "assigned_to": task["assigned_to"],
-        "message": "ط§ظ‚ط¯ط§ظ… طھط£غŒغŒط¯ ط´ط¯ ظˆ ط¨ظ‡â€Œطµظˆط±طھ طھط³ع© ط¹ظ…ظ„غŒط§طھغŒ ط«ط¨طھ ط´ط¯.",
+        "message": "اقدام تأیید شد و به‌صورت تسک عملیاتی ثبت شد.",
     }
 
 
@@ -701,7 +701,7 @@ def cashflow_forecast(
             shortage_days.append({
                 "date": current_date,
                 "shortage": abs(available),
-                "message": f"ع©ط³ط±غŒ ظ†ظ‚ط¯غŒظ†ع¯غŒ ظ¾غŒط´â€Œط¨غŒظ†غŒâ€Œط´ط¯ظ‡ ط¯ط± {current_date.isoformat()}",
+                "message": f"کسری نقدینگی پیش‌بینی‌شده در {current_date.isoformat()}",
             })
         timeline.append({
             "date": current_date,
@@ -732,20 +732,20 @@ def cashflow_forecast(
             recommendations.append({
                 "type": "collection",
                 "priority": "high",
-                "title": f"ظ¾غŒع¯غŒط±غŒ ظˆطµظˆظ„ ط§ط² {debtor['counterparty']}",
+                "title": f"پیگیری وصول از {debtor['counterparty']}",
                 "target_amount": round(target_amount, 2),
                 "available_balance": float(debtor["balance"] or 0),
                 "customer_id": debtor["customer_id"],
-                "reason": "طھط£ظ…غŒظ† ع©ط³ط±غŒ ظ¾غŒط´â€Œط¨غŒظ†غŒâ€Œط´ط¯ظ‡ ط§ط² ط¨ط²ط±ع¯â€Œطھط±غŒظ† ظ…ط§ظ†ط¯ظ‡â€Œظ‡ط§غŒ ط¨ط¯ظ‡ع©ط§ط±ط§ظ†",
+                "reason": "تأمین کسری پیش‌بینی‌شده از بزرگ‌ترین مانده‌های بدهکاران",
             })
             remaining_shortage -= target_amount
         if remaining_shortage > 0:
             recommendations.append({
                 "type": "cash_sale",
                 "priority": "high",
-                "title": "ط¨ط±ظ†ط§ظ…ظ‡ ظپط±ظˆط´ ظ†ظ‚ط¯غŒ ع©ظˆطھط§ظ‡â€Œظ…ط¯طھ",
+                "title": "برنامه فروش نقدی کوتاه‌مدت",
                 "target_amount": round(remaining_shortage, 2),
-                "reason": "ط¨ط®ط´ ط¨ط§ظ‚غŒâ€Œظ…ط§ظ†ط¯ظ‡ ع©ط³ط±غŒ ط¨ط§ ظˆطµظˆظ„ ظ¾غŒط´ظ†ظ‡ط§ط¯غŒ ظ¾ظˆط´ط´ ط¯ط§ط¯ظ‡ ظ†ظ…غŒâ€Œط´ظˆط¯",
+                "reason": "بخش باقی‌مانده کسری با وصول پیشنهادی پوشش داده نمی‌شود",
             })
         payable_candidates = sorted(
             (doc for doc in documents if doc["document_type"] == "payable"),
@@ -756,9 +756,9 @@ def cashflow_forecast(
             recommendations.append({
                 "type": "reschedule",
                 "priority": "medium",
-                "title": f"ط¨ط±ط±ط³غŒ ط¬ط§ط¨ظ‡â€Œط¬ط§غŒغŒ ط³ط±ط±ط³غŒط¯ {candidate['counterparty']}",
+                "title": f"بررسی جابه‌جایی سررسید {candidate['counterparty']}",
                 "target_amount": float(candidate["amount"] or 0),
-                "reason": "ط³ظ†ط§ط±غŒظˆغŒ ط¬ط§غŒع¯ط²غŒظ† ط¯ط± طµظˆط±طھ ظ…ط­ظ‚ظ‚â€Œظ†ط´ط¯ظ† ظˆطµظˆظ„ غŒط§ ظپط±ظˆط´ ظ†ظ‚ط¯غŒ",
+                "reason": "سناریوی جایگزین در صورت محقق‌نشدن وصول یا فروش نقدی",
             })
 
     for recommendation in recommendations:
@@ -797,14 +797,14 @@ def cashflow_forecast(
 from fastapi import UploadFile, File
 
 class ManualCheckCreate(BaseModel):
-    check_type: str = Field(..., description="'receivable' (ط¯ط±غŒط§ظپطھظ†غŒ) غŒط§ 'payable' (ظ¾ط±ط¯ط§ط®طھظ†غŒ)")
-    counterparty: str = Field(..., description="ظ†ط§ظ… ط·ط±ظپ ط­ط³ط§ط¨ / ط¯ط§ط±ظˆط®ط§ظ†ظ‡ / ط´ط±ع©طھ")
-    amount: float = Field(..., description="ظ…ط¨ظ„ط؛ ع†ع©")
-    due_date: str = Field(..., description="طھط§ط±غŒط® ط³ط±ط±ط³غŒط¯ (ظ…ط«ظ„ط§ظ‹ 1405/07/20 غŒط§ 2026-10-12)")
-    reference_number: Optional[str] = Field(None, description="ط´ظ…ط§ط±ظ‡ ع†ع© غŒط§ ط´ظ†ط§ط³ظ‡ طµغŒط§ط¯غŒ")
-    bank_name: Optional[str] = Field(None, description="ظ†ط§ظ… ط¨ط§ظ†ع© ظˆ ط´ط¹ط¨ظ‡")
+    check_type: str = Field(..., description="'receivable' (دریافتنی) یا 'payable' (پرداختنی)")
+    counterparty: str = Field(..., description="نام طرف حساب / داروخانه / شرکت")
+    amount: float = Field(..., description="مبلغ چک")
+    due_date: str = Field(..., description="تاریخ سررسید (مثلاً 1405/07/20 یا 2026-10-12)")
+    reference_number: Optional[str] = Field(None, description="شماره چک یا شناسه صیادی")
+    bank_name: Optional[str] = Field(None, description="نام بانک و شعبه")
     status: str = Field("open", description="'open', 'cleared', 'bounced'")
-    notes: Optional[str] = Field(None, description="طھظˆط¶غŒط­ط§طھ طھع©ظ…غŒظ„غŒ")
+    notes: Optional[str] = Field(None, description="توضیحات تکمیلی")
 
 class CheckStatusUpdate(BaseModel):
     status: str = Field(..., description="'open', 'cleared', 'bounced', 'cancelled'")
@@ -817,10 +817,10 @@ def create_manual_check(data: ManualCheckCreate, _: dict = Depends(require_treas
         try:
             parsed_date = date.fromisoformat(data.due_date.strip())
         except Exception:
-            raise HTTPException(status_code=400, detail="ظپط±ظ…طھ طھط§ط±غŒط® ظ†ط§ظ…ط¹طھط¨ط± ط§ط³طھ. ظ„ط·ظپط§ظ‹ ط¨ظ‡ طµظˆط±طھ ط´ظ…ط³غŒ (1405/07/20) غŒط§ ظ…غŒظ„ط§ط¯غŒ ظˆط§ط±ط¯ ع©ظ†غŒط¯.")
+            raise HTTPException(status_code=400, detail="فرمت تاریخ نامعتبر است. لطفاً به صورت شمسی (1405/07/20) یا میلادی وارد کنید.")
     
-    doc_type = "receivable_check" if ("rec" in data.check_type.lower() or "ط¯ط±غŒط§ظپطھ" in data.check_type) else "payable_check"
-    bank_desc = f"ط¨ط§ظ†ع©: {data.bank_name}" if data.bank_name else ""
+    doc_type = "receivable_check" if ("rec" in data.check_type.lower() or "دریافت" in data.check_type) else "payable_check"
+    bank_desc = f"بانک: {data.bank_name}" if data.bank_name else ""
     full_notes = f"{bank_desc} | {data.notes or ''}".strip(" |")
     
     with engine.begin() as conn:
@@ -848,7 +848,7 @@ def create_manual_check(data: ManualCheckCreate, _: dict = Depends(require_treas
         
     return {
         "success": True,
-        "message": "ع†ع© ط¨ط§ ظ…ظˆظپظ‚غŒطھ ط«ط¨طھ ع¯ط±ط¯غŒط¯",
+        "message": "چک با موفقیت ثبت گردید",
         "check_id": new_id,
         "document_type": doc_type,
         "amount": data.amount,
@@ -861,7 +861,7 @@ def update_check_status(check_id: int, data: CheckStatusUpdate, _: dict = Depend
     valid_statuses = {"open", "cleared", "bounced", "cancelled"}
     new_status = data.status.strip().lower()
     if new_status not in valid_statuses:
-        raise HTTPException(status_code=400, detail=f"ظˆط¶ط¹غŒطھ ظ†ط§ظ…ط¹طھط¨ط± ط§ط³طھ. ظˆط¶ط¹غŒطھâ€Œظ‡ط§غŒ ظ…ط¬ط§ط²: {valid_statuses}")
+        raise HTTPException(status_code=400, detail=f"وضعیت نامعتبر است. وضعیت‌های مجاز: {valid_statuses}")
     
     with engine.begin() as conn:
         res = conn.execute(
@@ -869,7 +869,7 @@ def update_check_status(check_id: int, data: CheckStatusUpdate, _: dict = Depend
             {"status": new_status, "id": check_id}
         )
         if not res.fetchone():
-            raise HTTPException(status_code=404, detail="ع†ع© ظ…ظˆط±ط¯ ظ†ط¸ط± غŒط§ظپطھ ظ†ط´ط¯")
+            raise HTTPException(status_code=404, detail="چک مورد نظر یافت نشد")
             
     return {"success": True, "check_id": check_id, "new_status": new_status}
 
@@ -917,8 +917,8 @@ def get_checks_balance_sheet(_: dict = Depends(require_treasury_access)):
         st = (r["status"] or "open").lower()
         due = r["due_date"]
         
-        is_rec = "rec" in dtype.lower() or "ط¯ط±غŒط§ظپطھ" in dtype
-        is_pay = "pay" in dtype.lower() or "ظ¾ط±ط¯ط§ط®طھ" in dtype
+        is_rec = "rec" in dtype.lower() or "دریافت" in dtype
+        is_pay = "pay" in dtype.lower() or "پرداخت" in dtype
         
         if is_rec:
             if st in ("open", "in_progress", "pending"):
@@ -927,7 +927,7 @@ def get_checks_balance_sheet(_: dict = Depends(require_treasury_access)):
                 if due < today:
                     aging_buckets["overdue"]["receivable"] += amt
                     aging_buckets["overdue"]["count"] += 1
-                    high_risk_checks.append({**dict(r), "risk_reason": "ط³ط±ط±ط³غŒط¯ ع¯ط°ط´طھظ‡ ظˆ ظˆطµظˆظ„ ظ†ط´ط¯ظ‡"})
+                    high_risk_checks.append({**dict(r), "risk_reason": "سررسید گذشته و وصول نشده"})
                 elif due <= d7:
                     aging_buckets["next_7_days"]["receivable"] += amt
                     aging_buckets["next_7_days"]["count"] += 1
@@ -940,12 +940,12 @@ def get_checks_balance_sheet(_: dict = Depends(require_treasury_access)):
                 else:
                     aging_buckets["over_60_days"]["receivable"] += amt
                     aging_buckets["over_60_days"]["count"] += 1
-            elif st in ("cleared", "collected", "paid", "ظˆطµظˆظ„"):
+            elif st in ("cleared", "collected", "paid", "وصول"):
                 rec_cleared += amt
-            elif st in ("bounced", "dishonored", "ط¨ط±ع¯ط´طھ"):
+            elif st in ("bounced", "dishonored", "برگشت"):
                 rec_bounced += amt
                 rec_bounced_count += 1
-                high_risk_checks.append({**dict(r), "risk_reason": "ع†ع© ط¨ط±ع¯ط´طھغŒ"})
+                high_risk_checks.append({**dict(r), "risk_reason": "چک برگشتی"})
                 
         elif is_pay:
             if st in ("open", "in_progress", "pending"):
@@ -966,14 +966,14 @@ def get_checks_balance_sheet(_: dict = Depends(require_treasury_access)):
                 else:
                     aging_buckets["over_60_days"]["payable"] += amt
                     aging_buckets["over_60_days"]["count"] += 1
-            elif st in ("cleared", "paid", "ظ¾ط§ط³"):
+            elif st in ("cleared", "paid", "پاس"):
                 pay_cleared += amt
-            elif st in ("bounced", "dishonored", "ط¨ط±ع¯ط´طھ"):
+            elif st in ("bounced", "dishonored", "برگشت"):
                 pay_bounced += amt
                 pay_bounced_count += 1
 
     net_position = (cash_res + rec_open) - pay_open
-    status_label = "ظ…ط§ط²ط§ط¯ ظ†ظ‚ط¯غŒظ†ع¯غŒ" if net_position >= 0 else "ع©ط³ط±غŒ ظ†ظ‚ط¯غŒظ†ع¯غŒ"
+    status_label = "مازاد نقدینگی" if net_position >= 0 else "کسری نقدینگی"
     
     return {
         "summary": {
@@ -1004,7 +1004,7 @@ async def import_checks_excel(file: UploadFile = File(...), _: dict = Depends(re
     try:
         cells = read_xlsx_cells(content)
     except Exception as e:
-        raise HTTPException(status_code=400, detail=f"ط®ط·ط§ ط¯ط± ط®ظˆط§ظ†ط¯ظ† ظپط§غŒظ„ ط§ع©ط³ظ„: {str(e)}")
+        raise HTTPException(status_code=400, detail=f"خطا در خواندن فایل اکسل: {str(e)}")
         
     rows_by_idx = {}
     for cell in cells:
@@ -1015,7 +1015,7 @@ async def import_checks_excel(file: UploadFile = File(...), _: dict = Depends(re
         for r_idx in sorted(rows_by_idx.keys()):
             r_data = rows_by_idx[r_idx]
             vals = list(r_data.values())
-            if any("ظ…ط¨ظ„ط؛" in v or "ط·ط±ظپ" in v or "ع†ع©" in v for v in vals):
+            if any("مبلغ" in v or "طرف" in v or "چک" in v for v in vals):
                 continue
                 
             counterparty, amount, due_str, ref_num = "", 0.0, "", ""
@@ -1028,9 +1028,9 @@ async def import_checks_excel(file: UploadFile = File(...), _: dict = Depends(re
                 elif not due_str and re.search(r"(13|14)\d{2}[-/]\d{1,2}[-/]\d{1,2}", v.translate(PERSIAN_DIGITS)):
                     due_str = v
                 elif not counterparty and len(v) > 2 and not v.isdigit():
-                    if "ظ¾ط±ط¯ط§ط®طھ" in v:
+                    if "پرداخت" in v:
                         check_type = "payable_check"
-                    elif "ط¯ط±غŒط§ظپطھ" in v:
+                    elif "دریافت" in v:
                         check_type = "receivable_check"
                     else:
                         counterparty = v
@@ -1049,7 +1049,7 @@ async def import_checks_excel(file: UploadFile = File(...), _: dict = Depends(re
                             reference_number, notes, collection_probability, created_at
                         ) VALUES (
                             :doc_type, :counterparty, :amount, :due_date, 'open',
-                            :ref_num, 'ظˆط±ظˆط¯ ط§ط² ط§ع©ط³ظ„', 1.0, NOW()
+                            :ref_num, 'ورود از اکسل', 1.0, NOW()
                         )
                     """),
                     {
@@ -1064,7 +1064,7 @@ async def import_checks_excel(file: UploadFile = File(...), _: dict = Depends(re
                 
     return {
         "success": True,
-        "message": f"طھط¹ط¯ط§ط¯ {inserted_count} ظپظ‚ط±ظ‡ ع†ع© ط¨ط§ ظ…ظˆظپظ‚غŒطھ ط§ط² ط§ع©ط³ظ„ ط«ط¨طھ ع¯ط±ط¯غŒط¯",
+        "message": f"تعداد {inserted_count} فقره چک با موفقیت از اکسل ثبت گردید",
         "inserted_count": inserted_count
     }
 
@@ -1080,7 +1080,7 @@ def sync_checks_from_holoo(_: dict = Depends(require_treasury_access)):
         return {
             "success": False,
             "connected": False,
-            "message": "ط¹ط¯ظ… ط¯ط³طھط±ط³غŒ ط¨ظ‡ ط³ط±ظˆط± ظ‡ظ„ظˆ ط¯ط± ط¯ظپطھط± (ط§ط­طھظ…ط§ظ„ط§ظ‹ ط®ط§ط±ط¬ ط§ط² ط´ط¨ع©ظ‡ ط¯ظپطھط± ظ‡ط³طھغŒط¯ غŒط§ ط¢غŒâ€Œظ¾غŒ ظ‡ظ„ظˆ ظ¾ط§ط³ط® ظ†ظ…غŒâ€Œط¯ظ‡ط¯).",
+            "message": "عدم دسترسی به سرور هلو در دفتر (احتمالاً خارج از شبکه دفتر هستید یا آی‌پی هلو پاسخ نمی‌دهد).",
             "error": str(e)
         }
         
@@ -1093,7 +1093,7 @@ def sync_checks_from_holoo(_: dict = Depends(require_treasury_access)):
                 return {
                     "success": True,
                     "connected": True,
-                    "message": "ط§طھطµط§ظ„ ط¨ظ‡ ظ‡ظ„ظˆ ط¨ط§ ظ…ظˆظپظ‚غŒطھ ط¨ط±ظ‚ط±ط§ط± ط´ط¯.",
+                    "message": "اتصال به هلو با موفقیت برقرار شد.",
                     "data": resp.json()
                 }
         except Exception:
@@ -1102,5 +1102,5 @@ def sync_checks_from_holoo(_: dict = Depends(require_treasury_access)):
     return {
         "success": True,
         "connected": True,
-        "message": "ط§طھطµط§ظ„ ط¨ظ‡ ظ‡ظ„ظˆ ط¨ط±ظ‚ط±ط§ط± ط´ط¯ ط§ظ…ط§ ط±ع©ظˆط±ط¯ ط¬ط¯غŒط¯غŒ ط¯ط± ط§ظ†ط¯ظ¾ظˆغŒظ†طھ ع†ع©â€Œظ‡ط§ غŒط§ظپطھ ظ†ط´ط¯."
+        "message": "اتصال به هلو برقرار شد اما رکورد جدیدی در اندپوینت چک‌ها یافت نشد."
     }

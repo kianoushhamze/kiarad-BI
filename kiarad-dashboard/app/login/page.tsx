@@ -1,9 +1,7 @@
 "use client";
 
-import { useState, type FormEvent } from "react";
+import React, { useState } from "react";
 import { useRouter } from "next/navigation";
-import { API_URL } from "../../lib/api";
-import { saveSession, type SessionUser } from "../../lib/secure-api";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -12,27 +10,89 @@ export default function LoginPage() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
-  const submit = async (event: FormEvent) => {
-    event.preventDefault(); setLoading(true); setError("");
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError("");
+    setLoading(true);
+
     try {
-      const response = await fetch(`${API_URL}/auth/login`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ username, password }) });
-      const body = await response.json();
-      if (!response.ok) throw new Error(body?.detail ?? "نام کاربری یا رمز عبور درست نیست.");
-      saveSession(body.access_token, body.user as SessionUser);
-      router.replace(body.user.role === "salesperson" ? "/visitors" : body.user.role === "finance" ? "/treasury" : "/management");
-    } catch (reason) { setError(reason instanceof Error ? reason.message : "ورود انجام نشد."); }
-    finally { setLoading(false); }
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
+      const res = await fetch(`${apiUrl}/auth/login`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ username, password }),
+      });
+
+      if (!res.ok) {
+        throw new Error("نام کاربری یا کلمه عبور اشتباه است.");
+      }
+
+      const data = await res.json();
+      localStorage.setItem("kiarad_token", data.access_token);
+      localStorage.setItem("kiarad_user", JSON.stringify(data.user));
+
+      if (data.user?.role === "salesperson") {
+        router.push("/personnel");
+      } else {
+        router.push("/");
+      }
+    } catch (err: any) {
+      setError(err.message || "خطا در اتصال به سرور");
+    } finally {
+      setLoading(false);
+    }
   };
 
-  return <div dir="rtl" className="relative grid min-h-screen place-items-center overflow-hidden bg-[#070810] p-4 text-slate-200">
-    <div className="absolute inset-0 bg-[radial-gradient(circle_at_70%_15%,rgba(124,58,237,.3),transparent_30%),radial-gradient(circle_at_15%_85%,rgba(34,211,238,.1),transparent_24%)]" />
-    <form onSubmit={submit} className="relative w-full max-w-md rounded-3xl border border-white/10 bg-[#0c0e19]/90 p-7 shadow-[0_30px_100px_rgba(0,0,0,.55)] backdrop-blur-xl">
-      <div className="mb-7 flex items-center gap-3"><span className="grid h-12 w-12 place-items-center rounded-2xl bg-gradient-to-br from-violet-500 to-indigo-700 text-xl font-black">K</span><div><h1 className="text-lg font-black text-white">ورود به کیاراد BI</h1><p className="mt-1 text-[11px] text-slate-500">دسترسی مدیرعامل، مالی و ویزیتورها</p></div></div>
-      <label className="text-[11px] text-slate-400">نام کاربری<input autoComplete="username" value={username} onChange={e => setUsername(e.target.value)} className="mt-2 w-full rounded-xl border border-white/10 bg-black/20 px-4 py-3 text-sm text-white outline-none focus:border-violet-400/50" /></label>
-      <label className="mt-4 block text-[11px] text-slate-400">رمز عبور<input type="password" autoComplete="current-password" value={password} onChange={e => setPassword(e.target.value)} className="mt-2 w-full rounded-xl border border-white/10 bg-black/20 px-4 py-3 text-sm text-white outline-none focus:border-violet-400/50" /></label>
-      {error && <div className="mt-4 rounded-xl border border-rose-500/20 bg-rose-500/10 p-3 text-[11px] text-rose-300">{error}</div>}
-      <button disabled={loading} className="mt-6 w-full rounded-xl bg-violet-600 py-3 text-sm font-bold text-white hover:bg-violet-500 disabled:opacity-60">{loading ? "در حال ورود…" : "ورود به سامانه"}</button>
-      <p className="mt-5 text-center text-[10px] leading-5 text-slate-600">اطلاعات ورود را مدیر سامانه ایجاد می‌کند.</p>
-    </form>
-  </div>;
+  return (
+    <div dir="rtl" className="min-h-screen flex items-center justify-center bg-[#0d0b18] text-white p-4 font-sans">
+      <div className="w-full max-w-md bg-[#17142b] border border-purple-900/40 rounded-2xl p-8 shadow-2xl">
+        <div className="text-center mb-8">
+          <h1 className="text-2xl font-bold bg-gradient-to-r from-purple-400 to-indigo-300 bg-clip-text text-transparent">
+            شرکت پخش کیاراد شفا اندیش
+          </h1>
+          <p className="text-gray-400 text-sm mt-2">سامانه یکپارچه هوش تجاری و عملیات ویزیت</p>
+        </div>
+
+        {error && (
+          <div className="mb-4 p-3 bg-red-950/60 border border-red-500/50 rounded-xl text-red-300 text-sm text-center">
+            {error}
+          </div>
+        )}
+
+        <form onSubmit={handleSubmit} className="space-y-5">
+          <div>
+            <label className="block text-xs text-gray-300 mb-2 font-medium">نام کاربری</label>
+            <input
+              type="text"
+              required
+              value={username}
+              onChange={(e) => setUsername(e.target.value)}
+              placeholder="مثال: kianoush یا visitor1"
+              className="w-full px-4 py-3 bg-[#0a0814] border border-purple-900/50 rounded-xl text-white placeholder-gray-600 focus:outline-none focus:border-purple-500 transition"
+            />
+          </div>
+
+          <div>
+            <label className="block text-xs text-gray-300 mb-2 font-medium">کلمه عبور</label>
+            <input
+              type="password"
+              required
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              placeholder="••••••••"
+              className="w-full px-4 py-3 bg-[#0a0814] border border-purple-900/50 rounded-xl text-white placeholder-gray-600 focus:outline-none focus:border-purple-500 transition"
+            />
+          </div>
+
+          <button
+            type="submit"
+            disabled={loading}
+            className="w-full py-3.5 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white font-semibold rounded-xl shadow-lg shadow-purple-900/30 transition duration-200 disabled:opacity-50"
+          >
+            {loading ? "در حال اعتبارسنجی..." : "ورود به سامانه"}
+          </button>
+        </form>
+      </div>
+    </div>
+  );
 }

@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
@@ -7,13 +7,15 @@ import { clearSession, getSavedUser, getToken, secureApi, type SessionUser } fro
 import { AssistantChat } from "./assistant-chat";
 
 const links = [
-  ["نمای کلی", "/management", "◫"],
-  ["ویزیتورها", "/visitors", "♙"],
+  ["نمای کلی", "/management", "📊"],
+  ["گزارش عملکرد و فیش‌ها", "/visitors", "📈"],
+  ["تعریف و فرمول ویزیتورها", "/manager", "👥"],
   ["تسک‌ها", "/tasks", "☑"],
-  ["گزارش شبانه", "/daily-reports", "▤"],
+  ["گزارش شبانه", "/daily-reports", "📰"],
   ["خزانه‌داری", "/treasury", "◈"],
-  ["کالا و کانال‌ها", "/catalog", "▦"],
-] as const;
+  ["کالا و کانال‌ها", "/catalog", "⊞"],
+  ["پنل عملیات ویزیتور", "/personnel", "💼"]
+];
 
 export function PortalShell({ title, eyebrow, actions, children }: { title: string; eyebrow: string; actions?: ReactNode; children: ReactNode }) {
   const pathname = usePathname();
@@ -43,7 +45,7 @@ export function PortalShell({ title, eyebrow, actions, children }: { title: stri
   const visibleLinks = user?.role === "finance"
     ? links.filter(([, href]) => href === "/treasury")
     : user?.role === "salesperson"
-      ? links.filter(([, href]) => ["/visitors", "/tasks", "/daily-reports"].includes(href))
+      ? links.filter(([, href]) => ["/visitors", "/manager", "/tasks", "/daily-reports", "/personnel"].includes(href))
       : links;
 
   if (!ready) return <div dir="rtl" className="grid min-h-screen place-items-center bg-[#070810] text-sm text-slate-500">در حال بررسی دسترسی…</div>;
@@ -80,3 +82,6 @@ export function Surface({ children, className = "" }: { children: ReactNode; cla
 
 export const fieldClass = "w-full rounded-xl border border-white/[0.08] bg-black/20 px-3 py-2.5 text-xs text-white outline-none placeholder:text-slate-700 focus:border-violet-400/40";
 export const primaryButton = "rounded-xl bg-violet-600 px-4 py-2.5 text-xs font-bold text-white hover:bg-violet-500 disabled:opacity-50";
+
+
+export default PortalShell;

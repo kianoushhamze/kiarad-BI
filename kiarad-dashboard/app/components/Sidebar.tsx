@@ -12,7 +12,9 @@ export default function Sidebar() {
       items: [
         { label: "داشبورد مدیرعامل", href: "/management", icon: "📊" },
         { label: "فروش آنلاین (دیجی‌کالا/ترب)", href: "/online-sales", icon: "🛒", badge: "جدید" },
-        { label: "کارنامه KPI ویزیتورها", href: "/visitor-kpis", icon: "📈" },
+                { label: "کارنامه KPI ویزیتورها", href: "/visitor-kpis", icon: "📈" },
+        { label: "تعریف و مدیریت ویزیتورها", href: "/manager", icon: "👥" },
+        { label: "پنل عملیات ویزیتور", href: "/personnel", icon: "💼" },
         { label: "کل پایگاه‌های کرمان", href: "/kerman-bases", icon: "🏢" },
         { label: "چت تیمی و هماهنگی", href: "/team-chat", icon: "💬" },
       ]
