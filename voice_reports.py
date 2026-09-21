@@ -18,17 +18,21 @@ PERSIAN_DIGITS = str.maketrans("۰۱۲۳۴۵۶۷۸۹٠١٢٣٤٥٦٧٨٩", "0123
 
 # لود مدل faster-whisper در بک‌اند
 whisper_model = None
-try:
-    from faster_whisper import WhisperModel
-    whisper_model = WhisperModel("small", device="cpu", compute_type="int8")
-    print("✓ مدل هوش مصنوعی faster-whisper با موفقیت بارگذاری شد.")
-except Exception as e:
-    try:
-        from faster_whisper import WhisperModel
-        whisper_model = WhisperModel("base", device="cpu", compute_type="int8")
-        print("✓ مدل base با موفقیت بارگذاری شد.")
-    except Exception as err:
-        print(f"توجه: خطا در بارگذاری whisper: {err}")
+_whisper_tried = False
+
+def get_whisper():
+    """Lazy-load whisper: only on first real audio request."""
+    global whisper_model, _whisper_tried
+    if whisper_model is None and not _whisper_tried:
+        _whisper_tried = True
+        try:
+            from faster_whisper import WhisperModel
+            whisper_model = WhisperModel("small", device="cpu", compute_type="int8")
+            print("OK: faster-whisper loaded lazily on first audio request.")
+        except Exception as err:
+            print(f"whisper load failed: {err}")
+    return whisper_model
+
 
 class AudioInput(BaseModel):
     audio_base64: str
@@ -129,7 +133,7 @@ async def transcribe_audio_endpoint(request: Request):
             tmp_path = tmp.name
 
         try:
-            segments, info = whisper_model.transcribe(
+            segments, info = get_whisper().transcribe(
                 tmp_path,
                 language="fa",
                 vad_filter=False,
