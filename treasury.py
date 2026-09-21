@@ -1,4 +1,4 @@
-﻿from calendar import monthrange
+from calendar import monthrange
 from datetime import date, timedelta
 import hashlib
 from io import BytesIO
