@@ -32,7 +32,7 @@ export default function ManagerPage() {
 
   const loadSalespersons = async () => {
     try {
-      let res = await authFetch("/operations/salespersons");
+      let res = await authFetch("/salespersons");
       if (!res.ok) res = await authFetch("/salespersons");
       if (res.ok) {
         const data = await res.json();
@@ -52,7 +52,7 @@ export default function ManagerPage() {
   const loadContract = async (id: number) => {
     setMsg("");
     try {
-      const res = await authFetch(`/compensation/contract/${id}`);
+      const res = await authFetch(`/api/compensation/contract/${id}`);
       const data = await res.json();
       if (data.configured) {
         setHourlyRate(data.hourly_rate || 0);
@@ -102,7 +102,7 @@ export default function ManagerPage() {
     setSaving(true);
     setMsg("");
     try {
-      const res = await authFetch(`/compensation/contract/${selectedId}`, {
+      const res = await authFetch(`/api/compensation/contract/${selectedId}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -129,7 +129,7 @@ export default function ManagerPage() {
   const handleCreateSalesperson = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      const res = await authFetch("/operations/salespersons", {
+      const res = await authFetch("/salespersons", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ full_name: fullName, username, password, region }),

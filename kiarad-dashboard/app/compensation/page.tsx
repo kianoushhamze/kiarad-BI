@@ -24,7 +24,7 @@ export default function CompensationPage() {
 
   const fetchVisitors = async () => {
     try {
-      let res = await authFetch("/operations/salespersons");
+      let res = await authFetch("/salespersons");
       if (!res.ok) res = await authFetch("/salespersons");
       if (res.ok) {
         const data = await res.json();
@@ -44,7 +44,7 @@ export default function CompensationPage() {
   const loadContract = async (id: number) => {
     setMsg("");
     try {
-      const res = await authFetch(`/compensation/contract/${id}`);
+      const res = await authFetch(`/api/compensation/contract/${id}`);
       const data = await res.json();
       if (data.configured) {
         setHourlyRate(data.hourly_rate || 0);
@@ -94,7 +94,7 @@ export default function CompensationPage() {
     setSaving(true);
     setMsg("");
     try {
-      const res = await authFetch(`/compensation/contract/${selectedId}`, {
+      const res = await authFetch(`/api/compensation/contract/${selectedId}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

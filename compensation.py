@@ -1,124 +1,128 @@
-﻿from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy.orm import Session
-from pydantic import BaseModel
-from typing import List, Optional
-from datetime import datetime
-from db import get_db
-from compensation_models import SalespersonContract, SalespersonTarget, AttendanceSession, VisitorMission, TargetType
 
-try:
-    from holo_api import get_sales_invoices, get_customer_settlements
-except ImportError:
-    def get_sales_invoices(salesperson_id, start_date, end_date):
-        return []
-    def get_customer_settlements(salesperson_id, start_date, end_date):
-        return []
+# -*- coding: utf-8 -*-
+"""Compensation: contracts, targets, attendance - raw SQL, zero ORM dependency."""
+from fastapi import APIRouter, HTTPException
+from db import get_connection
 
 router = APIRouter(prefix="/api/compensation", tags=["Compensation"])
 
-class TargetSchema(BaseModel):
-    target_type: TargetType
-    item_identifier: str
-    item_title: str
-    target_amount: float
-    target_quantity: int
-    commission_percent: float
+CONTRACT_COLS = ("id", "hourly_rate", "min_monthly_hours", "settlement_commission_percent",
+                 "daily_mission_allowance", "per_km_rate")
+TARGET_COLS = ("target_type", "item_identifier", "item_title",
+               "target_amount", "target_quantity", "commission_percent")
 
-class ContractSaveSchema(BaseModel):
-    hourly_rate: float
-    min_monthly_hours: float
-    settlement_commission_percent: float
-    daily_mission_allowance: float
-    per_km_rate: float
-    targets: List[TargetSchema]
-
-class AttendanceToggleSchema(BaseModel):
-    salesperson_id: int
-    lat: Optional[float] = None
-    lng: Optional[float] = None
 
 @router.get("/contract/{salesperson_id}")
-def get_contract(salesperson_id: int, db: Session = Depends(get_db)):
-    contract = db.query(SalespersonContract).filter_by(salesperson_id=salesperson_id).first()
-    if not contract:
-        return {"configured": False, "salesperson_id": salesperson_id}
-    return {
-        "configured": True,
-        "hourly_rate": contract.hourly_rate,
-        "min_monthly_hours": contract.min_monthly_hours,
-        "settlement_commission_percent": contract.settlement_commission_percent,
-        "daily_mission_allowance": contract.daily_mission_allowance,
-        "per_km_rate": contract.per_km_rate,
-        "targets": [
-            {
-                "target_type": t.target_type,
-                "item_identifier": t.item_identifier,
-                "item_title": t.item_title,
-                "target_amount": t.target_amount,
-                "target_quantity": t.target_quantity,
-                "commission_percent": t.commission_percent,
-            }
-            for t in contract.targets
-        ]
-    }
+def get_contract(salesperson_id: int):
+    conn = get_connection()
+    cur = conn.cursor()
+    cur.execute(
+        "SELECT id, hourly_rate, min_monthly_hours, settlement_commission_percent, "
+        "daily_mission_allowance, per_km_rate FROM salesperson_contracts WHERE salesperson_id = %s",
+        (salesperson_id,))
+    row = cur.fetchone()
+    if not row:
+        cur.close()
+        conn.close()
+        return dict(configured=False, salesperson_id=salesperson_id)
+    contract = dict(zip(CONTRACT_COLS, row))
+    cur.execute(
+        "SELECT target_type, item_identifier, item_title, target_amount, target_quantity, "
+        "commission_percent FROM salesperson_targets WHERE contract_id = %s",
+        (contract.get("id"),))
+    targets = list()
+    for t in cur.fetchall():
+        targets.append(dict(zip(TARGET_COLS, t)))
+    cur.close()
+    conn.close()
+    contract.update(configured=True, salesperson_id=salesperson_id, targets=targets)
+    return contract
+
 
 @router.post("/contract/{salesperson_id}")
-def save_contract(salesperson_id: int, data: ContractSaveSchema, db: Session = Depends(get_db)):
-    contract = db.query(SalespersonContract).filter_by(salesperson_id=salesperson_id).first()
-    if not contract:
-        contract = SalespersonContract(salesperson_id=salesperson_id)
-        db.add(contract)
-        db.flush()
-    
-    contract.hourly_rate = data.hourly_rate
-    contract.min_monthly_hours = data.min_monthly_hours
-    contract.settlement_commission_percent = data.settlement_commission_percent
-    contract.daily_mission_allowance = data.daily_mission_allowance
-    contract.per_km_rate = data.per_km_rate
-    
-    db.query(SalespersonTarget).filter_by(contract_id=contract.id).delete()
-    for t in data.targets:
-        db.add(SalespersonTarget(
-            contract_id=contract.id,
-            target_type=t.target_type,
-            item_identifier=t.item_identifier,
-            item_title=t.item_title,
-            target_amount=t.target_amount,
-            target_quantity=t.target_quantity,
-            commission_percent=t.commission_percent
-        ))
-    
-    db.commit()
-    return {"status": "success", "message": "قرارداد ویزیتور ذخیره شد."}
+def save_contract(salesperson_id: int, data: dict):
+    try:
+        hourly_rate = float(data.get("hourly_rate", 0) or 0)
+        min_hours = float(data.get("min_monthly_hours", 176) or 176)
+        settlement = float(data.get("settlement_commission_percent", 0) or 0)
+        allowance = float(data.get("daily_mission_allowance", 0) or 0)
+        per_km = float(data.get("per_km_rate", 0) or 0)
+        targets = data.get("targets") or list()
+    except Exception:
+        raise HTTPException(status_code=422, detail="invalid payload")
+    conn = get_connection()
+    cur = conn.cursor()
+    cur.execute(
+        "INSERT INTO salesperson_contracts (salesperson_id, hourly_rate, min_monthly_hours, "
+        "settlement_commission_percent, daily_mission_allowance, per_km_rate, updated_at) "
+        "VALUES (%s, %s, %s, %s, %s, %s, NOW()) "
+        "ON CONFLICT (salesperson_id) DO UPDATE SET hourly_rate = EXCLUDED.hourly_rate, "
+        "min_monthly_hours = EXCLUDED.min_monthly_hours, "
+        "settlement_commission_percent = EXCLUDED.settlement_commission_percent, "
+        "daily_mission_allowance = EXCLUDED.daily_mission_allowance, "
+        "per_km_rate = EXCLUDED.per_km_rate, updated_at = NOW() RETURNING id",
+        (salesperson_id, hourly_rate, min_hours, settlement, allowance, per_km))
+    contract_id = next(iter(cur.fetchone()))
+    cur.execute("DELETE FROM salesperson_targets WHERE contract_id = %s", (contract_id,))
+    for t in targets:
+        cur.execute(
+            "INSERT INTO salesperson_targets (contract_id, target_type, item_identifier, "
+            "item_title, target_amount, target_quantity, commission_percent) "
+            "VALUES (%s, %s, %s, %s, %s, %s, %s)",
+            (contract_id, str(t.get("target_type", "brand")), str(t.get("item_identifier", "")),
+             str(t.get("item_title", "")), float(t.get("target_amount", 0) or 0),
+             int(t.get("target_quantity", 0) or 0), float(t.get("commission_percent", 0) or 0)))
+    conn.commit()
+    cur.close()
+    conn.close()
+    return dict(status="success", message="قرارداد ویزیتور ذخیره شد.")
+
 
 @router.post("/attendance/start")
-def start_attendance(data: AttendanceToggleSchema, db: Session = Depends(get_db)):
-    active = db.query(AttendanceSession).filter_by(salesperson_id=data.salesperson_id, is_active=True).first()
-    if active:
-        return {"status": "already_active", "session_id": active.id}
-    
-    session = AttendanceSession(
-        salesperson_id=data.salesperson_id,
-        start_time=datetime.utcnow(),
-        start_lat=data.lat,
-        start_lng=data.lng,
-        is_active=True
-    )
-    db.add(session)
-    db.commit()
-    return {"status": "started", "session_id": session.id}
+def start_attendance(data: dict):
+    sp = int(data.get("salesperson_id", 0) or 0)
+    if not sp:
+        raise HTTPException(status_code=422, detail="salesperson_id is required")
+    conn = get_connection()
+    cur = conn.cursor()
+    cur.execute("SELECT id FROM attendance_sessions WHERE salesperson_id = %s AND is_active = TRUE", (sp,))
+    row = cur.fetchone()
+    if row:
+        cur.close()
+        conn.close()
+        return dict(status="already_active", session_id=next(iter(row)))
+    cur.execute(
+        "INSERT INTO attendance_sessions (salesperson_id, start_time, start_lat, start_lng, is_active) "
+        "VALUES (%s, NOW(), %s, %s, TRUE) RETURNING id",
+        (sp, data.get("lat"), data.get("lng")))
+    session_id = next(iter(cur.fetchone()))
+    conn.commit()
+    cur.close()
+    conn.close()
+    return dict(status="started", session_id=session_id)
+
 
 @router.post("/attendance/stop")
-def stop_attendance(data: AttendanceToggleSchema, db: Session = Depends(get_db)):
-    session = db.query(AttendanceSession).filter_by(salesperson_id=data.salesperson_id, is_active=True).first()
-    if not session:
+def stop_attendance(data: dict):
+    sp = int(data.get("salesperson_id", 0) or 0)
+    if not sp:
+        raise HTTPException(status_code=422, detail="salesperson_id is required")
+    conn = get_connection()
+    cur = conn.cursor()
+    cur.execute("SELECT id FROM attendance_sessions WHERE salesperson_id = %s AND is_active = TRUE", (sp,))
+    row = cur.fetchone()
+    if not row:
+        cur.close()
+        conn.close()
         raise HTTPException(status_code=400, detail="نشست فعالی یافت نشد.")
-    
-    session.end_time = datetime.utcnow()
-    session.end_lat = data.lat
-    session.end_lng = data.lng
-    session.is_active = False
-    diff = session.end_time - session.start_time
-    session.duration_hours = round(diff.total_seconds() / 3600.0, 2)
-    db.commit()
-    return {"status": "stopped", "duration_hours": session.duration_hours}
+    session_id = next(iter(row))
+    cur.execute(
+        "UPDATE attendance_sessions SET end_time = NOW(), end_lat = %s, end_lng = %s, is_active = FALSE, "
+        "duration_hours = ROUND((EXTRACT(EPOCH FROM (NOW() - start_time)) / 3600.0)::numeric, 2) "
+        "WHERE id = %s RETURNING duration_hours",
+        (data.get("lat"), data.get("lng"), session_id))
+    dur = next(iter(cur.fetchone()))
+    conn.commit()
+    cur.close()
+    conn.close()
+    return dict(status="stopped", duration_hours=float(dur))
