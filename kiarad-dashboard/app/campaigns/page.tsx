@@ -16,6 +16,12 @@ type LbRow = {
   rank?: number; name?: string; achieved?: number; invoices?: number;
 };
 
+type AiProposal = {
+  title?: string; description?: string;
+  starts_at?: string; ends_at?: string;
+  target_amount?: number; reward_type?: string; reward_value?: number; reward_note?: string;
+};
+
 export default function CampaignsPage() {
   const listInit: Array<Campaign> = new Array();
   const emptyList: Array<Campaign> = new Array();
@@ -36,6 +42,12 @@ export default function CampaignsPage() {
   const [cRewardType, setCRewardType] = useState("fixed");
   const [cRewardValue, setCRewardValue] = useState("");
   const [cNote, setCNote] = useState("");
+
+  const aiPropInit: AiProposal = new Object();
+  const [aiBusy, setAiBusy] = useState(false);
+  const [aiProp, setAiProp] = useState<AiProposal>(aiPropInit);
+  const [aiRationale, setAiRationale] = useState("");
+  const [aiMsg, setAiMsg] = useState("");
 
   const setEmpty = function () { setCampaigns(emptyList); };
 
@@ -60,6 +72,36 @@ export default function CampaignsPage() {
   const money = function (v?: number) {
     if (!v) return "۰ ریال";
     return v.toLocaleString("fa-IR") + " ریال";
+  };
+
+  const fetchAiSuggestion = async function () {
+    if (aiBusy) return;
+    setAiBusy(true); setAiMsg(""); setAiProp(new Object()); setAiRationale("");
+    try {
+      const data = (await secureApi("/campaigns/ai/suggest", { method: "POST", body: "{}" })) as any;
+      const prop = (data && data.proposal) || new Object();
+      setAiProp(prop);
+      setAiRationale((data && data.rationale) || "");
+      setAiMsg("پیشنهاد آماده شد — بررسی کن و تأیید یا رد کن.");
+    } catch (err: any) {
+      setAiMsg("پیشنهاد ناموفق: " + (err && err.message ? err.message : "خطا"));
+    } finally { setAiBusy(false); }
+  };
+
+  const decideAi = async function (suggId: number, action: string) {
+    if (aiBusy) return;
+    setAiBusy(true);
+    try {
+      await secureApi("/campaigns/ai/decide", {
+        method: "POST",
+        body: JSON.stringify({ suggestion_id: suggId, action: action })
+      });
+      setAiMsg(action === "approve" ? "✓ کمپین از پیشنهاد هوشمند ساخته شد." : "پیشنهاد رد شد.");
+      setAiProp(new Object()); setAiRationale("");
+      await load();
+    } catch (err: any) {
+      setAiMsg("تصمیم ناموفق: " + (err && err.message ? err.message : "خطا"));
+    } finally { setAiBusy(false); }
   };
 
   const submit = async function (e: React.FormEvent) {
@@ -125,13 +167,45 @@ export default function CampaignsPage() {
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", borderBottom: "1px solid #1E293B", paddingBottom: "16px", marginBottom: "24px" }}>
         <div>
           <h1 style={{ fontSize: "20px", fontWeight: "bold", margin: 0, color: "#38BDF8" }}>🎯 کمپین‌های فروش و پاداش</h1>
-          <p style={{ margin: "4px 0 0 0", fontSize: "12px", color: "#94A3B8" }}>پیشرفت زنده از فروش واقعی — بدون داده نمایشی</p>
+          <p style={{ margin: "4px 0 0 0", fontSize: "12px", color: "#94A3B8" }}>پیشرفت زنده از فروش واقعی — تصمیم هوشمند با تأیید انسانی</p>
         </div>
         <Link href="/management" style={{ background: "#2563EB", color: "#fff", padding: "8px 18px", borderRadius: "8px", textDecoration: "none", fontSize: "13px", fontWeight: "bold" }}>← داشبورد اصلی</Link>
       </div>
 
       {error ? <div style={{ background: "#450A0A", border: "1px solid #7F1D1D", color: "#FCA5A5", padding: "12px 18px", borderRadius: "10px", marginBottom: "16px", fontSize: "13px" }}>⚠️ {error} <button type="button" onClick={function(){load();}} style={{ marginRight: "8px", background: "#7F1D1D", color: "#FCA5A5", border: "none", padding: "3px 12px", borderRadius: "6px", cursor: "pointer" }}>تلاش مجدد</button></div> : null}
       {okMsg ? <div style={{ background: "#064E3B", border: "1px solid #10B981", color: "#6EE7B7", padding: "12px 18px", borderRadius: "10px", marginBottom: "16px", fontSize: "13px" }}>{okMsg}</div> : null}
+
+      <div style={Object.assign({}, card, { marginBottom: "24px", borderColor: "#334155" })}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "10px" }}>
+          <h3 style={{ margin: 0, fontSize: "15px", color: "#A78BFA" }}>🤖 دستیار هوشمند — پیشنهاد کمپین از داده‌های زنده</h3>
+          <button type="button" onClick={fetchAiSuggestion} disabled={aiBusy} style={{ background: aiBusy ? "#4C1D95" : "#7C3AED", color: "#fff", border: "none", padding: "8px 18px", borderRadius: "8px", cursor: "pointer", fontWeight: "bold", fontSize: "13px" }}>
+            {aiBusy ? "⏳ در حال تحلیل داده‌ها..." : "✨ پیشنهاد بگیر"}
+          </button>
+        </div>
+        <p style={{ margin: "0 0 12px 0", fontSize: "12px", color: "#94A3B8" }}>تحلیل فروش ۳۰ روزه، تفکیک ویزیتور و شهرها، روند ماهانه — هدف پیشنهادی همیشه بین ۱.۱ تا ۱.۵ برابر فروش واقعی مهار می‌شود. هیچ کمپینی بدون تأیید تو ساخته نمی‌شود.</p>
+        {aiMsg ? <div style={{ fontSize: "12px", color: "#C4B5FD", marginBottom: "10px" }}>{aiMsg}</div> : null}
+        {aiProp && aiProp.title ? (
+          <div style={{ background: "#111C35", borderRadius: "10px", padding: "16px", border: "1px solid #4C1D95" }}>
+            <div style={{ fontWeight: "bold", fontSize: "15px", marginBottom: "6px" }}>💡 {aiProp.title}</div>
+            {aiProp.description ? <div style={{ fontSize: "12px", color: "#94A3B8", marginBottom: "8px" }}>{aiProp.description}</div> : null}
+            <div style={{ display: "flex", flexWrap: "wrap", gap: "18px", fontSize: "12px", marginBottom: "10px" }}>
+              <div>بازه: <strong>{aiProp.starts_at} ← {aiProp.ends_at}</strong></div>
+              <div>هدف: <strong style={{ color: "#34D399" }}>{money(aiProp.target_amount)}</strong></div>
+              <div>پاداش: <strong style={{ color: "#FBBF24" }}>{aiProp.reward_type === "percent" ? (aiProp.reward_value || 0) + "٪" : money(aiProp.reward_value)}</strong></div>
+              {aiProp.reward_note ? <div style={{ color: "#94A3B8" }}>({aiProp.reward_note})</div> : null}
+            </div>
+            {aiRationale ? (
+              <div style={{ background: "#090E1A", borderRadius: "8px", padding: "12px", fontSize: "12px", color: "#CBD5E1", marginBottom: "12px", lineHeight: "1.9" }}>
+                <strong style={{ color: "#A78BFA" }}>تحلیل دستیار: </strong>{aiRationale}
+              </div>
+            ) : null}
+            <div style={{ display: "flex", gap: "8px" }}>
+              <button type="button" onClick={function(){ if (aiProp && aiProp.id) { decideAi(aiProp.id, "approve"); } }} disabled={aiBusy} style={{ background: "#10B981", color: "#fff", border: "none", padding: "7px 18px", borderRadius: "8px", cursor: "pointer", fontWeight: "bold", fontSize: "12px" }}>✅ تأیید و ساخت کمپین</button>
+              <button type="button" onClick={function(){ if (aiProp && aiProp.id) { decideAi(aiProp.id, "reject"); } }} disabled={aiBusy} style={{ background: "#7F1D1D", color: "#FCA5A5", border: "none", padding: "7px 18px", borderRadius: "8px", cursor: "pointer", fontSize: "12px" }}>❌ رد پیشنهاد</button>
+            </div>
+          </div>
+        ) : null}
+      </div>
 
       <div style={{ display: "grid", gridTemplateColumns: "1.1fr 2fr", gap: "24px" }}>
         <div style={card}>
@@ -169,7 +243,7 @@ export default function CampaignsPage() {
         <div>
           {loading ? <div style={{ color: "#94A3B8", padding: "40px", textAlign: "center", ...card }}>در حال دریافت کمپین‌ها...</div> : null}
           {!loading && campaigns.length === 0 && !error ? (
-            <div style={{ color: "#94A3B8", padding: "40px", textAlign: "center", ...card }}>هنوز کمپینی ساخته نشده — اولین را از فرم بساز.</div>
+            <div style={{ color: "#94A3B8", padding: "40px", textAlign: "center", ...card }}>هنوز کمپینی ساخته نشده — از دستیار هوشمند پیشنهاد بگیر یا از فرم بساز.</div>
           ) : null}
           <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
             {campaigns.map(function (c: Campaign) {
