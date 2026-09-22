@@ -1,104 +1,110 @@
-"use client";
-import React, { useState, useEffect } from "react";
 
-interface Message {
-  id?: number;
-  sender: string;
-  role?: string;
-  message?: string;
-  content?: string;
-  created_at?: string;
-}
+"use client";
+import React, { useState, useEffect, useCallback, useRef } from "react";
+import Link from "next/link";
+import { secureApi, getSavedUser } from "../../lib/secure-api";
+
+type Message = {
+  id?: number; sender?: string; message?: string; created_at?: string;
+};
 
 export default function TeamChatPage() {
-  const [messages, setMessages] = useState<Message[]>([]);
+  const listInit: Array<Message> = new Array();
+  const emptyList: Array<Message> = new Array();
+  const [messages, setMessages] = useState<Array<Message>>(listInit);
   const [text, setText] = useState("");
-  const [sender, setSender] = useState("مدیریت");
   const [loading, setLoading] = useState(false);
+  const [fetching, setFetching] = useState(true);
+  const [error, setError] = useState("");
+  const me = getSavedUser();
+  const myName = me && me.full_name ? me.full_name : "کاربر";
+  const endRef = useRef<HTMLDivElement>(null);
+  const setEmpty = function () { setMessages(emptyList); };
 
-  const fetchMessages = async () => {
+  const fetchMessages = useCallback(async function () {
     try {
-      const res = await fetch("http://localhost:8000/chat/messages");
-      if (res.ok) {
-        const data = await res.json();
-        setMessages(Array.isArray(data) ? data : data.messages || []);
-      }
-    } catch (e) {
-      console.error(e);
-    }
-  };
+      const data = (await secureApi("/chat/messages?room=general", { method: "GET" })) as any;
+      const fresh: Array<Message> = new Array();
+      const raw = Array.isArray(data) ? data : data && data.messages;
+      if (raw) raw.forEach(function (m: Message) { fresh.push(m); });
+      setMessages(fresh);
+      setError("");
+    } catch (err: any) {
+      const msg = err && err.message ? String(err.message) : "خطای ناشناخته";
+      setEmpty();
+      setError(msg.indexOf("Authentication") !== -1
+        ? "ابتدا از صفحه ورود وارد سیستم شوید."
+        : "دریافت پیام‌ها ناموفق بود: " + msg);
+    } finally { setFetching(false); }
+  }, new Array());
 
-  useEffect(() => {
+  useEffect(function () {
     fetchMessages();
     const interval = setInterval(fetchMessages, 3000);
-    return () => clearInterval(interval);
-  }, []);
+    return function () { clearInterval(interval); };
+  }, new Array(fetchMessages));
 
-  const handleSend = async (e: React.FormEvent) => {
+  useEffect(function () {
+    endRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, new Array(messages));
+
+  const send = async function (e: React.FormEvent) {
     e.preventDefault();
-    if (!text.trim()) return;
+    if (!text.trim() || loading) return;
     setLoading(true);
     try {
-      const res = await fetch("http://localhost:8000/chat/send", {
+      await secureApi("/chat/send", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ sender, message: text, room: "general" }),
+        body: JSON.stringify({ sender: myName, message: text, room: "general" })
       });
-      if (res.ok) {
-        setText("");
-        fetchMessages();
-      }
-    } catch (e) {
-      console.error(e);
-    } finally {
-      setLoading(false);
-    }
+      setText("");
+      await fetchMessages();
+    } catch (err: any) {
+      const msg = err && err.message ? String(err.message) : "خطای ناشناخته";
+      setError("ارسال ناموفق بود: " + msg);
+    } finally { setLoading(false); }
   };
 
   return (
-    <div style={{ maxWidth: "900px", margin: "20px auto", padding: "20px", background: "#0F172A", borderRadius: "12px", color: "#fff", border: "1px solid #334155" }}>
-
-      {/* دکمه بازگشت مستقیم به داشبورد مدیریت بدون نیاز به ورود مجدد */}
-      <div style={{ marginBottom: "16px", display: "flex", justifyContent: "flex-end" }}>
-        <a href="/management" style={{ background: "#1E293B", color: "#38BDF8", border: "1px solid #334155", padding: "8px 16px", borderRadius: "8px", textDecoration: "none", fontSize: "13px", fontWeight: "bold", display: "inline-flex", alignItems: "center", gap: "8px", boxShadow: "0 2px 4px rgba(0,0,0,0.2)" }}>
-          <span>←</span><span>بازگشت به داشبورد اصلی</span>
-        </a>
-      </div>
-
+    <div style={{ maxWidth: "900px", margin: "20px auto", padding: "20px", background: "#0F172A", borderRadius: "12px", color: "#fff", border: "1px solid #334155", direction: "rtl", fontFamily: "tahoma, sans-serif" }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", borderBottom: "1px solid #334155", paddingBottom: "12px", marginBottom: "16px" }}>
-        <h2 style={{ margin: 0, fontSize: "18px" }}>💬 اتاق چت تیمی و هماهنگی توزیع کیاراد</h2>
-        <a href="/management" style={{ color: "#38BDF8", textDecoration: "none", fontSize: "14px" }}>← بازگشت به داشبورد</a>
-      </div>
-      
-      <div style={{ height: "450px", overflowY: "auto", padding: "12px", background: "#1E293B", borderRadius: "8px", display: "flex", flexDirection: "column", gap: "10px" }}>
-        {messages.length === 0 ? (
-          <div style={{ textAlign: "center", color: "#94A3B8", marginTop: "180px" }}>پیامی در این اتاق وجود ندارد. اولین پیام را ارسال کنید.</div>
-        ) : (
-          messages.map((m, idx) => (
-            <div key={idx} style={{ alignSelf: m.sender === sender ? "flex-end" : "flex-start", background: m.sender === sender ? "#2563EB" : "#334155", padding: "8px 14px", borderRadius: "8px", maxWidth: "75%" }}>
-              <div style={{ fontSize: "11px", color: "#CBD5E1", marginBottom: "4px" }}>{m.sender}</div>
-              <div style={{ fontSize: "14px" }}>{m.message || m.content}</div>
-            </div>
-          ))
-        )}
+        <h2 style={{ margin: 0, fontSize: "18px" }}>💬 اتاق چت تیمی کیاراد</h2>
+        <div style={{ display: "flex", gap: "10px", alignItems: "center" }}>
+          <span style={{ fontSize: "12px", color: "#94A3B8" }}>به‌عنوان: <strong style={{ color: "#38BDF8" }}>{myName}</strong></span>
+          <Link href="/management" style={{ background: "#1E293B", color: "#38BDF8", border: "1px solid #334155", padding: "6px 14px", borderRadius: "8px", textDecoration: "none", fontSize: "13px", fontWeight: "bold" }}>← داشبورد اصلی</Link>
+        </div>
       </div>
 
-      <form onSubmit={handleSend} style={{ display: "flex", gap: "10px", marginTop: "14px" }}>
-        <select value={sender} onChange={(e) => setSender(e.target.value)} style={{ background: "#1E293B", color: "#fff", border: "1px solid #475569", borderRadius: "6px", padding: "8px 12px" }}>
-          <option value="مدیریت">مدیریت (کیانوش)</option>
-          <option value="فروشنده تست">فروشنده تست</option>
-          <option value="حسابداری">حسابداری</option>
-          <option value="انباردار">انباردار</option>
-        </select>
-        <input
-          type="text"
-          value={text}
-          onChange={(e) => setText(e.target.value)}
-          placeholder="پیام یا گزارش خود را بنویسید..."
-          style={{ flex: 1, background: "#1E293B", color: "#fff", border: "1px solid #475569", borderRadius: "6px", padding: "8px 14px", outline: "none" }}
-        />
-        <button type="submit" disabled={loading} style={{ background: "#10B981", color: "#fff", border: "none", padding: "8px 20px", borderRadius: "6px", cursor: "pointer", fontWeight: "bold" }}>
-          ارسال
+      {error ? (
+        <div style={{ background: "#450A0A", border: "1px solid #7F1D1D", color: "#FCA5A5", padding: "12px 16px", borderRadius: "10px", marginBottom: "14px", fontSize: "13px" }}>
+          ⚠️ {error} <button type="button" onClick={function(){fetchMessages();}} style={{ marginRight: "8px", background: "#7F1D1D", color: "#FCA5A5", border: "none", padding: "3px 12px", borderRadius: "6px", cursor: "pointer" }}>تلاش مجدد</button>
+        </div>
+      ) : null}
+
+      <div style={{ height: "450px", overflowY: "auto", padding: "12px", background: "#1E293B", borderRadius: "8px", display: "flex", flexDirection: "column", gap: "10px" }}>
+        {fetching ? <div style={{ textAlign: "center", color: "#94A3B8", marginTop: "180px" }}>در حال دریافت پیام‌ها...</div> : null}
+        {!fetching && messages.length === 0 && !error ? (
+          <div style={{ textAlign: "center", color: "#94A3B8", marginTop: "180px" }}>هنوز پیامی در این اتاق نیست — اولین پیام را بفرست.</div>
+        ) : null}
+        {messages.map(function (m, idx) {
+          const mine = m.sender === myName;
+          return (
+            <div key={idx} style={{ alignSelf: mine ? "flex-end" : "flex-start", background: mine ? "#2563EB" : "#334155", padding: "8px 14px", borderRadius: "8px", maxWidth: "75%" }}>
+              <div style={{ fontSize: "11px", color: "#CBD5E1", marginBottom: "4px" }}>{m.sender}{m.created_at ? " • " + String(m.created_at).slice(11, 16) : ""}</div>
+              <div style={{ fontSize: "14px" }}>{m.message}</div>
+            </div>
+          );
+        })}
+        <div ref={endRef} />
+      </div>
+
+      <form onSubmit={send} style={{ display: "flex", gap: "10px", marginTop: "14px" }}>
+        <input type="text" value={text} onChange={function(e){setText(e.target.value);}}
+          placeholder="پیام خود را بنویسید..."
+          style={{ flex: 1, background: "#1E293B", color: "#fff", border: "1px solid #475569", borderRadius: "6px", padding: "8px 14px", outline: "none" }} />
+        <button type="submit" disabled={loading}
+          style={{ background: loading ? "#065F46" : "#10B981", color: "#fff", border: "none", padding: "8px 20px", borderRadius: "6px", cursor: "pointer", fontWeight: "bold" }}>
+          {loading ? "..." : "ارسال"}
         </button>
       </form>
     </div>

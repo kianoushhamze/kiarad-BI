@@ -1,112 +1,175 @@
+
 "use client";
-
-import React, { useState } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
+import { secureApi } from "../../lib/secure-api";
 
-export default function ManagerControlPage() {
-  const [visitors, setVisitors] = useState([
-    { id: 1, name: "امیرانی", username: "amirani", region: "سیرجان", status: "active" },
-    { id: 2, name: "کریمی", username: "karimi", region: "جیرفت و کهنوج", status: "active" },
-    { id: 3, name: "محمدی", username: "mohammadi", region: "رفسنجان و زرند", status: "active" },
-    { id: 4, name: "نماینده علمی تست", username: "visitor1", region: "کرمان مرکزی", status: "active" },
-  ]);
+type UserRow = { id?: number; username?: string; full_name?: string; role?: string; salesperson_name?: string; is_active?: any; };
+type SpRow = { id?: number; name?: string; phone?: string; };
 
-  const [newName, setNewName] = useState("");
-  const [newUsername, setNewUsername] = useState("");
-  const [newPassword, setNewPassword] = useState("");
-  const [newRegion, setNewRegion] = useState("کرمان مرکزی");
+export default function PersonnelPage() {
+  const usersInit: Array<UserRow> = new Array();
+  const spInit: Array<SpRow> = new Array();
+  const emptyUsers: Array<UserRow> = new Array();
+  const [users, setUsers] = useState<Array<UserRow>>(usersInit);
+  const [sps, setSps] = useState<Array<SpRow>>(spInit);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
   const [msg, setMsg] = useState("");
+  const [spName, setSpName] = useState("");
+  const [spPhone, setSpPhone] = useState("");
+  const [uFull, setUFull] = useState("");
+  const [uUser, setUUser] = useState("");
+  const [uPass, setUPass] = useState("");
+  const [uRole, setURole] = useState("salesperson");
+  const [uSp, setUSp] = useState("");
+  const [saving, setSaving] = useState(false);
 
-  const handleAddVisitor = (e: React.FormEvent) => {
+  const setUsersEmpty = function () { setUsers(emptyUsers); };
+
+  const load = useCallback(async function () {
+    setLoading(true); setError("");
+    try {
+      const d = (await secureApi("/users", { method: "GET" })) as any;
+      const f: Array<UserRow> = new Array();
+      if (d && d.users) d.users.forEach(function (x: UserRow) { f.push(x); });
+      setUsers(f);
+      const sd = (await secureApi("/salespersons", { method: "GET" })) as any;
+      const fs: Array<SpRow> = new Array();
+      if (sd && sd.salespersons) sd.salespersons.forEach(function (x: SpRow) { fs.push(x); });
+      setSps(fs);
+    } catch (err: any) {
+      const m = err && err.message ? String(err.message) : "خطای ناشناخته";
+      setUsersEmpty();
+      setError(m.indexOf("Authentication") !== -1 ? "ابتدا از صفحه ورود وارد سیستم شوید." : "دریافت داده ناموفق بود: " + m);
+    } finally { setLoading(false); }
+  }, new Array());
+
+  useEffect(function () { load(); }, new Array(load));
+
+  const flash = function (t: string) { setMsg(t); setTimeout(function(){ setMsg(""); }, 5000); };
+
+  const addSp = async function (e: React.FormEvent) {
     e.preventDefault();
-    if (!newName || !newUsername || !newPassword) return;
-
-    setVisitors([...visitors, {
-      id: visitors.length + 1,
-      name: newName,
-      username: newUsername.trim().toLowerCase(),
-      region: newRegion,
-      status: "active"
-    }]);
-
-    setMsg(`ویزیتور «${newName}» با موفقیت افزوده شد.`);
-    setNewName("");
-    setNewUsername("");
-    setNewPassword("");
-    setTimeout(() => setMsg(""), 4000);
+    if (!spName.trim() || saving) return;
+    setSaving(true);
+    try {
+      await secureApi("/salespersons", { method: "POST", body: JSON.stringify({ name: spName, phone: spPhone || null }) });
+      setSpName(""); setSpPhone("");
+      flash("✓ ویزیتور در دیتابیس ثبت شد.");
+      await load();
+    } catch (err: any) { flash("ثبت ویزیتور ناموفق: " + (err && err.message ? err.message : "خطا")); }
+    finally { setSaving(false); }
   };
 
-  return (
-    <div dir="rtl" className="min-h-screen bg-[#0d0b18] text-white p-6 font-sans">
-      <header className="flex justify-between items-center pb-6 border-b border-purple-900/40 mb-8">
-        <div>
-          <h1 className="text-2xl font-bold bg-gradient-to-r from-purple-400 to-indigo-300 bg-clip-text text-transparent">
-            مدیریت پرسنل و ویزیتورهای کیاراد بی‌آی
-          </h1>
-          <p className="text-xs text-gray-400 mt-1">تعریف دسترسی و مناطق ویزیت علمی و بازاریابی استان کرمان</p>
-        </div>
-        <Link href="/" className="px-4 py-2 bg-purple-950/60 border border-purple-800/40 text-purple-300 rounded-xl hover:bg-purple-900/50 text-xs transition">
-          ← بازگشت به داشبورد اصلی
-        </Link>
-      </header>
+  const addUser = async function (e: React.FormEvent) {
+    e.preventDefault();
+    if (saving) return;
+    if (uPass.length < 10) { flash("رمز عبور باید حداقل ۱۰ کاراکتر باشد."); return; }
+    if (uRole === "salesperson" && !uSp) { flash("برای نقش ویزیتور، انتخاب پروفایل ویزیتور الزامی است."); return; }
+    setSaving(true);
+    try {
+      await secureApi("/users", { method: "POST", body: JSON.stringify({
+        username: uUser, full_name: uFull, password: uPass, role: uRole,
+        salesperson_id: uRole === "salesperson" && uSp ? Number(uSp) : null }) });
+      setUFull(""); setUUser(""); setUPass(""); setUSp("");
+      flash("✓ حساب کاربری واقعی ساخته شد — از این لحظه می‌تواند وارد سیستم شود.");
+      await load();
+    } catch (err: any) { flash("ساخت حساب ناموفق: " + (err && err.message ? err.message : "خطا")); }
+    finally { setSaving(false); }
+  };
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        <div className="bg-[#17142b] p-6 rounded-2xl border border-purple-900/30 h-fit">
-          <h2 className="text-base font-semibold text-purple-200 mb-4">تعریف ویزیتور جدید</h2>
-          {msg && <div className="mb-4 p-3 bg-emerald-950/60 border border-emerald-500/40 rounded-xl text-emerald-300 text-xs text-center">{msg}</div>}
-          <form onSubmit={handleAddVisitor} className="space-y-4">
-            <div>
-              <label className="block text-xs text-gray-300 mb-1">نام و نام خانوادگی</label>
-              <input type="text" required value={newName} onChange={(e) => setNewName(e.target.value)} placeholder="مثال: مهدی حسینی" className="w-full px-3 py-2.5 bg-[#0a0814] border border-purple-900/50 rounded-xl text-sm text-white" />
-            </div>
-            <div>
-              <label className="block text-xs text-gray-300 mb-1">نام کاربری (جهت ورود)</label>
-              <input type="text" required value={newUsername} onChange={(e) => setNewUsername(e.target.value)} placeholder="مثال: hosseini" className="w-full px-3 py-2.5 bg-[#0a0814] border border-purple-900/50 rounded-xl text-sm text-white" />
-            </div>
-            <div>
-              <label className="block text-xs text-gray-300 mb-1">کلمه عبور</label>
-              <input type="password" required value={newPassword} onChange={(e) => setNewPassword(e.target.value)} placeholder="••••••••" className="w-full px-3 py-2.5 bg-[#0a0814] border border-purple-900/50 rounded-xl text-sm text-white" />
-            </div>
-            <div>
-              <label className="block text-xs text-gray-300 mb-1">منطقه فعالیت</label>
-              <select value={newRegion} onChange={(e) => setNewRegion(e.target.value)} className="w-full px-3 py-2.5 bg-[#0a0814] border border-purple-900/50 rounded-xl text-sm text-white">
-                <option value="کرمان مرکزی">کرمان مرکزی</option>
-                <option value="سیرجان">سیرجان</option>
-                <option value="رفسنجان">رفسنجان</option>
-                <option value="جیرفت و کهنوج">جیرفت و کهنوج</option>
-                <option value="بم">بم</option>
-                <option value="زرند و راور">زرند و راور</option>
-              </select>
-            </div>
-            <button type="submit" className="w-full mt-2 py-3 bg-purple-600 hover:bg-purple-500 text-white font-medium rounded-xl text-sm transition">
-              افزودن ویزیتور به سیستم
-            </button>
+  const is: React.CSSProperties = { width: "100%", background: "#111C35", border: "1px solid #334155", color: "#fff", padding: "8px 12px", borderRadius: "8px", fontSize: "13px", outline: "none" };
+  const ls: React.CSSProperties = { fontSize: "12px", color: "#94A3B8", display: "block", marginBottom: "4px" };
+  const card: React.CSSProperties = { background: "#0F1A30", border: "1px solid #1E293B", borderRadius: "12px", padding: "20px" };
+
+  return (
+    <div dir="rtl" style={{ minHeight: "100vh", background: "#090E1A", color: "#F8FAFC", fontFamily: "tahoma, sans-serif", padding: "24px 32px" }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", borderBottom: "1px solid #1E293B", paddingBottom: "16px", marginBottom: "24px" }}>
+        <div>
+          <h1 style={{ fontSize: "20px", fontWeight: "bold", margin: 0, color: "#38BDF8" }}>👥 مدیریت پرسنل و ویزیتورها</h1>
+          <p style={{ margin: "4px 0 0 0", fontSize: "12px", color: "#94A3B8" }}>ساخت حساب واقعی با رمز هش‌شده — داده زنده از دیتابیس</p>
+        </div>
+        <Link href="/management" style={{ background: "#2563EB", color: "#fff", padding: "8px 18px", borderRadius: "8px", textDecoration: "none", fontSize: "13px", fontWeight: "bold" }}>← داشبورد اصلی</Link>
+      </div>
+
+      {error ? <div style={{ background: "#450A0A", border: "1px solid #7F1D1D", color: "#FCA5A5", padding: "12px 18px", borderRadius: "10px", marginBottom: "16px", fontSize: "13px" }}>⚠️ {error}</div> : null}
+      {msg ? <div style={{ background: "#064E3B", border: "1px solid #10B981", color: "#6EE7B7", padding: "12px 18px", borderRadius: "10px", marginBottom: "16px", fontSize: "13px" }}>{msg}</div> : null}
+
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "20px", marginBottom: "24px" }}>
+        <div style={card}>
+          <h3 style={{ margin: "0 0 14px 0", fontSize: "15px", color: "#38BDF8" }}>🏃 گام ۱: ثبت پروفایل ویزیتور</h3>
+          <form onSubmit={addSp} style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
+            <div><label style={ls}>نام و نام خانوادگی:</label>
+              <input type="text" required value={spName} onChange={function(e){setSpName(e.target.value);}} placeholder="مثال: مهدی حسینی" style={is} /></div>
+            <div><label style={ls}>تلفن (اختیاری):</label>
+              <input type="text" value={spPhone} onChange={function(e){setSpPhone(e.target.value);}} style={is} /></div>
+            <button type="submit" disabled={saving} style={{ background: saving ? "#065F46" : "#10B981", color: "#fff", border: "none", padding: "10px", borderRadius: "8px", cursor: "pointer", fontWeight: "bold", fontSize: "13px" }}>ثبت ویزیتور</button>
           </form>
         </div>
 
-        <div className="lg:col-span-2 bg-[#17142b] p-6 rounded-2xl border border-purple-900/30">
-          <h2 className="text-base font-semibold text-purple-200 mb-4">ویزیتورهای فعال</h2>
-          <table className="w-full text-right text-sm">
-            <thead className="bg-[#0a0814] text-gray-400 border-b border-purple-900/30">
-              <tr>
-                <th className="p-3">نام ویزیتور</th>
-                <th className="p-3">نام کاربری</th>
-                <th className="p-3">منطقه</th>
-                <th className="p-3">وضعیت</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-purple-900/20">
-              {visitors.map((v) => (
-                <tr key={v.id} className="hover:bg-purple-950/20">
-                  <td className="p-3 font-medium">{v.name}</td>
-                  <td className="p-3 text-purple-300 font-mono text-xs">{v.username}</td>
-                  <td className="p-3 text-gray-300">{v.region}</td>
-                  <td className="p-3"><span className="px-2.5 py-1 bg-emerald-950/60 border border-emerald-500/30 text-emerald-300 rounded-lg text-xs">فعال</span></td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+        <div style={card}>
+          <h3 style={{ margin: "0 0 14px 0", fontSize: "15px", color: "#38BDF8" }}>🔐 گام ۲: ساخت حساب ورود سیستم</h3>
+          <form onSubmit={addUser} style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px" }}>
+              <div><label style={ls}>نام کامل:</label>
+                <input type="text" required value={uFull} onChange={function(e){setUFull(e.target.value);}} style={is} /></div>
+              <div><label style={ls}>نام کاربری:</label>
+                <input type="text" required minLength={3} value={uUser} onChange={function(e){setUUser(e.target.value);}} style={is} /></div>
+            </div>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px" }}>
+              <div><label style={ls}>رمز عبور (حداقل ۱۰ کاراکتر):</label>
+                <input type="password" required minLength={10} value={uPass} onChange={function(e){setUPass(e.target.value);}} style={is} /></div>
+              <div><label style={ls}>نقش:</label>
+                <select value={uRole} onChange={function(e){setURole(e.target.value);}} style={is}>
+                  <option value="salesperson">ویزیتور</option>
+                  <option value="sales_manager">مدیر فروش</option>
+                  <option value="finance">مالی</option>
+                </select></div>
+            </div>
+            {uRole === "salesperson" ? (
+              <div><label style={ls}>پروفایل ویزیتور متصل:</label>
+                <select value={uSp} onChange={function(e){setUSp(e.target.value);}} style={is}>
+                  <option value="">— انتخاب کنید —</option>
+                  {sps.map(function (s: SpRow) { return <option key={s.id} value={String(s.id)}>{s.name}</option>; })}
+                </select></div>
+            ) : null}
+            <button type="submit" disabled={saving} style={{ background: saving ? "#065F46" : "#2563EB", color: "#fff", border: "none", padding: "10px", borderRadius: "8px", cursor: "pointer", fontWeight: "bold", fontSize: "13px" }}>ساخت حساب کاربری</button>
+          </form>
         </div>
+      </div>
+
+      <div style={card}>
+        <h3 style={{ margin: "0 0 14px 0", fontSize: "15px", color: "#F8FAFC" }}>📋 حساب‌های واقعی سیستم ({users.length} کاربر)</h3>
+        {loading ? <div style={{ color: "#94A3B8", padding: "24px", textAlign: "center" }}>در حال دریافت...</div> : null}
+        {!loading && users.length === 0 && !error ? (
+          <div style={{ color: "#94A3B8", padding: "24px", textAlign: "center", background: "#111C35", borderRadius: "8px" }}>هنوز حسابی ثبت نشده است.</div>
+        ) : null}
+        <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "13px" }}>
+          <thead><tr style={{ color: "#94A3B8", borderBottom: "1px solid #1E293B" }}>
+            <th style={{ padding: "10px", textAlign: "right" }}>نام</th>
+            <th style={{ padding: "10px", textAlign: "right" }}>نام کاربری</th>
+            <th style={{ padding: "10px", textAlign: "right" }}>نقش</th>
+            <th style={{ padding: "10px", textAlign: "right" }}>ویزیتور متصل</th>
+            <th style={{ padding: "10px", textAlign: "right" }}>وضعیت</th>
+          </tr></thead>
+          <tbody>
+            {users.map(function (u: UserRow) {
+              const active = u.is_active === true || u.is_active === 1 || u.is_active === "1";
+              return (
+                <tr key={u.id} style={{ borderBottom: "1px solid #1E293B" }}>
+                  <td style={{ padding: "10px", fontWeight: "bold" }}>{u.full_name}</td>
+                  <td style={{ padding: "10px", color: "#38BDF8" }}>{u.username}</td>
+                  <td style={{ padding: "10px" }}>{u.role}</td>
+                  <td style={{ padding: "10px", color: "#94A3B8" }}>{u.salesperson_name || "—"}</td>
+                  <td style={{ padding: "10px" }}>
+                    <span style={{ background: active ? "#065F46" : "#7F1D1D", color: active ? "#6EE7B7" : "#FCA5A5", padding: "3px 10px", borderRadius: "12px", fontSize: "11px" }}>{active ? "فعال" : "غیرفعال"}</span>
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
       </div>
     </div>
   );

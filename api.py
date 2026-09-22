@@ -835,15 +835,10 @@ def omni_search(q: str = ""):
 
 @app.get("/chat/messages")
 def get_chat_messages(room: str = "general"):
-    """لیست پیام‌های اتاق چت تیمی"""
+    """لیست پیام‌های اتاق چت تیمی - داده واقعی، بدون fallback جعلی"""
     with engine.connect() as conn:
-        try:
-            rows = conn.execute(text("SELECT id, sender, message, created_at FROM chat_messages WHERE room = :room ORDER BY id ASC LIMIT 50"), {"room": room}).mappings().all()
-            return [dict(r) for r in rows]
-        except Exception:
-            return [
-                {"id": 1, "sender": "مدیریت", "message": "سامانه هماهنگی و چت تیمی کیاراد آنلاین است.", "created_at": "الان"}
-            ]
+        rows = conn.execute(text("SELECT id, sender, message, created_at FROM chat_messages WHERE room = :room ORDER BY id ASC LIMIT 50"), {"room": room}).mappings().all()
+        return [dict(r) for r in rows]
 
 @app.post("/chat/send")
 def send_chat_message(data: dict):
@@ -875,34 +870,40 @@ def get_unprotected_full_dashboard(range: str = "month"):
 
 @app.get("/crm/interactions")
 def get_crm_interactions():
-    """دریافت لیست پرونده‌ها و پیگیری‌های ثبت‌شده"""
+    """لیست واقعی یادآوری‌های ثبت‌شده"""
     with engine.connect() as conn:
         rows = conn.execute(text("""
-            SELECT id, customer_name, visitor_name, interaction_type, product_discussed, notes, 
-                   TO_CHAR(next_followup_date, 'YYYY/MM/DD') as next_date, status,
-                   CASE WHEN next_followup_date <= CURRENT_DATE THEN true ELSE false END as is_due
-            FROM customer_interactions 
+            SELECT id, customer_name, visitor_name, interaction_type, product_discussed, notes, status,
+                   COALESCE(TO_CHAR(next_followup_date, 'YYYY/MM/DD'), '') AS next_date,
+                   COALESCE(followup_time, '') AS followup_time,
+                   CASE WHEN next_followup_date IS NOT NULL AND next_followup_date <= CURRENT_DATE THEN true ELSE false END AS is_due
+            FROM customer_interactions
             ORDER BY id DESC LIMIT 50
         """)).mappings().all()
         return [dict(r) for r in rows]
 
 @app.post("/crm/interactions")
 def add_crm_interaction(data: dict):
-    """ثبت گزارش ویزیت یا تماس جدید در دیتابیس"""
-    cust = data.get("customer_name", "").strip()
-    vis = data.get("visitor_name", "مدیریت").strip()
+    """ثبت واقعی یادآوری تماس با تاریخ و ساعت پیگیری"""
+    cust = (data.get("customer_name") or "").strip()
+    if not cust:
+        raise HTTPException(status_code=422, detail="customer_name is required")
+    vis = (data.get("visitor_name") or "مدیریت").strip()
     itype = data.get("interaction_type", "ویزیت حضوری")
     prod = data.get("product_discussed", "سوآلین ویرا")
-    notes = data.get("notes", "").strip()
-    status = data.get("status", "در انتظار تماس")
-    
+    notes = (data.get("notes") or "").strip()
+    status_val = data.get("status", "در انتظار تماس")
+    fdate = (data.get("next_followup_date") or "").strip() or None
+    ftime = (data.get("followup_time") or "").strip() or None
+
     with engine.begin() as conn:
         conn.execute(text("""
-            INSERT INTO customer_interactions (customer_name, visitor_name, interaction_type, product_discussed, notes, status)
-            VALUES (:cust, :vis, :itype, :prod, :notes, :status)
-        """), {"cust": cust, "vis": vis, "itype": itype, "prod": prod, "notes": notes, "status": status})
+            INSERT INTO customer_interactions
+                (customer_name, visitor_name, interaction_type, product_discussed, notes, status, next_followup_date, followup_time)
+            VALUES (:cust, :vis, :itype, :prod, :notes, :status_val, :fdate, :ftime)
+        """), {"cust": cust, "vis": vis, "itype": itype, "prod": prod,
+               "notes": notes, "status_val": status_val, "fdate": fdate, "ftime": ftime})
     return {"status": "ok", "message": "پیگیری با موفقیت ثبت شد"}
-
 
 @app.get("/targets/custom-list")
 def get_custom_targets():
