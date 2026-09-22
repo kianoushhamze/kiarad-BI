@@ -31,10 +31,12 @@ app.include_router(proformas_router)
 from telegram_api import router as telegram_api_router
 from compensation import router as compensation_router
 from campaign import router as campaign_router
+from campaign_ai import router as campaign_ai_router
 app.include_router(kerman_router)
 app.include_router(telegram_api_router)
 app.include_router(compensation_router)
 app.include_router(campaign_router)
+app.include_router(campaign_ai_router)
 app.include_router(operations_router)
 app.include_router(treasury_router)
 app.include_router(assistant_router)
