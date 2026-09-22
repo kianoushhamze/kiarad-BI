@@ -44,6 +44,7 @@ export default function CampaignsPage() {
   const [cNote, setCNote] = useState("");
 
   const aiPropInit: AiProposal = new Object();
+  const [aiSuggId, setAiSuggId] = useState(0);
   const [aiBusy, setAiBusy] = useState(false);
   const [aiProp, setAiProp] = useState<AiProposal>(aiPropInit);
   const [aiRationale, setAiRationale] = useState("");
@@ -76,11 +77,12 @@ export default function CampaignsPage() {
 
   const fetchAiSuggestion = async function () {
     if (aiBusy) return;
-    setAiBusy(true); setAiMsg(""); setAiProp(new Object()); setAiRationale("");
+    setAiBusy(true); setAiMsg(""); setAiProp(new Object()); setAiRationale(""); setAiSuggId(0);
     try {
       const data = (await secureApi("/campaigns/ai/suggest", { method: "POST", body: "{}" })) as any;
       const prop = (data && data.proposal) || new Object();
       setAiProp(prop);
+      setAiSuggId((data && data.suggestion_id) || 0);
       setAiRationale((data && data.rationale) || "");
       setAiMsg("پیشنهاد آماده شد — بررسی کن و تأیید یا رد کن.");
     } catch (err: any) {
@@ -97,7 +99,7 @@ export default function CampaignsPage() {
         body: JSON.stringify({ suggestion_id: suggId, action: action })
       });
       setAiMsg(action === "approve" ? "✓ کمپین از پیشنهاد هوشمند ساخته شد." : "پیشنهاد رد شد.");
-      setAiProp(new Object()); setAiRationale("");
+      setAiProp(new Object()); setAiRationale(""); setAiSuggId(0);
       await load();
     } catch (err: any) {
       setAiMsg("تصمیم ناموفق: " + (err && err.message ? err.message : "خطا"));
@@ -200,8 +202,8 @@ export default function CampaignsPage() {
               </div>
             ) : null}
             <div style={{ display: "flex", gap: "8px" }}>
-              <button type="button" onClick={function(){ if (aiProp && aiProp.id) { decideAi(aiProp.id, "approve"); } }} disabled={aiBusy} style={{ background: "#10B981", color: "#fff", border: "none", padding: "7px 18px", borderRadius: "8px", cursor: "pointer", fontWeight: "bold", fontSize: "12px" }}>✅ تأیید و ساخت کمپین</button>
-              <button type="button" onClick={function(){ if (aiProp && aiProp.id) { decideAi(aiProp.id, "reject"); } }} disabled={aiBusy} style={{ background: "#7F1D1D", color: "#FCA5A5", border: "none", padding: "7px 18px", borderRadius: "8px", cursor: "pointer", fontSize: "12px" }}>❌ رد پیشنهاد</button>
+              <button type="button" onClick={function(){ if (aiSuggId) { decideAi(aiSuggId, "approve"); } }} disabled={aiBusy} style={{ background: "#10B981", color: "#fff", border: "none", padding: "7px 18px", borderRadius: "8px", cursor: "pointer", fontWeight: "bold", fontSize: "12px" }}>✅ تأیید و ساخت کمپین</button>
+              <button type="button" onClick={function(){ if (aiSuggId) { decideAi(aiSuggId, "reject"); } }} disabled={aiBusy} style={{ background: "#7F1D1D", color: "#FCA5A5", border: "none", padding: "7px 18px", borderRadius: "8px", cursor: "pointer", fontSize: "12px" }}>❌ رد پیشنهاد</button>
             </div>
           </div>
         ) : null}
