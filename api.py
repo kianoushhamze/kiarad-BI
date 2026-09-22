@@ -28,7 +28,9 @@ from holoo_router import router as holoo_router
 app = FastAPI(title="Kiarad BI API")
 app.include_router(voice_reports_router)
 app.include_router(proformas_router)
+from telegram_api import router as telegram_api_router
 app.include_router(kerman_router)
+app.include_router(telegram_api_router)
 app.include_router(operations_router)
 app.include_router(treasury_router)
 app.include_router(assistant_router)
