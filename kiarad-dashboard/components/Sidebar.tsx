@@ -7,29 +7,48 @@ import { usePathname } from "next/navigation";
 export default function Sidebar() {
   const pathname = usePathname();
 
+  
   const menuGroups = [
     {
-      title: "عملیات اصلی",
+      title: "مدیریت و مالی",
       items: [
         { label: "داشبورد مدیرعامل", href: "/management", icon: "📊" },
-        { label: "فروش آنلاین (دیجی‌کالا/ترب)", href: "/online-sales", icon: "🛒", badge: "جدید" },
-                { label: "کارنامه KPI ویزیتورها", href: "/visitor-kpis", icon: "📈" },
-        { label: "تعریف و مدیریت ویزیتورها", href: "/manager", icon: "👥" },
-        { label: "پنل عملیات ویزیتور", href: "/personnel", icon: "💼" },
-        { label: "کل پایگاه‌های کرمان", href: "/kerman-bases", icon: "🏢" },
-        { label: "چت تیمی و هماهنگی", href: "/team-chat", icon: "💬" },
+        { label: "خزانه", href: "/treasury", icon: "💰" },
+        { label: "نرخ‌نامه و کاتالوگ", href: "/catalog", icon: "🏷️" },
+        { label: "فروش آنلاین (دیجی‌کالا/ترب)", href: "/online-sales", icon: "🛒", badge: "جدید" }
       ]
     },
     {
-      title: "ابزارهای میدانی و فروش",
+      title: "فروش و کمپین",
       items: [
         { label: "ثبت پیش‌فاکتور", href: "/proformas", icon: "📝" },
-        { label: "نقشه آنلاین کرمان", href: "/map", icon: "🗺️" },
+        { label: "کمپین‌های فروش و پاداش", href: "/campaigns", icon: "🎯", badge: "هوشمند" },
+        { label: "کارنامه KPI ویزیتورها", href: "/visitor-kpis", icon: "📈" },
+        { label: "کل پایگاه‌های کرمان", href: "/kerman-bases", icon: "🏢" },
+        { label: "نقشه آنلاین کرمان", href: "/map", icon: "🗺️" }
+      ]
+    },
+    {
+      title: "تیم و پرسنل",
+      items: [
+        { label: "قرارداد و حقوق ویزیتور", href: "/compensation", icon: "📄" },
+        { label: "تعریف و مدیریت ویزیتورها", href: "/manager", icon: "👥" },
+        { label: "پنل عملیات ویزیتور", href: "/personnel", icon: "💼" },
+        { label: "تسک‌ها و پیگیری‌ها", href: "/tasks", icon: "✅" },
+        { label: "چت تیمی و هماهنگی", href: "/team-chat", icon: "💬" }
+      ]
+    },
+    {
+      title: "گزارش‌های میدانی",
+      items: [
         { label: "گزارش صوتی هوشمند", href: "/voice-report", icon: "🎙️" },
-        { label: "عملکرد پرسنل", href: "/", icon: "👥" },
+        { label: "گزارش روزانه", href: "/daily-reports", icon: "🗒️" },
+        { label: "گزارش بازدیدها", href: "/visitors", icon: "📍" },
+        { label: "عملکرد پرسنل", href: "/", icon: "👥" }
       ]
     }
   ];
+
 
   return (
     <aside style={{ width: "260px", minWidth: "260px", background: "#0B1329", borderLeft: "1px solid #1E293B", height: "100vh", position: "sticky", top: 0, padding: "20px 14px", display: "flex", flexDirection: "column", justifyContent: "space-between", direction: "rtl", fontFamily: "tahoma, sans-serif" }}>
