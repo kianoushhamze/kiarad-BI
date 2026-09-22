@@ -2,6 +2,7 @@
 
 import React, { useState } from "react";
 import { useRouter } from "next/navigation";
+import { saveSession } from "../../lib/secure-api";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -28,13 +29,12 @@ export default function LoginPage() {
       }
 
       const data = await res.json();
-      localStorage.setItem("kiarad_token", data.access_token);
-      localStorage.setItem("kiarad_user", JSON.stringify(data.user));
+      saveSession(data.access_token, data.user);
 
       if (data.user?.role === "salesperson") {
         router.push("/personnel");
       } else {
-        router.push("/");
+        router.push("/management");
       }
     } catch (err: any) {
       setError(err.message || "خطا در اتصال به سرور");
