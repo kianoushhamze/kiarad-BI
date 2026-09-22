@@ -1,6 +1,6 @@
 
 # -*- coding: utf-8 -*-
-"""AI campaign suggestions with human approval loop - reuses the real assistant engine."""
+"""AI campaign suggestions - strictly data-grounded, human-approved."""
 import json
 from datetime import date, timedelta
 from fastapi import APIRouter, Depends, HTTPException
@@ -22,18 +22,62 @@ def parse_json_block(text_value):
         return None
 
 
+def build_market_brief():
+    conn = get_connection()
+    cur = conn.cursor()
+    per_sp = list()
+    cur.execute(
+        "SELECT sp.name, COALESCE(SUM(s.total_amount), 0), COUNT(s.id) "
+        "FROM salespersons sp LEFT JOIN sales s "
+        " ON s.salesperson_id = sp.id AND s.date >= CURRENT_DATE - INTERVAL '30 days' "
+        "GROUP BY sp.id, sp.name ORDER BY 2 DESC")
+    for (nm, tot, cnt) in cur.fetchall():
+        per_sp.append("- " + str(nm) + ": " + format(float(tot), ",.0f") + " ریال | " + str(cnt) + " فاکتور")
+    cities = list()
+    cur.execute(
+        "SELECT COALESCE(NULLIF(c.city, ''), 'نامشخص') AS city, COUNT(s.id), COALESCE(SUM(s.total_amount), 0) "
+        "FROM sales s JOIN customers c ON c.id = s.customer_id "
+        "WHERE s.date >= CURRENT_DATE - INTERVAL '30 days' "
+        "GROUP BY city ORDER BY 3 DESC LIMIT 5")
+    for (city, cnt, tot) in cur.fetchall():
+        cities.append("- " + str(city) + ": " + format(float(tot), ",.0f") + " ریال | " + str(cnt) + " فاکتور")
+    cur.execute("SELECT COALESCE(SUM(total_amount), 0) FROM sales "
+                "WHERE date >= CURRENT_DATE - INTERVAL '60 days' AND date < CURRENT_DATE - INTERVAL '30 days'")
+    prev30 = float(next(iter(cur.fetchone())) or 0)
+    cur.close()
+    conn.close()
+    return per_sp, cities, prev30
+
+
 @router.post("/suggest")
 def suggest(user: dict = Depends(require_user)):
     with engine.connect() as conn:
         ctx = build_live_context(conn)
-    ask = (
-        "بر اساس داده‌های زنده‌ی شرکت، یک کمپین فروش و پاداش برای تیم ویزیتور پیشنهاد بده. "
-        "پاسخ فقط و فقط یک آبجکت JSON خالص باشد، بدون هیچ متن اضافه، با کلیدهای: "
-        "title (عنوان کوتاه)، description (توضیح یک‌خطی)، days (طول کمپین به روز، عدد بین ۷ تا ۱۲۰)، "
-        "target_amount (هدف فروش کل بازه به ریال، عددی منطقی و قابل‌دستیابی بر اساس فروش واقعی)، "
-        "reward_type (fixed یا percent)، reward_value (مبلغ ریال یا درصد)، "
-        "reward_note (توضیح پاداش)، rationale (دلیل تحلیلی در دو سه جمله با ارجاع به اعداد واقعی)."
+    per_sp, cities, prev30 = build_market_brief()
+    cur30 = float(ctx.get("sales_30d", 0) or 0)
+    trend_line = ""
+    if prev30 > 0:
+        pct = round((cur30 - prev30) / prev30 * 100.0, 1)
+        trend_line = " | روند نسبت به ماه قبل: " + ("+" if pct >= 0 else "") + str(pct) + "٪"
+    low = cur30 * 1.1
+    high = cur30 * 1.5
+    brief = (
+        "داده‌های تحلیلی زنده (فقط بر این مبنا تصمیم بگیر):\n"
+        "- فروش ۳۰ روز اخیر: " + format(cur30, ",.0f") + " ریال | "
+        + str(int(ctx.get("invoices_30d", 0))) + " فاکتور" + trend_line + "\n"
+        "- فروش ۳۰ روز قبل از آن: " + format(prev30, ",.0f") + " ریال\n"
+        "- فروش به تفکیک ویزیتور (۳۰ روز اخیر):\n" + "\n".join(per_sp) + "\n"
+        "- سهم شهرها (۳۰ روز اخیر):\n" + "\n".join(cities) + "\n"
     )
+    rules = (
+        "قوانین الزامی:\n"
+        "۱) target_amount باید بین " + format(low, ",.0f") + " و " + format(high, ",.0f")
+        + " ریال باشد (۱.۱ تا ۱.۵ برابر فروش واقعی ۳۰ روز اخیر) و در rationale نسبت به این اعداد را توضیح بده.\n"
+        "۲) هیچ عددی از خودت اختراع نکن؛ فقط از داده‌های بالا.\n"
+        "۳) اگر داده برای تصمیم کافی نیست (مثلاً داده تستی یا پراکنده است)، در rationale صریح بگو چه داده‌ای کم است.\n"
+        "۴) پاسخ فقط آبجکت JSON با کلیدهای: title, description, days, target_amount, reward_type, reward_value, reward_note, rationale."
+    )
+    ask = brief + "\n" + rules + "\nبر این مبنا یک کمپین فروش و پاداش برای تیم ویزیتور پیشنهاد بده."
     answer = call_gpt(ask, ctx, list(), user.get("role", "unknown"), user.get("full_name", ""))
     if not answer:
         raise HTTPException(status_code=502, detail="سرویس هوش مصنوعی پاسخ نداد — کلید LLM_API_KEY و اینترنت را بررسی کن.")
@@ -69,7 +113,7 @@ def suggest(user: dict = Depends(require_user)):
     conn.commit()
     cur.close()
     conn.close()
-    return dict(suggestion_id=sid, proposal=payload, rationale=rationale)
+    return dict(suggestion_id=sid, proposal=payload, rationale=rationale, market_brief=dict(sales_30d=cur30, prev_30d=prev30))
 
 
 @router.get("/pending")
