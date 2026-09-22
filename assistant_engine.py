@@ -47,11 +47,11 @@ def get_env_live(key, default=""):
     return os.getenv(key, default)
 
 
-def require_user(auth: Optional[str] = Header(default=None)) -> dict:
+def require_user(authorization: Optional[str] = Header(default=None)) -> dict:
     """Real auth: no token means 401. Never a default CEO."""
-    if not auth or not auth.startswith("Bearer "):
+    if not authorization or not authorization.startswith("Bearer "):
         raise HTTPException(status_code=401, detail="Authentication required")
-    return current_user(auth)
+    return current_user(authorization)
 
 
 def build_live_context(conn) -> dict:
