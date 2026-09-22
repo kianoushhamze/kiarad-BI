@@ -1,5 +1,6 @@
 "use client";
 import React, { useState, useEffect } from "react";
+import { authFetch } from "../../lib/secure-api";
 import Link from "next/link";
 
 export default function VisitorKpiPage() {
@@ -7,7 +8,7 @@ export default function VisitorKpiPage() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetch("http://127.0.0.1:8000/operations/visitors/kpis")
+    authFetch("/operations/visitors/kpis")
       .then(r => r.json())
       .then(data => { setKpis(Array.isArray(data) ? data : []); setLoading(false); })
       .catch(() => setLoading(false));

@@ -1,5 +1,6 @@
 "use client";
 import React, { useState, useEffect } from "react";
+import { authFetch } from "../../lib/secure-api";
 import Link from "next/link";
 
 export default function KermanBasesPage() {
@@ -10,7 +11,7 @@ export default function KermanBasesPage() {
   const [cityFilter, setCityFilter] = useState("all");
 
   useEffect(() => {
-    fetch("http://127.0.0.1:8000/operations/customers-list")
+    authFetch("/operations/customers-list")
       .then(r => r.json())
       .then(data => {
         const list = Array.isArray(data) ? data : (data.customers || []);

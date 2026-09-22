@@ -1,3 +1,4 @@
+import { authFetch } from "../../lib/secure-api";
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
@@ -28,9 +29,9 @@ export default function ManagementDashboard() {
     setLoading(true);
     setError("");
     try {
-      const res = await fetch(`http://localhost:8000/dashboard/full?range=${selectedPeriod}`);
+      const res = await authFetch(`/dashboard/full?range=${selectedPeriod}`);
       if (!res.ok) {
-        const fallback = await fetch(`http://localhost:8000/api/dashboard/full?range=${selectedPeriod}`);
+        const fallback = await authFetch(`/api/dashboard/full?range=${selectedPeriod}`);
         if (!fallback.ok) throw new Error("عدم دریافت پاسخ از سرور هلو");
         const json = await fallback.json();
         setData(json);
