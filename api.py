@@ -4,8 +4,10 @@ from proformas import router as proformas_router
 from datetime import date, timedelta
 from typing import Optional
 
+import jwt
 from fastapi import Depends, FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 from sqlalchemy import text
 from sqlalchemy.exc import SQLAlchemyError
 
@@ -41,6 +43,40 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+
+
+# ---------------------------------------------------------------------------
+# Authentication gate: JWT for humans, X-API-Key for automations (n8n)
+# ---------------------------------------------------------------------------
+import os as _os
+_KIARAD_API_KEY = _os.getenv("KIARAD_API_KEY", "")
+_KIARAD_JWT = _os.getenv("KIARAD_JWT_SECRET", "")
+_OPEN_PATHS = ("/", "/health", "/docs", "/redoc", "/openapi.json", "/auth/login")
+
+@app.middleware("http")
+async def auth_gate(request, call_next):
+    if request.method == "OPTIONS":
+        return await call_next(request)
+    path = request.url.path
+    if path in _OPEN_PATHS:
+        return await call_next(request)
+    jwt_secret = _os.environ.get("KIARAD_JWT_SECRET", "")
+    api_key = _os.environ.get("KIARAD_API_KEY", "")
+    auth = request.headers.get("authorization", "")
+    if auth.startswith("Bearer "):
+        if not jwt_secret:
+            print("gate 401 reason=empty-jwt-secret path=" + path)
+        else:
+            try:
+                jwt.decode(auth[7:], jwt_secret, algorithms=["HS256"])
+                return await call_next(request)
+            except Exception:
+                print("gate 401 reason=bad-jwt path=" + path)
+    if api_key and request.headers.get("x-api-key", "") == api_key:
+        return await call_next(request)
+    if not api_key:
+        print("gate 401 reason=empty-api-key path=" + path)
+    return JSONResponse(status_code=401, content={"detail": "Authentication required"})
 
 def run_query(query: str, params: Optional[dict] = None):
     params = params or {}
