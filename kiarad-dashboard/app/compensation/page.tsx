@@ -1,4 +1,6 @@
 "use client";
+import { authFetch } from "../../lib/secure-api";
+
 import React, { useState, useEffect } from "react";
 import { PortalShell } from "@/components/portal-shell";
 
@@ -22,8 +24,8 @@ export default function CompensationPage() {
 
   const fetchVisitors = async () => {
     try {
-      let res = await fetch("/api/operations/salespersons");
-      if (!res.ok) res = await fetch("/api/salespersons");
+      let res = await authFetch("/operations/salespersons");
+      if (!res.ok) res = await authFetch("/salespersons");
       if (res.ok) {
         const data = await res.json();
         setSalespersons(data);
@@ -42,7 +44,7 @@ export default function CompensationPage() {
   const loadContract = async (id: number) => {
     setMsg("");
     try {
-      const res = await fetch(`/api/compensation/contract/${id}`);
+      const res = await authFetch(`/compensation/contract/${id}`);
       const data = await res.json();
       if (data.configured) {
         setHourlyRate(data.hourly_rate || 0);
@@ -92,7 +94,7 @@ export default function CompensationPage() {
     setSaving(true);
     setMsg("");
     try {
-      const res = await fetch(`/api/compensation/contract/${selectedId}`, {
+      const res = await authFetch(`/compensation/contract/${selectedId}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

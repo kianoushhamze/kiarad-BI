@@ -1,4 +1,5 @@
-﻿"use client";
+"use client";
+
 import React, { useState, useEffect } from "react";
 
 export default function CompensationModal({ salesperson, onClose }: { salesperson: any; onClose: () => void }) {

@@ -1,4 +1,4 @@
-﻿export default function MapPage() {
+export default function MapPage() {
   return (
     <div style={{ height: "100vh", background: "#0F172A", padding: "16px", direction: "rtl", fontFamily: "tahoma" }}>
 

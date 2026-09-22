@@ -1,4 +1,6 @@
-﻿"use client";
+"use client";
+import { authFetch } from "../../lib/secure-api";
+
 import React, { useState, useEffect, useRef } from "react";
 
 export default function VoiceReportPage() {
@@ -15,7 +17,7 @@ export default function VoiceReportPage() {
   useEffect(() => { loadHistory(); }, []);
 
   const loadHistory = () => {
-    fetch("http://127.0.0.1:8000/operations/daily-reports-recent")
+    authFetch("/operations/daily-reports-recent")
       .then(r => r.json()).then(d => setHistory(Array.isArray(d) ? d : [])).catch(() => {});
   };
 
@@ -58,7 +60,7 @@ export default function VoiceReportPage() {
     reader.onloadend = async () => {
       const base64Audio = reader.result.split(",");
       try {
-        const res = await fetch("http://127.0.0.1:8000/operations/transcribe-audio", {
+        const res = await authFetch("/operations/transcribe-audio", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ audio_base64: base64Audio })
@@ -77,7 +79,7 @@ export default function VoiceReportPage() {
     if (!parsed) return;
     setLoading(true);
     try {
-      const res = await fetch("http://127.0.0.1:8000/operations/submit-daily-report", {
+      const res = await authFetch("/operations/submit-daily-report", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(parsed)

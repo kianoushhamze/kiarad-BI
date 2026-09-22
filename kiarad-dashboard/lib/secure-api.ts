@@ -1,3 +1,4 @@
+
 import { API_URL } from "./api";
 
 export type SessionUser = {
@@ -35,31 +36,37 @@ export function clearSession() {
   localStorage.removeItem(USER_KEY);
 }
 
-export async function secureApi<T>(path: string, options: RequestInit = {}): Promise<T> {
-  const token = getToken();
+function buildHeaders(options: RequestInit): Record<string, string> {
   const isFormData = typeof FormData !== "undefined" && options.body instanceof FormData;
-  const response = await fetch(`${API_URL}${path}`, {
-    ...options,
-    cache: "no-store",
-    headers: {
-      ...(!isFormData ? { "Content-Type": "application/json" } : {}),
-      ...(options.headers ?? {}),
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
-    },
-  });
+  const extra = (options.headers ?? {}) as Record<string, string>;
+  const headers: Record<string, string> = Object.assign({}, extra);
+  if (!isFormData) {
+    Object.assign(headers, { "Content-Type": "application/json" });
+  }
+  const token = getToken();
+  if (token) {
+    Object.assign(headers, { Authorization: "Bearer " + token });
+  }
+  return headers;
+}
+
+export async function secureApi<T>(path: string, options: RequestInit = {}): Promise<T> {
+  const response = await fetch(API_URL + path, Object.assign({}, options, {
+    headers: buildHeaders(options),
+    cache: "no-store"
+  }));
   if (response.status === 401) clearSession();
   if (!response.ok) {
-    const body = await response.json().catch(() => null);
-    throw new Error(body?.detail ?? `خطای سرویس (${response.status})`);
+    const body = await response.json().catch(function () { return null; });
+    const detail = body && body.detail ? String(body.detail) : "خطای سرویس (" + response.status + ")";
+    throw new Error(detail);
   }
   return response.json();
 }
 
 export async function authFetch(path: string, options: RequestInit = {}): Promise<Response> {
-  const token = getToken();
-  const isFormData = typeof FormData !== "undefined" && options.body instanceof FormData;
-  const headers: Record<string, string> = {};
-  if (!isFormData && options.body) headers["Content-Type"] = "application/json";
-  if (token) headers["Authorization"] = `Bearer ${token}`;
-  return fetch(`${API_URL}${path}`, { ...options, headers: { ...headers, ...((options.headers ?? {}) as Record<string, string>) } });
+  return fetch(API_URL + path, Object.assign({}, options, {
+    headers: buildHeaders(options),
+    cache: "no-store"
+  }));
 }

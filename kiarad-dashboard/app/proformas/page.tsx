@@ -1,4 +1,6 @@
-﻿"use client";
+"use client";
+import { authFetch } from "../../lib/secure-api";
+
 import React, { useState, useEffect } from "react";
 
 export default function ProformaPage() {
@@ -31,12 +33,12 @@ export default function ProformaPage() {
     setMounted(true);
     const headers = getHeaders();
 
-    fetch("http://127.0.0.1:8000/operations/customers-list", { headers })
+    authFetch("/operations/customers-list", { headers })
       .then(res => res.json())
       .then(data => setCustomers(Array.isArray(data) ? data : []))
       .catch(() => {});
 
-    fetch("http://127.0.0.1:8000/operations/products-list", { headers })
+    authFetch("/operations/products-list", { headers })
       .then(res => res.json())
       .then(data => setProducts(Array.isArray(data) ? data : []))
       .catch(() => {});
@@ -45,7 +47,7 @@ export default function ProformaPage() {
   }, []);
 
   const loadHistory = () => {
-    fetch("http://127.0.0.1:8000/operations/proformas/my", { headers: getHeaders() })
+    authFetch("/operations/proformas/my", { headers: getHeaders() })
       .then(res => res.json())
       .then(data => setHistory(Array.isArray(data) ? data : []))
       .catch(() => {});
@@ -57,7 +59,7 @@ export default function ProformaPage() {
       setCreditStatus(null);
       return;
     }
-    fetch(`http://127.0.0.1:8000/operations/customers/${customerId}/credit`, { headers: getHeaders() })
+    authFetch(`/operations/customers/${customerId}/credit`, { headers: getHeaders() })
       .then(res => res.json())
       .then(data => setCreditStatus(data))
       .catch(() => {});
@@ -92,7 +94,7 @@ export default function ProformaPage() {
     setMessage("");
 
     try {
-      const res = await fetch("http://127.0.0.1:8000/operations/proformas", {
+      const res = await authFetch("/operations/proformas", {
         method: "POST",
         headers: getHeaders(),
         body: JSON.stringify({

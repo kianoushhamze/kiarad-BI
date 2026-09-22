@@ -1,5 +1,5 @@
-import { authFetch } from "../../lib/secure-api";
 "use client";
+import { authFetch } from "../../lib/secure-api";
 
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
