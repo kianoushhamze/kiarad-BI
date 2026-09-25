@@ -16,20 +16,29 @@
 body{font-family:var(--font);background:var(--bg);color:var(--text);line-height:1.7;font-size:15px;
 background-image:radial-gradient(700px 420px at 85% -5%,rgba(139,92,246,.13),transparent 65%),
 radial-gradient(600px 400px at 5% 105%,rgba(99,102,241,.10),transparent 60%);background-attachment:fixed}
-.wrap{max-width:1240px;margin:0 auto;padding:24px}
-.top{display:flex;align-items:center;gap:16px;flex-wrap:wrap;margin-bottom:28px}
+.wrap{max-width:1240px;margin:0 auto;padding:20px}
+.top{display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin-bottom:14px}
 .brand{display:flex;align-items:center;gap:12px}
-.brand b{font-weight:800;font-size:19px;display:block}
-.brand small{color:var(--muted);font-weight:200;font-size:11.5px;display:block}
-.chips{display:flex;gap:12px;flex-wrap:wrap;margin-inline-start:auto}
-.chip{border:1px solid var(--stroke);background:var(--surface);border-radius:var(--pill);padding:5px 13px;font-size:12px;color:var(--muted);display:flex;align-items:center;gap:7px;text-decoration:none;transition:border-color .3s,color .3s}
-.chip:hover{border-color:var(--violet);color:var(--text)}
-.dot{width:8px;height:8px;border-radius:50%;background:var(--emerald);box-shadow:0 0 0 3px var(--emerald-soft)}
-h1{font-size:clamp(24px,4vw,34px);font-weight:800;letter-spacing:-.02em;margin-bottom:4px}
+.brand b{font-weight:800;font-size:18px;display:block}
+.brand small{color:var(--muted);font-weight:200;font-size:11px;display:block}
+.topbtns{display:flex;gap:10px;flex-wrap:wrap;margin-inline-start:auto}
+.btn-ghost{background:transparent;border:1px solid var(--stroke);color:var(--violet);font-family:var(--font);font-size:12px;border-radius:var(--pill);padding:6px 16px;cursor:pointer;text-decoration:none;display:inline-block;transition:border-color .3s,background .3s}
+.btn-ghost:hover{border-color:var(--violet);background:var(--violet-soft)}
+h1{font-size:clamp(22px,3.6vw,30px);font-weight:800;letter-spacing:-.02em;margin-bottom:2px}
 h1 span{background:linear-gradient(135deg,var(--violet),#c4b5fd);-webkit-background-clip:text;background-clip:text;color:transparent}
-.sub{color:var(--muted);font-weight:200;margin-bottom:16px}
+.sub{color:var(--muted);font-weight:200;margin-bottom:14px}
 .sub b{color:var(--text);font-weight:600}
-.shortcuts{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:22px}
+
+/* ---- tab bar ---- */
+.tabs{display:flex;gap:8px;flex-wrap:wrap;border:1px solid var(--stroke);background:var(--surface);
+border-radius:var(--pill);padding:6px;margin-bottom:20px}
+.tab{border:none;background:transparent;color:var(--muted);font-family:var(--font);font-size:13px;
+border-radius:var(--pill);padding:7px 18px;cursor:pointer;transition:background .3s,color .3s}
+.tab:hover{color:var(--text)}
+.tab.on{background:linear-gradient(135deg,var(--violet),var(--indigo));color:#fff;font-weight:600}
+.pane{display:none}
+.pane.on{display:block}
+
 .grid{display:grid;gap:16px}
 .g4{grid-template-columns:repeat(4,1fr)}
 .g2{grid-template-columns:2fr 1fr}
@@ -53,28 +62,55 @@ h1 span{background:linear-gradient(135deg,var(--violet),#c4b5fd);-webkit-backgro
 .tag.high{background:rgba(248,113,113,.13);color:#fca5a5}
 .tag.med{background:rgba(217,164,65,.13);color:var(--gold)}
 .tag.low{background:var(--emerald-soft);color:#6ee7b7}
-.tag.soon{background:rgba(139,92,246,.12);color:#c4b5fd}
 .airow p{font-size:13.5px;flex:1}
 .airow p small{display:block;color:var(--muted);font-weight:200;font-size:11.5px}
 .staffrow{display:flex;justify-content:space-between;align-items:center;padding:9px 0;border-bottom:1px solid var(--stroke);font-size:13px}
 .staffrow:last-child{border-bottom:none}
 .staffrow .amt{color:#6ee7b7;font-weight:600}
-.note{background:rgba(217,164,65,.09);border:1px solid rgba(217,164,65,.25);color:#e8d5ab;border-radius:var(--pill);padding:6px 16px;font-size:12px;display:inline-block;margin-bottom:16px}
-footer{margin-top:32px;padding-top:16px;border-top:1px solid var(--stroke);color:var(--muted);font-size:12px;display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;font-weight:200}
-.btn-ghost{background:transparent;border:1px solid var(--stroke);color:var(--violet);font-family:var(--font);font-size:12px;border-radius:var(--pill);padding:6px 16px;cursor:pointer;text-decoration:none;display:inline-block;transition:border-color .3s,background .3s}
-.btn-ghost:hover{border-color:var(--violet);background:var(--violet-soft)}
 .msgbox{border:1px solid rgba(139,92,246,.35);background:rgba(139,92,246,.10);color:#c4b5fd;border-radius:12px;padding:14px 18px;margin-bottom:18px;font-size:13px;display:none;align-items:center;gap:12px;flex-wrap:wrap}
+footer{margin-top:28px;padding-top:16px;border-top:1px solid var(--stroke);color:var(--muted);font-size:12px;display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;font-weight:200}
+
+/* ---- assistant chat ---- */
+.chatwrap{display:grid;grid-template-columns:1fr;gap:14px}
+.chatbox{background:var(--surface);border:1px solid var(--stroke);border-radius:var(--radius);
+display:flex;flex-direction:column;height:62vh;min-height:420px;overflow:hidden}
+.chathead{padding:14px 20px;border-bottom:1px solid var(--stroke);display:flex;align-items:center;gap:10px}
+.chathead .av{width:34px;height:34px;border-radius:50%;background:linear-gradient(135deg,var(--violet),var(--indigo));
+display:grid;place-items:center;color:#fff;font-weight:800;font-size:14px;flex:none}
+.chathead b{font-size:14px;display:block}
+.chathead small{color:var(--muted);font-size:11px;display:block}
+.chatlog{flex:1;overflow-y:auto;padding:18px 20px;display:flex;flex-direction:column;gap:12px}
+.bub{max-width:78%;padding:10px 16px;border-radius:14px;font-size:13.5px;white-space:pre-wrap;word-break:break-word}
+.bub.user{align-self:flex-start;background:linear-gradient(135deg,var(--violet),var(--indigo));color:#fff;border-bottom-right-radius:4px}
+.bub.ai{align-self:flex-end;background:var(--surface2);border:1px solid var(--stroke);border-bottom-left-radius:4px}
+.bub.sys{align-self:center;color:var(--muted);font-size:11.5px;background:transparent;border:none;padding:2px}
+.chatin{display:flex;gap:10px;padding:14px 16px;border-top:1px solid var(--stroke);background:var(--surface2)}
+.chatin textarea{flex:1;background:var(--surface);border:1px solid var(--stroke);color:var(--text);
+font-family:var(--font);font-size:14px;border-radius:12px;padding:10px 14px;resize:none;height:46px;line-height:1.6}
+.chatin textarea:focus{outline:2px solid var(--violet);outline-offset:1px}
+.chatsend{background:linear-gradient(135deg,var(--violet),var(--indigo));color:#fff;border:none;cursor:pointer;
+font-family:var(--font);font-weight:600;font-size:13.5px;border-radius:12px;padding:0 22px;transition:filter .3s}
+.chatsend:hover{filter:brightness(1.15)}
+.chatsend:disabled{opacity:.5;cursor:wait}
+.sugg{display:flex;gap:8px;flex-wrap:wrap;padding:0 16px 14px;background:var(--surface2)}
+.sugg button{background:transparent;border:1px solid var(--stroke);color:var(--muted);font-family:var(--font);
+font-size:11.5px;border-radius:var(--pill);padding:4px 12px;cursor:pointer;transition:all .3s}
+.sugg button:hover{border-color:var(--violet);color:var(--text)}
+
+/* ---- module frames ---- */
+.modframe{width:100%;height:78vh;min-height:520px;border:1px solid var(--stroke);border-radius:var(--radius);
+background:#fff;display:block}
+.modnote{color:var(--muted);font-size:12px;font-weight:200;margin-bottom:12px}
 @media(max-width:1020px){.g4{grid-template-columns:1fr 1fr}.g2{grid-template-columns:1fr}}
-@media(max-width:560px){.g4{grid-template-columns:1fr}.wrap{padding:16px}.chips{margin-inline-start:0}}
+@media(max-width:560px){.g4{grid-template-columns:1fr}.wrap{padding:14px}.topbtns{margin-inline-start:0}}
 </style>
 </head>
 <body>
 <div class="wrap">
-  <div class="note">پنل فرماندهی — اعداد زنده از دیتابیس | این صفحه مرکز فرمان است؛ عملیات‌ها در پنل فعلی و به‌تدریج همین‌جا منتقل می‌شوند</div>
 
   <header class="top">
     <div class="brand">
-      <svg width="52" height="52" viewBox="0 0 64 64" role="img" aria-label="لوگوی کیاراد">
+      <svg width="48" height="48" viewBox="0 0 64 64" role="img" aria-label="لوگوی کیاراد">
         <defs><linearGradient id="kg" x1="0" y1="0" x2="1" y2="1">
         <stop offset="0" stop-color="#6d5df0"/><stop offset="1" stop-color="#2e4a8f"/></linearGradient></defs>
         <circle cx="32" cy="32" r="29" fill="none" stroke="url(#kg)" stroke-width="1.6" opacity=".85"/>
@@ -82,74 +118,125 @@ footer{margin-top:32px;padding-top:16px;border-top:1px solid var(--stroke);color
               fill="none" stroke="url(#kg)" stroke-width="6.5" stroke-linecap="round"/>
         <path d="M41 44 C46 40 50 39 53 40 C52 46 48 49 42 49 C41.6 47.5 41 45.5 41 44 Z" fill="#10b981"/>
       </svg>
-      <div><b>کیاراد شفا اندیش</b><small>تولید و پخش محصولات آرایشی، بهداشتی و درمانی</small></div>
+      <div><b>کیاراد شفا اندیش</b><small>پنل فرماندهی — نسخه‌ی یکدست</small></div>
     </div>
-    <div class="chips">
+    <div class="topbtns">
       <a class="btn-ghost" href="/login" id="lnk-login" style="display:none">ورود به سیستم</a>
       <button class="btn-ghost" id="btn-logout" type="button" style="display:none">خروج از حساب</button>
-      <a class="btn-ghost" href="/management">پنل عملیاتی فعلی</a>
     </div>
   </header>
 
   <h1><span id="gt">سلام</span>، مهندس حمزه</h1>
-  <p class="sub">ایجنت کیاراد آماده است — <b>اعداد این صفحه مستقیم از دیتابیس شرکت می‌آیند</b></p>
+  <p class="sub">ایجنت کیاراد آماده است — <b>همه‌ی ماژول‌ها زیر یک پوسته</b></p>
   <div class="msgbox" id="mb"><span id="mbtext"></span><a class="btn-ghost" href="/login">همین حالا وارد شو</a></div>
 
-  <div class="shortcuts" aria-label="میانبرهای پنل">
-    <a class="chip" href="/tasks">تسک‌ها</a>
-    <a class="chip" href="/crm">CRM و یادآوری‌ها</a>
-    <a class="chip" href="/catalog">کاتالوگ</a>
-    <a class="chip" href="/treasury">خزانه‌داری</a>
-    <a class="chip" href="/visitors">ویزیتورها</a>
-    <a class="chip" href="/personnel">پرسنل</a>
-    <a class="chip" href="/campaigns">کمپین‌ها</a>
-  </div>
+  <nav class="tabs" aria-label="ماژول‌ها">
+    <button class="tab on" data-pane="p-home" type="button">فرماندهی</button>
+    <button class="tab" data-pane="p-ai" type="button">دستیار هوشمند</button>
+    <button class="tab" data-pane="p-tasks" type="button">تسک‌ها</button>
+    <button class="tab" data-pane="p-crm" type="button">CRM</button>
+    <button class="tab" data-pane="p-catalog" type="button">کاتالوگ</button>
+    <button class="tab" data-pane="p-treasury" type="button">خزانه</button>
+    <button class="tab" data-pane="p-visitors" type="button">ویزیتورها</button>
+    <button class="tab" data-pane="p-personnel" type="button">پرسنل</button>
+    <button class="tab" data-pane="p-campaigns" type="button">کمپین‌ها</button>
+  </nav>
 
-  <section class="grid g4">
-    <article class="card kpi"><div class="lbl">کل فروش (ریال)</div><div class="val" id="k1">…</div><span class="trend up">زنده از دیتابیس</span></article>
-    <article class="card kpi"><div class="lbl">مطالبات وصول‌نشده (ریال)</div><div class="val" id="k2">…</div><span class="trend warn">جدول واقعی بدهکاران</span></article>
-    <article class="card kpi"><div class="lbl">ارزش انبار (ریال)</div><div class="val" id="k3">…</div><span class="trend warn" id="k3t">…</span></article>
-    <article class="card kpi"><div class="lbl">پایگاه‌های فعال</div><div class="val" id="k4">…</div><span class="trend up">داروخانه و کلینیک</span></article>
+  <!-- ============ PANE: HOME ============ -->
+  <section class="pane on" id="p-home">
+    <section class="grid g4">
+      <article class="card kpi"><div class="lbl">کل فروش (ریال)</div><div class="val" id="k1">…</div><span class="trend up">زنده از دیتابیس</span></article>
+      <article class="card kpi"><div class="lbl">مطالبات وصول‌نشده (ریال)</div><div class="val" id="k2">…</div><span class="trend warn">جدول واقعی بدهکاران</span></article>
+      <article class="card kpi"><div class="lbl">ارزش انبار (ریال)</div><div class="val" id="k3">…</div><span class="trend warn" id="k3t">…</span></article>
+      <article class="card kpi"><div class="lbl">پایگاه‌های فعال</div><div class="val" id="k4">…</div><span class="trend up">داروخانه و کلینیک</span></article>
+    </section>
+
+    <section class="grid g2" style="margin-top:16px">
+      <article class="card">
+        <h2><svg viewBox="0 0 24 24"><path d="M3 20h18M6 16v-5m5 5V7m5 9v-7m5 7V4" stroke-linecap="round"/></svg>لیست اجرایی هوش مصنوعی</h2>
+        <div class="sub2">پیشنهادهای امروز — مبنا: داده‌ی واقعی</div>
+        <div class="airow"><span class="tag high">فوری</span><p>پیگیری وصول مطالبات — بزرگ‌ترین مانده‌ها در اولویت <small>مبنا: ۹۰ ردیف واقعی</small></p></div>
+        <div class="airow"><span class="tag high">فوری</span><p id="lowmsg">بررسی اقلام زیر حد سفارش… <small>مبنا: انبار واقعی</small></p></div>
+        <div class="airow"><span class="tag med">میانه</span><p>پایگاه‌های بدون خرید اخیر — لیست پیگیری ویزیتورها <small>مبنا: گام 9A</small></p></div>
+        <div class="airow"><span class="tag low">فرصت</span><p>کمپین پیشنهادی هوشمند درمالیست <small>مبنا: campaign_ai</small></p></div>
+      </article>
+      <article class="card">
+        <h2><svg viewBox="0 0 24 24"><path d="M17 20h5v-2a3 3 0 0 0-3-3M9 20H2v-2a5 5 0 0 1 9-3.2M16 3.1a4 4 0 0 1 0 7.8"/></svg>برترین کارشناسان فروش</h2>
+        <div class="sub2">۳۰ روز اخیر — پس از گام 1B کامل می‌شود</div>
+        <div id="staff"><div class="staffrow"><span>در حال خواندن…</span></div></div>
+      </article>
+    </section>
+
+    <section class="grid g2" style="margin-top:16px">
+      <article class="card">
+        <h2><svg viewBox="0 0 24 24"><path d="M21 8 12 3 3 8v8l9 5 9-5V8Z"/></svg>انبار و زنجیره‌ی تأمین</h2>
+        <div class="bignum gold" id="invv">…</div>
+        <p style="color:var(--muted);font-size:12.5px;margin-bottom:10px">ارزش موجودی انبار (ریال)</p>
+        <div class="rowline"><span>ردیف‌های فعال</span><b id="pcnt">…</b></div>
+        <div class="rowline"><span>زیر حد سفارش</span><b id="lowc">…</b></div>
+      </article>
+      <article class="card">
+        <h2><svg viewBox="0 0 24 24"><path d="M12 21C7 16.5 4 13.5 4 10a4.6 4.6 0 0 1 8-3.2A4.6 4.6 0 0 1 20 10c0 3.5-3 6.5-8 11Z"/></svg>سلامت مشتریان و CRM</h2>
+        <div class="bignum" id="ccnt">…</div>
+        <p style="color:var(--muted);font-size:12.5px;margin-bottom:10px">پایگاه ثبت‌شده در شبکه‌ی توزیع</p>
+        <div class="rowline"><span>تحقق تارگت فعال</span><b id="ach">…</b></div>
+        <div class="rowline"><span>وصول‌شده تا امروز</span><b id="coll">…</b></div>
+      </article>
+    </section>
   </section>
 
-  <section class="grid g2" style="margin-top:16px">
-    <article class="card">
-      <h2><svg viewBox="0 0 24 24"><path d="M3 20h18M6 16v-5m5 5V7m5 9v-7m5 7V4" stroke-linecap="round"/></svg>لیست اجرایی هوش مصنوعی</h2>
-      <div class="sub2">پیشنهادهای امروز — مبنا: داده‌ی واقعی</div>
-      <div class="airow"><span class="tag high">فوری</span><p>پیگیری وصول مطالبات — بزرگ‌ترین مانده‌ها در اولویت <small>مبنا: ۹۰ ردیف واقعی</small> <span class="tag soon">عملیات: گام 9D</span></p></div>
-      <div class="airow"><span class="tag high">فوری</span><p id="lowmsg">بررسی اقلام زیر حد سفارش… <small>مبنا: انبار واقعی</small></p></div>
-      <div class="airow"><span class="tag med">میانه</span><p>پایگاه‌های بدون خرید اخیر — لیست پیگیری ویزیتورها <small>مبنا: گام 9A</small> <span class="tag soon">گام 9A</span></p></div>
-      <div class="airow"><span class="tag low">فرصت</span><p>کمپین پیشنهادی هوشمند درمالیست <small>مبنا: campaign_ai</small></p></div>
-    </article>
-
-    <article class="card">
-      <h2><svg viewBox="0 0 24 24"><path d="M17 20h5v-2a3 3 0 0 0-3-3M9 20H2v-2a5 5 0 0 1 9-3.2M16 3.1a4 4 0 0 1 0 7.8"/></svg>برترین کارشناسان فروش</h2>
-      <div class="sub2">۳۰ روز اخیر — پس از گام 1B (فردا) کامل می‌شود</div>
-      <div id="staff"><div class="staffrow"><span>در حال خواندن…</span></div></div>
-    </article>
+  <!-- ============ PANE: AI ASSISTANT ============ -->
+  <section class="pane" id="p-ai">
+    <div class="chatwrap">
+      <div class="chatbox">
+        <div class="chathead">
+          <span class="av">ک</span>
+          <div><b>دستیار ارشد هوش تجاری کیاراد</b><small>متصل به داده‌ی زنده‌ی شرکت — سؤال بپرس، تحلیل بگیر</small></div>
+        </div>
+        <div class="chatlog" id="chatlog">
+          <div class="bub sys">سلام! از فروش و انبار تا بدهکاران و تسک‌ها بپرس.</div>
+        </div>
+        <div class="sugg" id="sugg"></div>
+        <div class="chatin">
+          <textarea id="chatmsg" placeholder="مثلاً: فروش این ماه چقدر بود؟ یا: بدهکارترین مشتری‌ها کی‌اند؟" rows="1"></textarea>
+          <button class="chatsend" id="chatsend" type="button">ارسال</button>
+        </div>
+      </div>
+    </div>
   </section>
 
-  <section class="grid g2" style="margin-top:16px">
-    <article class="card">
-      <h2><svg viewBox="0 0 24 24"><path d="M21 8 12 3 3 8v8l9 5 9-5V8Z"/></svg>انبار و زنجیره‌ی تأمین</h2>
-      <div class="bignum gold" id="invv">…</div>
-      <p style="color:var(--muted);font-size:12.5px;margin-bottom:10px">ارزش موجودی انبار (ریال)</p>
-      <div class="rowline"><span>ردیف‌های فعال</span><b id="pcnt">…</b></div>
-      <div class="rowline"><span>زیر حد سفارش</span><b id="lowc">…</b></div>
-      <div class="rowline"><span>سینک هلو</span><b>ساعتی فعال</b></div>
-    </article>
-    <article class="card">
-      <h2><svg viewBox="0 0 24 24"><path d="M12 21C7 16.5 4 13.5 4 10a4.6 4.6 0 0 1 8-3.2A4.6 4.6 0 0 1 20 10c0 3.5-3 6.5-8 11Z"/></svg>سلامت مشتریان و CRM</h2>
-      <div class="bignum" id="ccnt">…</div>
-      <p style="color:var(--muted);font-size:12.5px;margin-bottom:10px">پایگاه ثبت‌شده در شبکه‌ی توزیع</p>
-      <div class="rowline"><span>تحقق تارگت فعال</span><b id="ach">…</b></div>
-      <div class="rowline"><span>وصول‌شده تا امروز</span><b id="coll">…</b></div>
-      <div class="rowline"><span>قیف و لید</span><b>گام 9B</b></div>
-    </article>
+  <!-- ============ PANE: MODULES (one skin, real pages) ============ -->
+  <section class="pane" id="p-tasks">
+    <p class="modnote">ماژول تسک‌ها زیر پوسته‌ی یکدست — صفحه‌ی واقعی و کاملاً کارا (بازنویسی native با پوسته‌ی نئون: گام 9D)</p>
+    <iframe class="modframe" src="/tasks" title="تسک‌ها"></iframe>
+  </section>
+  <section class="pane" id="p-crm">
+    <p class="modnote">ماژول CRM و یادآوری‌ها — صفحه‌ی واقعی (بازنویسی native: گام 9D)</p>
+    <iframe class="modframe" src="/crm" title="CRM"></iframe>
+  </section>
+  <section class="pane" id="p-catalog">
+    <p class="modnote">کاتالوگ کالا — صفحه‌ی واقعی (بازنویسی native: گام 9D)</p>
+    <iframe class="modframe" src="/catalog" title="کاتالوگ"></iframe>
+  </section>
+  <section class="pane" id="p-treasury">
+    <p class="modnote">خزانه‌داری و نقدینگی — صفحه‌ی واقعی (بازنویسی native: گام 9D)</p>
+    <iframe class="modframe" src="/treasury" title="خزانه‌داری"></iframe>
+  </section>
+  <section class="pane" id="p-visitors">
+    <p class="modnote">پورتال ویزیتورها — صفحه‌ی واقعی (بازنویسی native: گام 9D)</p>
+    <iframe class="modframe" src="/visitors" title="ویزیتورها"></iframe>
+  </section>
+  <section class="pane" id="p-personnel">
+    <p class="modnote">پرسنل و کاربران — صفحه‌ی واقعی (بازنویسی native: گام 9D)</p>
+    <iframe class="modframe" src="/personnel" title="پرسنل"></iframe>
+  </section>
+  <section class="pane" id="p-campaigns">
+    <p class="modnote">کمپین‌ها و پیشنهادهای AI — صفحه‌ی واقعی (بازنویسی native: گام 9D)</p>
+    <iframe class="modframe" src="/campaigns" title="کمپین‌ها"></iframe>
   </section>
 
   <footer>
-    <span>کیاراد شفا اندیش — پنل فرماندهی v2.1 (طرح نئون، داده‌ی زنده)</span>
+    <span>کیاراد شفا اندیش — پنل فرماندهی v3 (یکدست، دستیار زنده)</span>
     <span id="st">در حال اتصال…</span>
   </footer>
 </div>
@@ -162,30 +249,49 @@ footer{margin-top:32px;padding-top:16px;border-top:1px solid var(--stroke);color
   function bill(n){ return fmt(Math.round(Number(n)/10000000)/100) + " میلیارد"; }
   var mb = document.getElementById("mb");
   var mbtext = document.getElementById("mbtext");
-  function showLogin(){ document.getElementById("lnk-login").style.display = "inline-block"; }
-  function showLogout(){ document.getElementById("btn-logout").style.display = "inline-block"; }
-  function fail(msg){ mb.style.display = "flex"; mbtext.textContent = msg; document.getElementById("st").textContent = "اتصال برقرار نشد"; showLogin(); }
+  function fail(msg){ mb.style.display="flex"; mbtext.textContent = msg; document.getElementById("st").textContent="اتصال برقرار نشد";
+    document.getElementById("lnk-login").style.display="inline-block"; }
   var h = new Date().getHours();
-  document.getElementById("gt").textContent = h < 12 ? "صبح بخیر" : (h < 18 ? "وقت بخیر" : "شب بخیر");
+  document.getElementById("gt").textContent = h<12 ? "صبح بخیر" : (h<18 ? "وقت بخیر" : "شب بخیر");
 
+  /* tabs */
+  var tabs = document.querySelectorAll(".tab");
+  tabs.forEach(function(t){
+    t.addEventListener("click", function(){
+      tabs.forEach(function(x){ x.classList.remove("on"); });
+      document.querySelectorAll(".pane").forEach(function(p){ p.classList.remove("on"); });
+      t.classList.add("on");
+      var pane = document.getElementById(t.getAttribute("data-pane"));
+      if (pane){ pane.classList.add("on"); }
+      if (t.getAttribute("data-pane") === "p-ai"){ var inp = document.getElementById("chatmsg"); if(inp){ inp.focus(); } }
+    });
+  });
+
+  /* logout */
   document.getElementById("btn-logout").addEventListener("click", function(){
     try{
-      var cands = [REAL, "kiarad_token", "kiarad_session_user"];
-      for (var i = 0; i < cands.length; i++){ window.localStorage.removeItem(cands[i]); }
+      var cands = [REAL, "kiarad_token", "kiarad_session_user", "kiarad_access_token"];
+      for (var i=0;i<cands.length;i++){ window.localStorage.removeItem(cands[i]); }
     }catch(e){}
     window.location.href = "/login";
   });
 
+  /* auth */
   var tok = "";
-  try{ tok = window.localStorage.getItem(REAL) || window.localStorage.getItem("kiarad_token") || ""; }catch(e){}
-  if (!tok){ fail("برای دیدن اعداد زنده، یک‌بار وارد سیستم شوید (همین یک‌بار کافی است تا توکن ذخیره شود)."); return; }
-  showLogout();
+  try{ tok = window.localStorage.getItem(REAL) || window.localStorage.getItem("kiarad_access_token") || ""; }catch(e){}
+  if (!tok){
+    fail("برای دیدن اعداد و استفاده از دستیار، یک‌بار وارد سیستم شوید.");
+    return;
+  }
+  document.getElementById("btn-logout").style.display = "inline-block";
 
   var api = "http://" + window.location.hostname + ":8000";
   var headers = { "Content-Type": "application/json", "Authorization": "Bearer " + tok };
+
+  /* ===== live numbers ===== */
   fetch(api + "/dashboard/full", { headers: headers, cache: "no-store" })
     .then(function(r){
-      if (r.status === 401){ throw new Error("توکن منقضی شده — دکمه‌ی ورود را بزن، یک‌بار وارد شو و برگرد."); }
+      if (r.status === 401){ throw new Error("توکن منقضی شده — دکمه‌ی ورود را بزن و دوباره وارد شو."); }
       if (!r.ok){ throw new Error("سرویس پاسخ " + r.status + " داد."); }
       return r.json();
     })
@@ -210,7 +316,7 @@ footer{margin-top:32px;padding-top:16px;border-top:1px solid var(--stroke);color
         box.innerHTML = '<div class="staffrow"><span>هنوز فروشی ثبت نشده — فردا با گام 1B پر می‌شود</span></div>';
       } else {
         var out = "";
-        sp.slice(0, 6).forEach(function(x){
+        sp.slice(0,6).forEach(function(x){
           out = out + '<div class="staffrow"><span>' + (x.name || "بدون نام") + '</span><span class="amt">' + bill(x.sales_amount) + '</span></div>';
         });
         box.innerHTML = out;
@@ -218,6 +324,68 @@ footer{margin-top:32px;padding-top:16px;border-top:1px solid var(--stroke);color
       document.getElementById("st").textContent = "اتصال زنده — " + new Date().toLocaleTimeString("fa-IR");
     })
     .catch(function(e){ fail(e.message || "خطای اتصال به بک‌اند."); });
+
+  /* ===== live AI assistant ===== */
+  var log = document.getElementById("chatlog");
+  var inp = document.getElementById("chatmsg");
+  var send = document.getElementById("chatsend");
+  var busy = false;
+
+  var SUGGS = ["فروش این ماه چقدر بود؟", "بدهکارترین مشتری‌ها کی‌اند؟", "وضعیت انبار چطور است؟", "تسک‌های عقب‌افتاده چند تا است؟"];
+  var sg = document.getElementById("sugg");
+  SUGGS.forEach(function(s){
+    var b = document.createElement("button");
+    b.type = "button"; b.textContent = s;
+    b.addEventListener("click", function(){ inp.value = s; doSend(); });
+    sg.appendChild(b);
+  });
+
+  function add(cls, txt){
+    var d = document.createElement("div");
+    d.className = "bub " + cls;
+    d.textContent = txt;
+    log.appendChild(d);
+    log.scrollTop = log.scrollHeight;
+    return d;
+  }
+
+  function doSend(){
+    if (busy){ return; }
+    var msg = (inp.value || "").trim();
+    if (!msg){ return; }
+    inp.value = "";
+    add("user", msg);
+    busy = true;
+    send.disabled = true;
+    send.textContent = "…";
+    var wait = add("sys", "ایجنت در حال تحلیل داده‌ی زنده…");
+    fetch(api + "/assistant/chat", {
+      method: "POST",
+      headers: headers,
+      body: JSON.stringify({ message: msg })
+    })
+    .then(function(r){
+      if (r.status === 401){ throw new Error("توکن منقضی شده — از دکمه‌ی ورود بالا استفاده کن."); }
+      if (r.status === 502){ throw new Error("سرویس هوش مصنوعی پاسخ نداد — کلید و اینترنت را بررسی کن."); }
+      if (!r.ok){ throw new Error("سرویس پاسخ " + r.status + " داد."); }
+      return r.json();
+    })
+    .then(function(d){
+      wait.remove();
+      add("ai", d.answer || "پاسخی نیامد.");
+    })
+    .catch(function(e){
+      wait.remove();
+      add("sys", e.message || "خطا در ارتباط با دستیار.");
+    })
+    .finally(function(){
+      busy = false; send.disabled = false; send.textContent = "ارسال"; inp.focus();
+    });
+  }
+  send.addEventListener("click", doSend);
+  inp.addEventListener("keydown", function(ev){
+    if (ev.key === "Enter" && !ev.shiftKey){ ev.preventDefault(); doSend(); }
+  });
 })();
 </script>
 </body>
