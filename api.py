@@ -694,56 +694,39 @@ def bi_dashboard():
 
 @app.get("/dashboard/full")
 def dashboard_full(range: str = "month"):
-    """اندپوینت یکپارچه، پرسرعت و پایدار داشبورد مدیریتی کیاراد"""
+    # 1A: REAL data only - no hardcoded numbers, no bracket subscripting
     with engine.connect() as conn:
-        # ۱. شاخص‌های کلیدی فروش
-        s_row = conn.execute(text("SELECT COUNT(*) as cnt, COALESCE(SUM(total_amount), 0) as sm FROM sales")).mappings().first()
-        t_amt = conn.execute(text("SELECT target_amount FROM targets WHERE status='active' LIMIT 1")).scalar() or 50000000
-        sales_total = float(s_row["sm"] or 10000000)
-        target_val = float(t_amt)
-        achieve = round((sales_total / target_val * 100), 1) if target_val else 20.0
-
-        # ۲. مشتریان و پایگاه‌ها
-        c_cnt = conn.execute(text("SELECT COUNT(*) FROM customers")).scalar() or 477
-
-        # ۳. موجودی انبار
-        p_cnt = conn.execute(text("SELECT COUNT(*) FROM products")).scalar() or 275
-
-        # ۴. پرسنل و ویزیتورها
-        staff_rows = conn.execute(text("SELECT id, name FROM salespersons ORDER BY id")).mappings().all()
-        staff_list = []
-        for s in staff_rows:
-            staff_list.append({
-                "id": s["id"],
-                "name": s["name"],
-                "sales_amount": sales_total,
-                "target": target_val,
-                "achievement_percent": achieve
-            })
-
-        return {
-            "ceo_kpi": {
-                "total_sales": sales_total,
-                "invoice_count": int(s_row["cnt"] or 3),
-                "customer_count": c_cnt,
-                "total_collected": 3000000.0,
-                "total_debt": 30900000000.0,
-                "active_target": target_val,
-                "achievement_percent": achieve
-            },
-            "staff": {"staff": staff_list},
-            "inventory": {
-                "product_count": p_cnt,
-                "inventory_value": 53100000000.0,
-                "low_stock_count": 4
-            },
-            "recommendations": {
-                "recommendations": [
-                    {"priority": "high", "message": "پیگیری وصول مطالبات معوق بالای ۳۰ روز"},
-                    {"priority": "medium", "message": "تمرکز روی تارگت جدید شامپو ضد ریزش درمالیست"}
-                ]
-            }
-        }
+        s_row = conn.execute(text("SELECT COUNT(*) AS cnt, COALESCE(SUM(total_amount), 0) AS sm FROM sales")).mappings().first()
+        total_sales = float(s_row.get("sm") or 0)
+        invoice_count = int(s_row.get("cnt") or 0)
+        pay_row = conn.execute(text("SELECT COALESCE(SUM(amount), 0) AS pv FROM payments")).mappings().first()
+        total_collected = float(pay_row.get("pv") or 0)
+        debt_row = conn.execute(text("SELECT COALESCE(SUM(balance), 0) AS dv FROM receivable_balances")).mappings().first()
+        total_debt = float(debt_row.get("dv") or 0)
+        if total_debt <= 0:
+            total_debt = max(total_sales - total_collected, 0.0)
+        cust_cnt = int(conn.execute(text("SELECT COUNT(*) FROM customers")).scalar() or 0)
+        prod_cnt = int(conn.execute(text("SELECT COUNT(*) FROM products WHERE is_active = 1")).scalar() or 0)
+        inv_val = float(conn.execute(text("SELECT COALESCE(SUM(price * stock), 0) FROM products WHERE is_active = 1")).scalar() or 0)
+        low_cnt = int(conn.execute(text("SELECT COUNT(*) FROM products WHERE is_active = 1 AND stock IS NOT NULL AND stock <= min_stock")).scalar() or 0)
+        t_row = conn.execute(text("SELECT target_amount FROM targets WHERE status = 'active' ORDER BY id DESC LIMIT 1")).scalar()
+        target_val = float(t_row) if t_row else 0.0
+        achieve = round((total_sales / target_val * 100), 1) if target_val > 0 else 0.0
+        staff_rows = conn.execute(text("SELECT sp.id, sp.name, COALESCE(SUM(s.total_amount), 0) AS sm, COUNT(s.id) AS cnt FROM salespersons sp LEFT JOIN sales s ON s.salesperson_id = sp.id AND s.date >= CURRENT_DATE - INTERVAL '30 days' GROUP BY sp.id, sp.name ORDER BY sm DESC")).mappings().all()
+        staff_list = list()
+        for sp in staff_rows:
+            sp_sales = float(sp.get("sm") or 0)
+            sp_target = target_val if len(staff_rows) == 1 else 0.0
+            sp_ach = round((sp_sales / sp_target * 100), 1) if sp_target > 0 else 0.0
+            staff_list.append(dict(id=sp.get("id"), name=sp.get("name"), sales_amount=sp_sales, target=sp_target, achievement_percent=sp_ach, invoice_count=int(sp.get("cnt") or 0)))
+        recommendations = list()
+        if total_debt > 0:
+            recommendations.append(dict(priority="high", message="مطالبات وصول‌نشده: " + format(total_debt, ",.0f") + " ریال - پیگیری وصول در اولویت است"))
+        if low_cnt > 0:
+            recommendations.append(dict(priority="critical", message=str(low_cnt) + " ردیف کالا به حد سفارش رسیده است"))
+        if target_val > 0:
+            recommendations.append(dict(priority="medium", message="تحقق تارگت فعال: " + str(achieve) + " درصد - باقیمانده: " + format(max(target_val - total_sales, 0), ",.0f") + " ریال"))
+        return dict(ceo_kpi=dict(total_sales=total_sales, invoice_count=invoice_count, customer_count=cust_cnt, total_collected=total_collected, total_debt=total_debt, active_target=target_val, achievement_percent=achieve), staff=dict(staff=staff_list), customers=dict(count=cust_cnt), inventory=dict(product_count=prod_cnt, inventory_value=inv_val, low_stock_count=low_cnt), recommendations=dict(recommendations=recommendations))
 
 @app.get("/dashboard/ceo")
 def ceo_dashboard():
@@ -807,7 +790,7 @@ def get_live_ai_insights(range: str = "month"):
         sales_row = conn.execute(text(f"""
             SELECT COUNT(*) as count, COALESCE(SUM(total_amount), 0) as total 
             FROM sales 
-            WHERE sale_date >= CURRENT_DATE - INTERVAL '{days} days'
+            WHERE date >= CURRENT_DATE - INTERVAL '{days} days'
         """)).mappings().first()
         
         target_val = conn.execute(text("SELECT target_amount FROM targets WHERE status='active' LIMIT 1")).scalar() or 50000000
@@ -816,7 +799,7 @@ def get_live_ai_insights(range: str = "month"):
         
         # ۲. وضعیت انبار و تأمین
         prod_count = conn.execute(text("SELECT COUNT(*) FROM products")).scalar() or 0
-        low_stock = conn.execute(text("SELECT COUNT(*) FROM products WHERE stock_quantity <= 5")).scalar() or 0
+        low_stock = conn.execute(text("SELECT COUNT(*) FROM products WHERE stock <= 5")).scalar() or 0
         
         # ۳. مشتریان و پایگاه‌های کرمان
         cust_count = conn.execute(text("SELECT COUNT(*) FROM customers")).scalar() or 0
