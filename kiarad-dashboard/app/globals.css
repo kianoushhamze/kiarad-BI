@@ -47,3 +47,18 @@ a{color:var(--kviolet)}
 ::-webkit-scrollbar-thumb{background:#2a2a3f;border-radius:8px}
 .bg-purple-600,.bg-violet-600,.bg-indigo-600{background:linear-gradient(135deg,#8b5cf6,#6366f1)!important}
 .text-purple-600,.text-violet-600,.text-indigo-600{color:#a78bfa!important}
+
+/* KIARAD_NEON_SKIN_V2 - auto-generated from real page classes */
+.bg-gray-800{background-color:var(--ksurf)!important}
+.bg-slate-700{background-color:var(--ksurf2)!important}
+.bg-slate-800{background-color:var(--ksurf)!important}
+.bg-slate-900{background-color:var(--ksurf)!important}
+.bg-white{background-color:var(--ksurf)!important}
+.border-white{border-color:var(--kstroke)!important}
+.text-gray-300{color:#6a6a85!important}
+.text-gray-400{color:#6a6a85!important}
+.text-slate-300{color:#6a6a85!important}
+.text-slate-400{color:#6a6a85!important}
+.text-slate-500{color:var(--kmuted)!important}
+.text-slate-600{color:var(--kmuted)!important}
+.text-white{color:var(--ktext)!important}
