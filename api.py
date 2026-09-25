@@ -1007,3 +1007,13 @@ def set_new_target(data: dict):
             VALUES (:sp_id, :title, :period, :focus, :amt, :bonus, 'active')
         """), {"sp_id": sp_id, "title": title, "period": period, "focus": focus, "amt": amt, "bonus": bonus})
     return {"status": "ok", "message": "تارگت با موفقیت فعال شد"}
+
+
+# KIARAD_CORS_OUTERMOST - appended last: outermost middleware, so even 401s carry CORS headers
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
