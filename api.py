@@ -1003,3 +1003,46 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# ---------------------------------------------------------------------------
+# Company monthly target: CEO sets it himself every month (self-service)
+# ---------------------------------------------------------------------------
+@app.get("/targets/company")
+def targets_company():
+    with engine.connect() as conn:
+        rows = conn.execute(text(
+            "SELECT id, title, target_amount, status, start_date, end_date FROM targets "
+            "WHERE salesperson_id IS NULL ORDER BY id DESC LIMIT 24"
+        )).mappings().all()
+        ms = conn.execute(text(
+            "SELECT COALESCE(SUM(total_amount), 0) FROM sales WHERE date >= date_trunc('month', CURRENT_DATE)"
+        )).scalar() or 0
+    items = list()
+    for r in rows:
+        items.append(dict(id=r.get("id"), title=r.get("title"), target_amount=float(r.get("target_amount") or 0),
+                          status=r.get("status"), start_date=str(r.get("start_date") or ""), end_date=str(r.get("end_date") or "")))
+    active_target = 0.0
+    for r in items:
+        if r.get("status") == "active":
+            active_target = r.get("target_amount")
+            break
+    month_sales = float(ms or 0)
+    achieve = round((month_sales / active_target * 100), 1) if active_target > 0 else 0.0
+    return dict(items=items, active_target=active_target, month_sales=month_sales, achievement_percent=achieve)
+
+@app.post("/targets/company")
+def set_company_target(data: dict):
+    amount_toman = float(data.get("amount_toman") or 0)
+    if amount_toman <= 0:
+        raise HTTPException(status_code=422, detail="amount_toman must be positive")
+    rial = amount_toman * 10
+    label = "تارگت ماهانه شرکت - " + date.today().strftime("%Y-%m")
+    with engine.begin() as conn:
+        conn.execute(text(
+            "UPDATE targets SET status = 'archived' WHERE salesperson_id IS NULL AND status = 'active'"
+        ))
+        tid = conn.execute(text(
+            "INSERT INTO targets (salesperson_id, title, period_type, product_focus, target_amount, bonus_reward, status, start_date, end_date) "
+            "VALUES (NULL, :t, 'ماهانه', 'کل سبد کالایی', :amt, 0, 'active', CURRENT_DATE, CURRENT_DATE + INTERVAL '30 days') RETURNING id"
+        ), dict(t=label, amt=rial)).scalar()
+    return dict(status="ok", id=tid, target_rial=rial, title=label)
