@@ -1,0 +1,1 @@
+kiarad-dashboard\app\management\page.tsx

@@ -3,7 +3,6 @@ import { authFetch } from "../../lib/secure-api";
 
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
-import { AssistantChat } from "../../components/assistant-chat";
 
 type Staff = { id?: number; name?: string; sales_amount?: number; target?: number; achievement_percent?: number };
 type Customer = { id?: number; name?: string; city?: string; total_purchase?: number; invoice_count?: number };
@@ -247,7 +246,7 @@ export default function ManagementDashboard() {
         {/* بخش دستیار هوشمند کیاراد */}
         <div style={{ marginTop: "24px" }}>
           <h3 style={{ fontSize: "16px", marginBottom: "12px", color: "#38BDF8" }}>🤖 دستیار هوشمند و تحلیل آنلاین هلو</h3>
-          <AssistantChat />
+          
         </div>
       </main>
     </div>
