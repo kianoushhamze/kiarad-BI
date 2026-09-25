@@ -1,7 +1,4 @@
-.venv/
-__pycache__/
-*.pyc
-logs/# Python
+# Python
 __pycache__/
 *.pyc
 .venv/
@@ -16,8 +13,10 @@ venv/
 secrets/
 *.pem
 *.key
+_quarantine/
 
 # Logs
+logs/
 *.log
 
 # Next.js
@@ -28,7 +27,7 @@ kiarad-dashboard/.next/
 *.sql
 *.dump
 
-# Temporary files
+# Temp files
 *.bak
 *.tmp
 _scripts_archive/
