@@ -711,7 +711,8 @@ def dashboard_full(range: str = "month"):
         low_cnt = int(conn.execute(text("SELECT COUNT(*) FROM products WHERE is_active = 1 AND stock IS NOT NULL AND stock <= min_stock")).scalar() or 0)
         t_row = conn.execute(text("SELECT target_amount FROM targets WHERE status = 'active' ORDER BY id DESC LIMIT 1")).scalar()
         target_val = float(t_row) if t_row else 0.0
-        achieve = round((total_sales / target_val * 100), 1) if target_val > 0 else 0.0
+        month_sales = float(conn.execute(text("SELECT COALESCE(SUM(total_amount), 0) FROM sales WHERE date >= date_trunc('month', CURRENT_DATE)")).scalar() or 0)
+        achieve = round((month_sales / target_val * 100), 1) if target_val > 0 else 0.0
         if achieve > 500:
             achieve = 0.0
         staff_rows = conn.execute(text("SELECT sp.id, sp.name, COALESCE(SUM(s.total_amount), 0) AS sm, COUNT(s.id) AS cnt FROM salespersons sp LEFT JOIN sales s ON s.salesperson_id = sp.id AND s.date >= CURRENT_DATE - INTERVAL '30 days' GROUP BY sp.id, sp.name ORDER BY sm DESC")).mappings().all()
