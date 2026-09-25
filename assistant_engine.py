@@ -64,11 +64,11 @@ def build_live_context(conn) -> dict:
     return dict(
         today=date.today().isoformat(),
         sales_30d=s("SELECT COALESCE(SUM(total_amount),0) FROM sales WHERE date >= CURRENT_DATE - INTERVAL '30 days'"),
-        sales_today=s("SELECT COALESCE(SUM(total_amount),0) FROM sales WHERE date = CURRENT_DATE"),
+        sales_today=s("SELECT COALESCE(SUM(total_amount),0) FROM sales WHERE date >= CURRENT_DATE AND date < CURRENT_DATE + INTERVAL '1 day'"),
         invoices_30d=s("SELECT COUNT(*) FROM sales WHERE date >= CURRENT_DATE - INTERVAL '30 days'"),
         open_tasks=s("SELECT COUNT(*) FROM tasks WHERE status NOT IN ('done','cancelled')"),
         overdue_tasks=s("SELECT COUNT(*) FROM tasks WHERE status NOT IN ('done','cancelled') AND due_date IS NOT NULL AND due_date < CURRENT_DATE"),
-        active_users=s("SELECT COUNT(*) FROM users WHERE is_active = true"),
+        active_users=s("SELECT COUNT(*) FROM users WHERE is_active = 1"),
     )
 
 
