@@ -1,3 +1,4 @@
+@import url('https://fonts.googleapis.com/css2?family=Vazirmatn:wght@200;400;600;800&display=swap');
 @import "tailwindcss";
 
 :root {
@@ -24,3 +25,25 @@ body {
   color: var(--foreground);
   font-family: Tahoma, Arial, sans-serif;
 }
+
+
+/* KIARAD_NEON_SKIN v1 - global dark neon for every module page */
+:root{--kbg:#0a0a12;--ksurf:#12121e;--ksurf2:#181828;--kstroke:rgba(255,255,255,.08);--ktext:#e9e9f4;--kmuted:#9a9ab4;--kviolet:#8b5cf6}
+body{background:var(--kbg)!important;color:var(--ktext)!important;font-family:Vazirmatn,Tahoma,sans-serif!important}
+.bg-white,.bg-gray-50,.bg-slate-50,.bg-gray-100,.bg-slate-100{background-color:var(--ksurf)!important}
+.bg-gray-200,.bg-slate-200,.bg-gray-300,.bg-slate-300{background-color:var(--ksurf2)!important}
+.text-gray-900,.text-gray-800,.text-slate-900,.text-slate-800,.text-black{color:var(--ktext)!important}
+.text-gray-700,.text-gray-600,.text-gray-500,.text-slate-700,.text-slate-600,.text-slate-500{color:var(--kmuted)!important}
+.border-gray-100,.border-gray-200,.border-gray-300,.border-slate-100,.border-slate-200,.border-slate-300{border-color:var(--kstroke)!important}
+input,select,textarea{background-color:var(--ksurf2)!important;color:var(--ktext)!important;border:1px solid var(--kstroke)!important;border-radius:10px}
+input::placeholder,textarea::placeholder{color:#6a6a85}
+table{color:var(--ktext)}
+th{color:var(--kmuted)!important;font-weight:600}
+td,th{border-color:var(--kstroke)!important}
+button{font-family:Vazirmatn,Tahoma,sans-serif}
+a{color:var(--kviolet)}
+::-webkit-scrollbar{width:9px;height:9px}
+::-webkit-scrollbar-track{background:var(--kbg)}
+::-webkit-scrollbar-thumb{background:#2a2a3f;border-radius:8px}
+.bg-purple-600,.bg-violet-600,.bg-indigo-600{background:linear-gradient(135deg,#8b5cf6,#6366f1)!important}
+.text-purple-600,.text-violet-600,.text-indigo-600{color:#a78bfa!important}
