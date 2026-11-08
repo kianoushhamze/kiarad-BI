@@ -2,8 +2,9 @@
 "use client";
 
 import React, { useState, useEffect, useCallback } from "react";
-import Link from "next/link";
 import { secureApi } from "../../lib/secure-api";
+import { PortalShell } from "../../components/portal-shell";
+import { IranDateInput } from "../../components/IranDateInput";
 
 type Campaign = {
   id?: number; title?: string; description?: string;
@@ -22,10 +23,9 @@ type AiProposal = {
   target_amount?: number; reward_type?: string; reward_value?: number; reward_note?: string;
 };
 
-export default function CampaignsPage() {
-  const listInit: Array<Campaign> = new Array();
-  const emptyList: Array<Campaign> = new Array();
-  const lbInit: Array<LbRow> = new Array();
+function CampaignsPageInner() {
+  const listInit: Array<Campaign> = [];
+  const lbInit: Array<LbRow> = [];
   const [campaigns, setCampaigns] = useState<Array<Campaign>>(listInit);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -50,25 +50,27 @@ export default function CampaignsPage() {
   const [aiRationale, setAiRationale] = useState("");
   const [aiMsg, setAiMsg] = useState("");
 
-  const setEmpty = function () { setCampaigns(emptyList); };
-
   const load = useCallback(async function () {
     setLoading(true); setError("");
     try {
-      const data = (await secureApi("/campaigns", { method: "GET" })) as any;
-      const fresh: Array<Campaign> = new Array();
+      const data = await secureApi<Campaign[]>("/campaigns", { method: "GET" });
+      const fresh: Array<Campaign> = [];
       if (Array.isArray(data)) data.forEach(function (c: Campaign) { fresh.push(c); });
       setCampaigns(fresh);
-    } catch (err: any) {
-      const msg = err && err.message ? String(err.message) : "خطای ناشناخته";
-      setEmpty();
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "خطای ناشناخته";
+      setCampaigns([]);
       setError(msg.indexOf("Authentication") !== -1
         ? "ابتدا از صفحه ورود وارد سیستم شوید."
         : "دریافت کمپین‌ها ناموفق بود: " + msg);
     } finally { setLoading(false); }
-  }, new Array());
+  }, []);
 
-  useEffect(function () { load(); }, new Array(load));
+  useEffect(function () {
+    let active = true;
+    void Promise.resolve().then(() => { if (active) void load(); });
+    return () => { active = false; };
+  }, [load]);
 
   const money = function (v?: number) {
     if (!v) return "۰ ریال";
@@ -79,14 +81,14 @@ export default function CampaignsPage() {
     if (aiBusy) return;
     setAiBusy(true); setAiMsg(""); setAiProp(new Object()); setAiRationale(""); setAiSuggId(0);
     try {
-      const data = (await secureApi("/campaigns/ai/suggest", { method: "POST", body: "{}" })) as any;
-      const prop = (data && data.proposal) || new Object();
+      const data = await secureApi<{ proposal?: AiProposal; suggestion_id?: number; rationale?: string }>("/campaigns/ai/suggest", { method: "POST", body: "{}" });
+      const prop = data.proposal || {};
       setAiProp(prop);
       setAiSuggId((data && data.suggestion_id) || 0);
       setAiRationale((data && data.rationale) || "");
       setAiMsg("پیشنهاد آماده شد — بررسی کن و تأیید یا رد کن.");
-    } catch (err: any) {
-      setAiMsg("پیشنهاد ناموفق: " + (err && err.message ? err.message : "خطا"));
+    } catch (err: unknown) {
+      setAiMsg("پیشنهاد ناموفق: " + (err instanceof Error ? err.message : "خطا"));
     } finally { setAiBusy(false); }
   };
 
@@ -101,8 +103,8 @@ export default function CampaignsPage() {
       setAiMsg(action === "approve" ? "✓ کمپین از پیشنهاد هوشمند ساخته شد." : "پیشنهاد رد شد.");
       setAiProp(new Object()); setAiRationale(""); setAiSuggId(0);
       await load();
-    } catch (err: any) {
-      setAiMsg("تصمیم ناموفق: " + (err && err.message ? err.message : "خطا"));
+    } catch (err: unknown) {
+      setAiMsg("تصمیم ناموفق: " + (err instanceof Error ? err.message : "خطا"));
     } finally { setAiBusy(false); }
   };
 
@@ -123,8 +125,8 @@ export default function CampaignsPage() {
       setCTitle(""); setCDesc(""); setCTarget(""); setCRewardValue(""); setCNote("");
       setOkMsg("✓ کمپین در دیتابیس ساخته شد.");
       await load();
-    } catch (err: any) {
-      const msg = err && err.message ? err.message : "خطا";
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "خطا";
       setOkMsg("");
       setError("ساخت کمپین ناموفق بود: " + msg);
     } finally { setSaving(false); }
@@ -134,14 +136,14 @@ export default function CampaignsPage() {
     if (!id) return;
     if (lbFor === id) { setLbFor(0); return; }
     try {
-      const data = (await secureApi("/campaigns/leaderboard?campaign_id=" + id, { method: "GET" })) as any;
-      const fresh: Array<LbRow> = new Array();
+      const data = await secureApi<{ leaderboard?: LbRow[] }>("/campaigns/leaderboard?campaign_id=" + id, { method: "GET" });
+      const fresh: Array<LbRow> = [];
       const raw = data && data.leaderboard;
       if (Array.isArray(raw)) raw.forEach(function (r: LbRow) { fresh.push(r); });
       setLbRows(fresh);
       setLbFor(id);
-    } catch (err: any) {
-      setError("دریافت رتبه‌بندی ناموفق بود: " + (err && err.message ? err.message : "خطا"));
+    } catch (err: unknown) {
+      setError("دریافت رتبه‌بندی ناموفق بود: " + (err instanceof Error ? err.message : "خطا"));
     }
   };
 
@@ -155,8 +157,8 @@ export default function CampaignsPage() {
       });
       setOkMsg("✓ کمپین بسته شد.");
       await load();
-    } catch (err: any) {
-      setError("بستن کمپین ناموفق بود: " + (err && err.message ? err.message : "خطا"));
+    } catch (err: unknown) {
+      setError("بستن کمپین ناموفق بود: " + (err instanceof Error ? err.message : "خطا"));
     } finally { setSaving(false); }
   };
 
@@ -165,17 +167,16 @@ export default function CampaignsPage() {
   const card: React.CSSProperties = { background: "#0F1A30", border: "1px solid #1E293B", borderRadius: "12px", padding: "20px" };
 
   return (
-    <div dir="rtl" style={{ minHeight: "100vh", background: "#090E1A", color: "#F8FAFC", fontFamily: "tahoma, sans-serif", padding: "24px 32px" }}>
+    <div dir="rtl" className="kiarad-campaigns" style={{ minHeight: "auto", background: "transparent", color: "#f0f3ff", padding: "0" }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", borderBottom: "1px solid #1E293B", paddingBottom: "16px", marginBottom: "24px" }}>
         <div>
-          <h1 style={{ fontSize: "20px", fontWeight: "bold", margin: 0, color: "#38BDF8" }}>🎯 کمپین‌های فروش و پاداش</h1>
+          <h1 style={{ fontSize: "20px", fontWeight: "bold", margin: 0, color: "#f0f3ff" }}>🎯 کمپین‌های فروش و پاداش</h1>
           <p style={{ margin: "4px 0 0 0", fontSize: "12px", color: "#94A3B8" }}>پیشرفت زنده از فروش واقعی — تصمیم هوشمند با تأیید انسانی</p>
         </div>
-        <Link href="/management" style={{ background: "#2563EB", color: "#fff", padding: "8px 18px", borderRadius: "8px", textDecoration: "none", fontSize: "13px", fontWeight: "bold" }}>← داشبورد اصلی</Link>
       </div>
 
       {error ? <div style={{ background: "#450A0A", border: "1px solid #7F1D1D", color: "#FCA5A5", padding: "12px 18px", borderRadius: "10px", marginBottom: "16px", fontSize: "13px" }}>⚠️ {error} <button type="button" onClick={function(){load();}} style={{ marginRight: "8px", background: "#7F1D1D", color: "#FCA5A5", border: "none", padding: "3px 12px", borderRadius: "6px", cursor: "pointer" }}>تلاش مجدد</button></div> : null}
-      {okMsg ? <div style={{ background: "#064E3B", border: "1px solid #10B981", color: "#6EE7B7", padding: "12px 18px", borderRadius: "10px", marginBottom: "16px", fontSize: "13px" }}>{okMsg}</div> : null}
+      {okMsg ? <div style={{ background: "#064E3B", border: "1px solid #12a57a", color: "#6EE7B7", padding: "12px 18px", borderRadius: "10px", marginBottom: "16px", fontSize: "13px" }}>{okMsg}</div> : null}
 
       <div style={Object.assign({}, card, { marginBottom: "24px", borderColor: "#334155" })}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "10px" }}>
@@ -202,14 +203,14 @@ export default function CampaignsPage() {
               </div>
             ) : null}
             <div style={{ display: "flex", gap: "8px" }}>
-              <button type="button" onClick={function(){ if (aiSuggId) { decideAi(aiSuggId, "approve"); } }} disabled={aiBusy} style={{ background: "#10B981", color: "#fff", border: "none", padding: "7px 18px", borderRadius: "8px", cursor: "pointer", fontWeight: "bold", fontSize: "12px" }}>✅ تأیید و ساخت کمپین</button>
+              <button type="button" onClick={function(){ if (aiSuggId) { decideAi(aiSuggId, "approve"); } }} disabled={aiBusy} style={{ background: "#12a57a", color: "#fff", border: "none", padding: "7px 18px", borderRadius: "8px", cursor: "pointer", fontWeight: "bold", fontSize: "12px" }}>✅ تأیید و ساخت کمپین</button>
               <button type="button" onClick={function(){ if (aiSuggId) { decideAi(aiSuggId, "reject"); } }} disabled={aiBusy} style={{ background: "#7F1D1D", color: "#FCA5A5", border: "none", padding: "7px 18px", borderRadius: "8px", cursor: "pointer", fontSize: "12px" }}>❌ رد پیشنهاد</button>
             </div>
           </div>
         ) : null}
       </div>
 
-      <div style={{ display: "grid", gridTemplateColumns: "1.1fr 2fr", gap: "24px" }}>
+      <div className="kiarad-campaigns-content" style={{ display: "grid", gridTemplateColumns: "1.1fr 2fr", gap: "24px" }}>
         <div style={card}>
           <h3 style={{ margin: "0 0 14px 0", fontSize: "15px", color: "#38BDF8" }}>➕ ساخت کمپین جدید</h3>
           <form onSubmit={submit} style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
@@ -219,9 +220,9 @@ export default function CampaignsPage() {
               <input type="text" value={cDesc} onChange={function(e){setCDesc(e.target.value);}} style={is} /></div>
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px" }}>
               <div><label style={ls}>از تاریخ:</label>
-                <input type="date" required value={cStart} onChange={function(e){setCStart(e.target.value);}} style={is} /></div>
+                <IranDateInput aria-label="تاریخ شروع شمسی کمپین" required value={cStart} onChange={setCStart} className="rounded-lg border border-white/10 bg-black/20 px-3 py-2 text-white" style={is} /></div>
               <div><label style={ls}>تا تاریخ:</label>
-                <input type="date" required value={cEnd} onChange={function(e){setCEnd(e.target.value);}} style={is} /></div>
+                <IranDateInput aria-label="تاریخ پایان شمسی کمپین" required value={cEnd} onChange={setCEnd} className="rounded-lg border border-white/10 bg-black/20 px-3 py-2 text-white" style={is} /></div>
             </div>
             <div><label style={ls}>هدف فروش در بازه (ریال):</label>
               <input type="number" min="0" required value={cTarget} onChange={function(e){setCTarget(e.target.value);}} style={is} /></div>
@@ -236,7 +237,7 @@ export default function CampaignsPage() {
             </div>
             <div><label style={ls}>توضیح پاداش:</label>
               <input type="text" value={cNote} onChange={function(e){setCNote(e.target.value);}} style={is} /></div>
-            <button type="submit" disabled={saving} style={{ background: saving ? "#065F46" : "#10B981", color: "#fff", border: "none", padding: "10px", borderRadius: "8px", cursor: "pointer", fontWeight: "bold", fontSize: "13px" }}>
+            <button type="submit" disabled={saving} style={{ background: saving ? "#065F46" : "#12a57a", color: "#fff", border: "none", padding: "10px", borderRadius: "8px", cursor: "pointer", fontWeight: "bold", fontSize: "13px" }}>
               {saving ? "در حال ثبت..." : "🎯 ساخت کمپین در دیتابیس"}
             </button>
           </form>
@@ -298,4 +299,8 @@ export default function CampaignsPage() {
       </div>
     </div>
   );
+}
+
+export default function CampaignsPage() {
+  return <PortalShell title="کمپین‌ها" eyebrow="کمپین‌های فروش"><div className="kskin"><CampaignsPageInner /></div></PortalShell>;
 }

@@ -9,7 +9,7 @@ export default function Navbar() {
   const navItems = [
     { label: "داشبورد اصلی", href: "/management" },
     { label: "عملکرد پرسنل", href: "/" },
-    { label: "📊 KPI ویزیتورها", href: "/visitor-kpis" },
+    { label: "📊 KPI ویزیتورها", href: "/management" },
     { label: "🏢 پایگاه‌های کرمان", href: "/kerman-bases" },
     { label: "💬 چت تیمی", href: "/team-chat" },
     { label: "📝 پیش‌فاکتور", href: "/proformas" },

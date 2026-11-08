@@ -1,0 +1,73 @@
+{
+  "unassigned_documents": 762,
+  "erp_writes": false,
+  "local_assignments": 0,
+  "feeds": [
+    {
+      "kind": 2,
+      "documents": 705,
+      "complete": true,
+      "keys": [
+        "Code",
+        "CustomerErpCode",
+        "CustomerName",
+        "Date",
+        "Detail",
+        "ErpCode",
+        "Mobile",
+        "SanadCode",
+        "SaveClsFCount",
+        "SumCard",
+        "SumCheck",
+        "SumDiscount",
+        "SumLevy",
+        "SumNaghd",
+        "SumNesiyeh",
+        "SumPrice",
+        "SumScot",
+        "Time",
+        "Type",
+        "TypeName",
+        "UserName",
+        "comment",
+        "customerCodeC",
+        "sanad_code",
+        "settleDate"
+      ],
+      "explicit_candidate_fields": {}
+    },
+    {
+      "kind": 4,
+      "documents": 57,
+      "complete": true,
+      "keys": [
+        "Code",
+        "CustomerErpCode",
+        "CustomerName",
+        "Date",
+        "Detail",
+        "ErpCode",
+        "Mobile",
+        "SanadCode",
+        "SaveClsFCount",
+        "SumCard",
+        "SumCheck",
+        "SumDiscount",
+        "SumLevy",
+        "SumNaghd",
+        "SumNesiyeh",
+        "SumPrice",
+        "SumScot",
+        "Time",
+        "Type",
+        "TypeName",
+        "UserName",
+        "comment",
+        "customerCodeC",
+        "sanad_code",
+        "settleDate"
+      ],
+      "explicit_candidate_fields": {}
+    }
+  ]
+}

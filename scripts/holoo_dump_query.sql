@@ -1,0 +1,1 @@
+COPY (SELECT holoo_code, column_name FROM digikala_variants LIMIT 30) TO STDOUT WITH (FORMAT csv)

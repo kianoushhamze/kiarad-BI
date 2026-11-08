@@ -1,0 +1,1 @@
+export const MAX_AUTOMATIC_ACCURACY_M = 1;

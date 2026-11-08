@@ -1,0 +1,1 @@
+CREATE TABLE IF NOT EXISTS variant_map (supplier_code TEXT PRIMARY KEY, holoo_code TEXT NOT NULL, note TEXT, updated_at TIMESTAMPTZ NOT NULL DEFAULT now());

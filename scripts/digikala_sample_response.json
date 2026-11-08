@@ -1,0 +1,50 @@
+{
+    "data":  {
+                 "items":  [
+                               {
+                                   "id":  7100001,
+                                   "sku":  "H1001",
+                                   "status":  "active",
+                                   "price":  {
+                                                 "rrp_price":  2900000,
+                                                 "selling_price":  2450000
+                                             },
+                                   "title":  "Test Product A - Size 1",
+                                   "stock":  12
+                               },
+                               {
+                                   "id":  7100002,
+                                   "sku":  "H1002",
+                                   "status":  "active",
+                                   "price":  {
+                                                 "rrp_price":  2200000,
+                                                 "selling_price":  1895000
+                                             },
+                                   "title":  "Test Product B - Size 2",
+                                   "stock":  7
+                               },
+                               {
+                                   "id":  7100003,
+                                   "sku":  "H1003",
+                                   "status":  "inactive",
+                                   "price":  {
+                                                 "rrp_price":  1200000,
+                                                 "selling_price":  990000
+                                             },
+                                   "title":  "Test Product C - Size 1",
+                                   "stock":  0
+                               },
+                               {
+                                   "id":  7100004,
+                                   "sku":  "H1004",
+                                   "status":  "active",
+                                   "price":  {
+                                                 "rrp_price":  3750000,
+                                                 "selling_price":  3750000
+                                             },
+                                   "title":  "Test Product D",
+                                   "stock":  3
+                               }
+                           ]
+             }
+}

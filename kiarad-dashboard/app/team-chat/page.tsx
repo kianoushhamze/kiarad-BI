@@ -1,112 +1,148 @@
 "use client";
 
+import Image from "next/image";
 import React, { useState, useEffect, useCallback, useRef } from "react";
 import Link from "next/link";
-import { secureApi, getSavedUser } from "../../lib/secure-api";
+import { authFetch, secureApi, getSavedUser } from "../../lib/secure-api";
+import { PortalShell } from "../../components/portal-shell";
 
 type Message = {
-  id?: number; sender?: string; message?: string; created_at?: string;
+  id: number;
+  sender: string;
+  message: string;
+  created_at?: string;
+  attachment_name?: string | null;
+  attachment_type?: string | null;
 };
 
+function ChatAttachment({ message }: { message: Message }) {
+  const [url, setUrl] = useState("");
+  useEffect(() => {
+    let alive = true;
+    let objectUrl = "";
+    authFetch("/chat/attachments/" + message.id).then(async (response) => {
+      if (!response.ok) throw new Error("دریافت فایل ناموفق بود");
+      objectUrl = URL.createObjectURL(await response.blob());
+      if (alive) setUrl(objectUrl);
+      else URL.revokeObjectURL(objectUrl);
+    }).catch(() => {});
+    return () => {
+      alive = false;
+      if (objectUrl) URL.revokeObjectURL(objectUrl);
+    };
+  }, [message.id]);
+
+  if (!url) return <div style={{ color: "#c4b5fd", fontSize: 12, marginTop: 8 }}>در حال دریافت پیوست…</div>;
+  if (message.attachment_type?.startsWith("image/")) {
+    return <a href={url} download={message.attachment_name || "image"} style={{ display: "block", marginTop: 8 }}>
+      <Image src={url} alt={message.attachment_name || "تصویر پیوست‌شده"} width={300} height={220} unoptimized style={{ maxWidth: 300, maxHeight: 220, width: "auto", height: "auto", objectFit: "contain", borderRadius: 8 }} />
+    </a>;
+  }
+  return <a href={url} download={message.attachment_name || "file"} style={{ display: "inline-block", marginTop: 8, color: "#ddd6fe", textDecoration: "underline" }}>
+    📎 {message.attachment_name || "دریافت فایل"}
+  </a>;
+}
+
 export default function TeamChatPage() {
-  const listInit: Array<Message> = new Array();
-  const emptyList: Array<Message> = new Array();
-  const [messages, setMessages] = useState<Array<Message>>(listInit);
+  const [messages, setMessages] = useState<Message[]>([]);
   const [text, setText] = useState("");
+  const [file, setFile] = useState<File | null>(null);
   const [loading, setLoading] = useState(false);
   const [fetching, setFetching] = useState(true);
   const [error, setError] = useState("");
   const me = getSavedUser();
-  const myName = me && me.full_name ? me.full_name : "کاربر";
+  const myName = me?.full_name || "کاربر";
+  const isFieldUser = me?.role === "salesperson" || me?.role === "visitor";
   const endRef = useRef<HTMLDivElement>(null);
-  const setEmpty = function () { setMessages(emptyList); };
+  const fileRef = useRef<HTMLInputElement>(null);
+  const cameraRef = useRef<HTMLInputElement>(null);
 
-  const fetchMessages = useCallback(async function () {
+  const fetchMessages = useCallback(async () => {
     try {
-      const data = (await secureApi("/chat/messages?room=general", { method: "GET" })) as any;
-      const fresh: Array<Message> = new Array();
-      const raw = Array.isArray(data) ? data : data && data.messages;
-      if (raw) raw.forEach(function (m: Message) { fresh.push(m); });
-      setMessages(fresh);
+      const data = await secureApi<Message[]>("/chat/messages?room=general", { method: "GET" });
+      setMessages(Array.isArray(data) ? data : []);
       setError("");
-    } catch (err: any) {
-      const msg = err && err.message ? String(err.message) : "خطای ناشناخته";
-      setEmpty();
-      setError(msg.indexOf("Authentication") !== -1
-        ? "ابتدا از صفحه ورود وارد سیستم شوید."
-        : "دریافت پیام‌ها ناموفق بود: " + msg);
-    } finally { setFetching(false); }
-  }, new Array());
+    } catch (err: unknown) {
+      setMessages([]);
+      const message = err instanceof Error ? err.message : "خطای ناشناخته";
+      setError(message.includes("Authentication") ? "ابتدا وارد سامانه شوید." : "دریافت پیام‌ها ناموفق بود: " + message);
+    } finally {
+      setFetching(false);
+    }
+  }, []);
 
-  useEffect(function () {
-    fetchMessages();
-    const interval = setInterval(fetchMessages, 3000);
-    return function () { clearInterval(interval); };
-  }, new Array(fetchMessages));
+  useEffect(() => {
+    let active = true;
+    let interval = 0;
+    void Promise.resolve().then(() => {
+      if (!active) return;
+      void fetchMessages();
+      interval = window.setInterval(() => { if (active) void fetchMessages(); }, 5000);
+    });
+    return () => { active = false; if (interval) window.clearInterval(interval); };
+  }, [fetchMessages]);
 
-  useEffect(function () {
+  useEffect(() => {
     endRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, new Array(messages));
+  }, [messages]);
 
-  const send = async function (e: React.FormEvent) {
-    e.preventDefault();
-    if (!text.trim() || loading) return;
+  const send = async (event: React.FormEvent) => {
+    event.preventDefault();
+    if ((!text.trim() && !file) || loading) return;
     setLoading(true);
     try {
-      await secureApi("/chat/send", {
-        method: "POST",
-        body: JSON.stringify({ sender: myName, message: text, room: "general" })
-      });
+      const body = new FormData();
+      body.set("message", text.trim());
+      body.set("room", "general");
+      if (file) body.set("file", file);
+      await secureApi("/chat/send", { method: "POST", body });
       setText("");
+      setFile(null);
+      if (fileRef.current) fileRef.current.value = "";
+      if (cameraRef.current) cameraRef.current.value = "";
       await fetchMessages();
-    } catch (err: any) {
-      const msg = err && err.message ? String(err.message) : "خطای ناشناخته";
-      setError("ارسال ناموفق بود: " + msg);
-    } finally { setLoading(false); }
+    } catch (err: unknown) {
+      setError("ارسال ناموفق بود: " + (err instanceof Error ? err.message : "خطای ناشناخته"));
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
-    <div style={{ maxWidth: "900px", margin: "20px auto", padding: "20px", background: "#0F172A", borderRadius: "12px", color: "#fff", border: "1px solid #334155", direction: "rtl", fontFamily: "tahoma, sans-serif" }}>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", borderBottom: "1px solid #334155", paddingBottom: "12px", marginBottom: "16px" }}>
-        <h2 style={{ margin: 0, fontSize: "18px" }}>💬 اتاق چت تیمی کیاراد</h2>
-        <div style={{ display: "flex", gap: "10px", alignItems: "center" }}>
-          <span style={{ fontSize: "12px", color: "#94A3B8" }}>به‌عنوان: <strong style={{ color: "#38BDF8" }}>{myName}</strong></span>
-          <Link href="/management" style={{ background: "#1E293B", color: "#38BDF8", border: "1px solid #334155", padding: "6px 14px", borderRadius: "8px", textDecoration: "none", fontSize: "13px", fontWeight: "bold" }}>← داشبورد اصلی</Link>
-        </div>
-      </div>
+    <PortalShell title="چت تیمی کیاراد" eyebrow="گفت‌وگوی مشترک کارکنان و ویزیتورها" actions={
+      <Link href={isFieldUser ? "/newdash_online.html" : "/management"} className="rounded-lg border border-violet-800/70 bg-violet-950/60 px-3.5 py-2 text-xs font-bold text-violet-200">بازگشت به داشبورد</Link>
+    }>
+    <div style={{ maxWidth: 1000, margin: "0 auto", padding: 16, color: "#f0f3ff", direction: "rtl" }}>
 
-      {error ? (
-        <div style={{ background: "#450A0A", border: "1px solid #7F1D1D", color: "#FCA5A5", padding: "12px 16px", borderRadius: "10px", marginBottom: "14px", fontSize: "13px" }}>
-          ⚠️ {error} <button type="button" onClick={function(){fetchMessages();}} style={{ marginRight: "8px", background: "#7F1D1D", color: "#FCA5A5", border: "none", padding: "3px 12px", borderRadius: "6px", cursor: "pointer" }}>تلاش مجدد</button>
-        </div>
-      ) : null}
+      {error ? <div role="alert" style={{ background: "#351321", border: "1px solid #7f1d3c", color: "#fda4af", padding: 12, borderRadius: 10, marginBottom: 12, fontSize: 13 }}>
+        {error} <button type="button" onClick={() => void fetchMessages()} style={{ marginRight: 8, background: "transparent", color: "inherit", border: "1px solid currentColor", padding: "4px 10px", borderRadius: 6, cursor: "pointer" }}>تلاش دوباره</button>
+      </div> : null}
 
-      <div style={{ height: "450px", overflowY: "auto", padding: "12px", background: "#1E293B", borderRadius: "8px", display: "flex", flexDirection: "column", gap: "10px" }}>
-        {fetching ? <div style={{ textAlign: "center", color: "#94A3B8", marginTop: "180px" }}>در حال دریافت پیام‌ها...</div> : null}
-        {!fetching && messages.length === 0 && !error ? (
-          <div style={{ textAlign: "center", color: "#94A3B8", marginTop: "180px" }}>هنوز پیامی در این اتاق نیست — اولین پیام را بفرست.</div>
-        ) : null}
-        {messages.map(function (m, idx) {
-          const mine = m.sender === myName;
-          return (
-            <div key={idx} style={{ alignSelf: mine ? "flex-end" : "flex-start", background: mine ? "#2563EB" : "#334155", padding: "8px 14px", borderRadius: "8px", maxWidth: "75%" }}>
-              <div style={{ fontSize: "11px", color: "#CBD5E1", marginBottom: "4px" }}>{m.sender}{m.created_at ? " • " + String(m.created_at).slice(11, 16) : ""}</div>
-              <div style={{ fontSize: "14px" }}>{m.message}</div>
-            </div>
-          );
+      <div aria-live="polite" style={{ height: 460, overflowY: "auto", padding: 14, background: "#14131b", borderRadius: 12, display: "flex", flexDirection: "column", gap: 10 }}>
+        {fetching ? <div style={{ textAlign: "center", color: "#94a3b8", marginTop: 180 }}>در حال دریافت پیام‌ها…</div> : null}
+        {!fetching && messages.length === 0 && !error ? <div style={{ textAlign: "center", color: "#94a3b8", marginTop: 180 }}>هنوز پیامی نیست؛ گفت‌وگو را شروع کنید.</div> : null}
+        {messages.map((message) => {
+          const mine = message.sender === myName;
+          return <article key={message.id} style={{ alignSelf: mine ? "flex-end" : "flex-start", background: mine ? "#34205a" : "#262431", border: "1px solid #393548", padding: "9px 14px", borderRadius: 12, maxWidth: "78%", overflowWrap: "anywhere" }}>
+            <div style={{ fontSize: 11, color: "#c4b5fd", marginBottom: 4 }}>{message.sender}{message.created_at ? " • " + String(message.created_at).slice(11, 16) : ""}</div>
+            {message.message ? <div style={{ whiteSpace: "pre-wrap", fontSize: 14 }}>{message.message}</div> : null}
+            {message.attachment_name ? <ChatAttachment message={message} /> : null}
+          </article>;
         })}
         <div ref={endRef} />
       </div>
 
-      <form onSubmit={send} style={{ display: "flex", gap: "10px", marginTop: "14px" }}>
-        <input type="text" value={text} onChange={function(e){setText(e.target.value);}}
-          placeholder="پیام خود را بنویسید..."
-          style={{ flex: 1, background: "#1E293B", color: "#fff", border: "1px solid #475569", borderRadius: "6px", padding: "8px 14px", outline: "none" }} />
-        <button type="submit" disabled={loading}
-          style={{ background: loading ? "#065F46" : "#10B981", color: "#fff", border: "none", padding: "8px 20px", borderRadius: "6px", cursor: "pointer", fontWeight: "bold" }}>
-          {loading ? "..." : "ارسال"}
-        </button>
+      <form onSubmit={send} style={{ display: "flex", gap: 9, marginTop: 14, alignItems: "center", flexWrap: "wrap" }}>
+        <input type="text" value={text} maxLength={4000} onChange={(event) => setText(event.target.value)} placeholder="پیام خود را بنویسید…" style={{ flex: "1 1 300px", background: "#17161f", color: "#fff", border: "1px solid #393548", borderRadius: 9, padding: "11px 14px", outline: "none" }} />
+        <input ref={fileRef} type="file" accept="image/jpeg,image/png,image/gif,image/webp,.pdf,.docx,.xlsx,.csv,.txt" hidden onChange={(event) => setFile(event.target.files?.[0] || null)} />
+        <input ref={cameraRef} type="file" accept="image/*" capture="environment" hidden onChange={(event) => setFile(event.target.files?.[0] || null)} />
+        <button type="button" title="گرفتن عکس با دوربین" aria-label="گرفتن عکس با دوربین" onClick={() => cameraRef.current?.click()} style={{ background: "#201a30", color: "#c4b5fd", border: "1px solid #493080", padding: "10px 13px", borderRadius: 9, cursor: "pointer", fontSize: 16, lineHeight: 1 }}>📷</button>
+        <button type="button" onClick={() => fileRef.current?.click()} style={{ background: "#201a30", color: "#c4b5fd", border: "1px solid #493080", padding: "10px 13px", borderRadius: 9, cursor: "pointer" }}>پیوست عکس یا فایل</button>
+        <button type="submit" disabled={loading || (!text.trim() && !file)} style={{ background: loading ? "#42305d" : "#752cf2", color: "#fff", border: 0, padding: "10px 20px", borderRadius: 9, cursor: "pointer", fontWeight: 700 }}>{loading ? "در حال ارسال…" : "ارسال"}</button>
+        {file ? <span style={{ flexBasis: "100%", color: "#c4b5fd", fontSize: 12 }}>پیوست: {file.name} ({(file.size / 1024 / 1024).toFixed(1)} مگابایت) <button type="button" onClick={() => { setFile(null); if (fileRef.current) fileRef.current.value = ""; if (cameraRef.current) cameraRef.current.value = ""; }} style={{ color: "#fda4af", background: "transparent", border: 0, cursor: "pointer" }}>حذف</button></span> : null}
       </form>
+      <div style={{ color: "#64748b", fontSize: 11, marginTop: 8 }}>تصویر، پی‌دی‌اف، ورد، اکسل، سی‌اس‌وی و متن؛ حداکثر ۱۰ مگابایت برای هر فایل.</div>
     </div>
+    </PortalShell>
   );
 }

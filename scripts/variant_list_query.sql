@@ -1,0 +1,1 @@
+COPY (SELECT dkp_id, left(title, 70) FROM digikala_variants ORDER BY dkp_id) TO STDOUT WITH (FORMAT csv)

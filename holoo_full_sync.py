@@ -7,6 +7,7 @@ import json
 import time
 import urllib.request
 from datetime import date, timedelta
+from iran_time import iran_now, iran_today
 
 ROOT = r"D:\project\kiaradbi"
 
@@ -56,7 +57,7 @@ def invoice_sync():
     base, token = holoo_login()
     headers = dict()
     headers.setdefault("Authorization", token)
-    today = date.today()
+    today = iran_today()
     start = today - timedelta(days=90)
     win_start = start.isoformat()
     win_end = today.isoformat()
@@ -70,7 +71,7 @@ def invoice_sync():
 
 
 def main():
-    now_str = time.strftime("%Y-%m-%d %H:%M:%S")
+    now_str = iran_now().strftime("%Y-%m-%d %H:%M:%S")
     try:
         d = backend_sync()
         print("[" + now_str + "] customers/products sync: " + json.dumps(d, ensure_ascii=False)[:180], flush=True)

@@ -9,6 +9,7 @@ from sqlalchemy import text, func
 
 import db
 from models import Sale, SaleItem, Customer, Product, InventoryReservation, SalesPerson
+from iran_time import iran_today
 from operations import current_user
 from digikala_api import DigikalaClient
 
@@ -46,7 +47,7 @@ def get_visitor_invoices(db_session: Session = Depends(get_db), user: dict = Dep
         query = query.filter(Sale.salesperson_id == salesperson_id)
     
     sales_data = query.order_by(Sale.id.desc()).all()
-    today = date.today()
+    today = iran_today()
     
     results = []
     for sale, customer in sales_data:
@@ -87,7 +88,7 @@ def get_overdue_summary(db_session: Session = Depends(get_db), user: dict = Depe
     if role == "salesperson" and salesperson_id:
         query = query.filter(Sale.salesperson_id == salesperson_id)
         
-    today = date.today()
+    today = iran_today()
     all_sales = query.all()
     
     overdue_invoices = []
@@ -184,7 +185,7 @@ def create_pre_invoice(payload: CreatePreInvoiceRequest, db_session: Session = D
     new_sale = Sale(
         customer_id=payload.customer_id,
         salesperson_id=salesperson_id,
-        date=date.today(),
+        date=iran_today(),
         total_amount=total_amount
     )
     db_session.add(new_sale)

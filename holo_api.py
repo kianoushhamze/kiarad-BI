@@ -32,7 +32,7 @@ def login():
 
     result = response.json()
 
-    print("Login response:", result)
+    print("Holoo session received")
 
     return result["Login"]["Token"]
 

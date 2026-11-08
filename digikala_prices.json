@@ -1,0 +1,26 @@
+{
+    "H1004":  {
+                  "updated":  "2026-10-30 16:52",
+                  "price":  "3750000",
+                  "source":  "simulated",
+                  "stock":  "3"
+              },
+    "H1002":  {
+                  "updated":  "2026-10-30 16:52",
+                  "price":  "1895000",
+                  "source":  "simulated",
+                  "stock":  "7"
+              },
+    "H1003":  {
+                  "updated":  "2026-10-30 16:52",
+                  "price":  "990000",
+                  "source":  "simulated",
+                  "stock":  "0"
+              },
+    "H1001":  {
+                  "updated":  "2026-10-30 16:52",
+                  "price":  "2450000",
+                  "source":  "simulated",
+                  "stock":  "12"
+              }
+}

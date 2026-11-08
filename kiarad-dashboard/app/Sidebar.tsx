@@ -23,7 +23,7 @@ export default function Sidebar() {
       items: [
         { label: "ثبت پیش‌فاکتور", href: "/proformas", icon: "📝" },
         { label: "کمپین‌های فروش و پاداش", href: "/campaigns", icon: "🎯", badge: "هوشمند" },
-        { label: "کارنامه KPI ویزیتورها", href: "/visitor-kpis", icon: "📈" },
+        { label: "کارنامه KPI ویزیتورها", href: "/management", icon: "📈" },
         { label: "کل پایگاه‌های کرمان", href: "/kerman-bases", icon: "🏢" },
         { label: "نقشه آنلاین کرمان", href: "/map", icon: "🗺️" }
       ]

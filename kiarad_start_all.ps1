@@ -10,7 +10,18 @@ Write-Host "`n[1/4] Docker engine..." -ForegroundColor Cyan
 docker ps 2>$null | Out-Null
 if ($LASTEXITCODE -ne 0) {
   Write-Host "  engine down - launching Docker Desktop..."
-  Start-Process "C:\Program Files\Docker\Docker\Docker Desktop.exe"
+  $desktopCandidates = @(
+    (Join-Path $env:LOCALAPPDATA "Programs\DockerDesktop\Docker Desktop.exe"),
+    "C:\Program Files\Docker\Docker\Docker Desktop.exe"
+  )
+  $desktopPath = $desktopCandidates | Where-Object { Test-Path $_ } | Select-Object -First 1
+  if ($desktopPath) {
+    Start-Process -FilePath $desktopPath -WindowStyle Hidden
+  } else {
+    Write-Host "  داکر دسکتاپ پیدا نشد؛ نصبش کن یا دستی بازش کن" -ForegroundColor Red
+    Read-Host "Enter to close"
+    exit 1
+  }
   $ready = $false
   foreach ($i in 1..24) {
     Start-Sleep -Seconds 5
@@ -23,8 +34,8 @@ if ($LASTEXITCODE -ne 0) {
 Write-Host "  DOCKER_OK" -ForegroundColor Green
 
 Write-Host "`n[2/4] Postgres container..." -ForegroundColor Cyan
-$st = docker inspect -f "{{.State.Running}}" kiarad-postgres 2>$null
-if ($st -ne "true") { docker start kiarad-postgres | Out-Null; Write-Host "  container started" } else { Write-Host "  already running" }
+docker compose up -d postgres | Out-Null
+if ($LASTEXITCODE -ne 0) { Write-Host "  پُستگرس اجرا نشد؛ تنظیمات پروژه را بررسی کن" -ForegroundColor Red; Read-Host "Enter to close"; exit 1 }
 $pg = $null; $t = 0
 while (-not $pg -and $t -lt 12) {
   Start-Sleep -Seconds 5
@@ -39,7 +50,7 @@ if (Get-NetTCPConnection -State Listen -LocalPort 8000 -ErrorAction SilentlyCont
   Write-Host "  already listening"
 } else {
   Write-Host "  starting backend..."
-  Start-Process -WindowStyle Minimized -FilePath "cmd.exe" -ArgumentList '/c cd /d D:\project\kiaradbi && .venv\Scripts\python.exe -m uvicorn api:app --host 0.0.0.0 --port 8000 --env-file .env >> backend_service.log 2>&1'
+  Start-Process -WindowStyle Hidden -FilePath "D:\project\kiaradbi\.venv\Scripts\python.exe" -WorkingDirectory "D:\project\kiaradbi" -ArgumentList @('-m','uvicorn','api:app','--host','127.0.0.1','--port','8000','--env-file','.env') -RedirectStandardOutput "D:\project\kiaradbi\backend_service.log" -RedirectStandardError "D:\project\kiaradbi\backend_service_error.log"
   $t = 0
   while (-not (Get-NetTCPConnection -State Listen -LocalPort 8000 -ErrorAction SilentlyContinue) -and $t -lt 12) {
     Start-Sleep -Seconds 5; $t++
@@ -55,7 +66,18 @@ if (Get-NetTCPConnection -State Listen -LocalPort 3000 -ErrorAction SilentlyCont
   Write-Host "  already listening"
 } else {
   Write-Host "  starting frontend..."
-  Start-Process -WindowStyle Minimized -FilePath "cmd.exe" -ArgumentList '/c cd /d D:\project\kiaradbi\kiarad-dashboard && npm run dev -- -H 0.0.0.0 > frontend.log 2>&1'
+  Push-Location "D:\project\kiaradbi\kiarad-dashboard"
+  try {
+    & node scripts/prepare-standalone.mjs
+    if ($LASTEXITCODE -ne 0) { throw "آماده‌سازی نسخهٔ مستقل انجام نشد؛ ابتدا داشبورد را بسازید." }
+    $panelPreviousHostname = $env:HOSTNAME
+    $panelPreviousPort = $env:PORT
+    try {
+      $env:HOSTNAME = "0.0.0.0"
+      $env:PORT = "3000"
+      Start-Process -WindowStyle Hidden -FilePath (Get-Command node).Source -WorkingDirectory "D:\project\kiaradbi\kiarad-dashboard" -ArgumentList @('.next/standalone/server.js') -RedirectStandardOutput "D:\project\kiaradbi\frontend.log" -RedirectStandardError "D:\project\kiaradbi\frontend_error.log"
+    } finally { $env:HOSTNAME=$panelPreviousHostname; $env:PORT=$panelPreviousPort }
+  } finally { Pop-Location }
   $t = 0
   while (-not (Get-NetTCPConnection -State Listen -LocalPort 3000 -ErrorAction SilentlyContinue) -and $t -lt 18) {
     Start-Sleep -Seconds 5; $t++

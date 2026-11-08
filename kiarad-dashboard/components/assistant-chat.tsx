@@ -3,10 +3,15 @@
 import React, { useState, useEffect, useRef } from "react";
 import { secureApi } from "../lib/secure-api";
 
+function currentTimeMs() {
+  return Date.now();
+}
+
 type Msg = {
   sender: "user" | "ai";
   text: string;
   elapsed?: number;
+  action?: { label: string; href: string };
 };
 
 type HistoryItem = {
@@ -22,26 +27,27 @@ type HistoryReply = {
 type ChatReply = {
   answer?: string;
   mode?: string;
+  action?: { label: string; href: string };
 };
 
-const QUICK_QUESTIONS = new Array(
+const QUICK_QUESTIONS = [
   "گزارش کلی وضعیت شرکت",
   "تحلیل فروش ماه و پیشنهاد عملی",
   "وضعیت نقدینگی و چک‌های در جریان",
   "برنامه محتوای اینستاگرام این هفته"
-);
+];
 
 function makeWelcome(): Array<Msg> {
-  const out: Array<Msg> = new Array();
+  const out: Array<Msg> = [];
   out.push({
     sender: "ai",
-    text: "سلام کیانوش! من دستیار ارشد هوش تجاری کیاراد هستم و به داده‌های زنده‌ی شرکت وصل‌ام. هر سوالی داری بپرس: از تحلیل فروش و نقدینگی تا سناریوی ریلز و برنامه‌ریزی تیم."
+    text: "سلام! دربارهٔ فروش، کالاها، مشتریان، خزانه، حقوق و کارها بپرس؛ گزارش مرتبط در محدودهٔ دسترسی تو خوانده می‌شود. نام فارسی یا لاتین کالا را بگو. زمان و محدودیت منبع در تحلیل مشخص می‌شود؛ برای تغییر تارگت پیش‌نویس قابل تأیید می‌سازم."
   });
   return out;
 }
 
 export function AssistantChat() {
-  const [messages, setMessages] = useState<Array<Msg>>(makeWelcome());
+  const [messages, setMessages] = useState<Array<Msg>>(makeWelcome);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
@@ -51,22 +57,19 @@ export function AssistantChat() {
 
   useEffect(
     function () {
-      let timer: any;
+      let timer: ReturnType<typeof setInterval> | undefined;
       if (loading) {
-        setElapsedSeconds(0);
         timer = setInterval(function () {
           setElapsedSeconds(function (prev: number) {
             return prev + 1;
           });
         }, 1000);
-      } else {
-        setElapsedSeconds(0);
       }
       return function () {
-        clearInterval(timer);
+        if (timer !== undefined) clearInterval(timer);
       };
     },
-    new Array(loading)
+    [loading]
   );
 
   const scrollToBottom = function () {
@@ -75,7 +78,7 @@ export function AssistantChat() {
 
   useEffect(function () {
     scrollToBottom();
-  }, new Array(messages, loading));
+  }, [messages, loading]);
 
   useEffect(
     function () {
@@ -89,7 +92,7 @@ export function AssistantChat() {
         window.removeEventListener("keydown", handleKeyDown);
       };
     },
-    new Array(isFullScreen)
+    [isFullScreen]
   );
 
   useEffect(function () {
@@ -99,7 +102,7 @@ export function AssistantChat() {
           method: "GET"
         })) as HistoryReply;
         if (data.messages && data.messages.length > 0) {
-          const loaded: Array<Msg> = new Array();
+          const loaded: Array<Msg> = [];
           data.messages.forEach(function (m: HistoryItem) {
             loaded.push({
               sender: m.role === "assistant" ? "ai" : "user",
@@ -117,7 +120,7 @@ export function AssistantChat() {
       }
     };
     run();
-  }, new Array());
+  }, []);
 
   const sendMessage = async function (queryText?: string) {
     const textToSend = (queryText || input).trim();
@@ -129,18 +132,20 @@ export function AssistantChat() {
       return next;
     });
     if (!queryText) setInput("");
+    setElapsedSeconds(0);
     setLoading(true);
-    const started = Date.now();
+    const started = currentTimeMs();
     try {
       const data = (await secureApi("/assistant/chat", {
         method: "POST",
         body: JSON.stringify({ message: textToSend })
       })) as ChatReply;
-      const elapsed = Math.round((Date.now() - started) / 1000);
+      const elapsed = Math.round((currentTimeMs() - started) / 1000);
       const aiMsg: Msg = {
         sender: "ai",
         text: data.answer || "پاسخی دریافت نشد.",
         elapsed: elapsed
+        ,action: data.action
       };
       setMessages(function (prev) {
         const next = prev.slice();
@@ -148,8 +153,8 @@ export function AssistantChat() {
         return next;
       });
       if (data.mode) setMode(data.mode);
-    } catch (err: any) {
-      let detail = err && err.message ? String(err.message) : "خطای ناشناخته";
+    } catch (err: unknown) {
+      let detail = err instanceof Error ? err.message : "خطای ناشناخته";
       if (detail.indexOf("Authentication") !== -1) {
         detail = "ابتدا از صفحه ورود وارد سیستم شوید.";
       }
@@ -200,7 +205,7 @@ export function AssistantChat() {
             دستیار ارشد هوش تجاری کیاراد
           </span>
           <span style={{ fontSize: "11px", background: "#065F46", color: "#6EE7B7", padding: "2px 8px", borderRadius: "10px" }}>
-            {mode === "gpt_free_v2" ? "● GPT زنده + داده‌های BI" : "● آماده"}
+            {mode.startsWith("verified_") ? "● پاسخ مستند از گزارش" : mode === "target_draft" ? "● پیش‌نویس؛ ثبت نشده" : "● گزارش در محدودهٔ دسترسی"}
           </span>
         </div>
         <button
@@ -232,6 +237,9 @@ export function AssistantChat() {
               }}
             >
               {m.text}
+              {m.action && /^\/(catalog|person-targets|compensation|assistant-actions)(\?|$)/.test(m.action.href) && !m.action.href.startsWith("//") ? (
+                <a href={m.action.href} target="_blank" rel="noopener noreferrer" style={{display:"block",marginTop:12,color:"#7dd3fc",textDecoration:"underline"}}>{m.action.label}</a>
+              ) : null}
               {m.sender === "ai" && m.elapsed && m.elapsed > 0 ? (
                 <div style={{ marginTop: "8px", paddingTop: "6px", borderTop: "1px solid rgba(255,255,255,0.1)", fontSize: "11px", color: "#FBBF24" }}>
                   ⏱ زمان پاسخ: {m.elapsed} ثانیه

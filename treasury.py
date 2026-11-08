@@ -1,5 +1,5 @@
-from calendar import monthrange
 from datetime import date, timedelta
+from decimal import Decimal, InvalidOperation
 import hashlib
 from io import BytesIO
 import posixpath
@@ -10,21 +10,29 @@ import xml.etree.ElementTree as ET
 from zipfile import BadZipFile, ZipFile
 
 from fastapi import APIRouter, Depends, Header, HTTPException, Query, Request, status
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy import text
 
 from db import engine
-from operations import current_user
+from iran_time import iran_today
+from operations import current_user, role_has_module_permission
+from treasury_finance import OPEN_STATUSES, PAYABLE_TYPES, RECEIVABLE_TYPES, month_of, recurring_dates
 
 
 router = APIRouter(prefix="/treasury", tags=["treasury"])
 TREASURY_ROLES = {"ceo", "finance"}
-PERSIAN_DIGITS = str.maketrans("????????????????????", "01234567890123456789")
+PERSIAN_DIGITS = str.maketrans("۰۱۲۳۴۵۶۷۸۹٠١٢٣٤٥٦٧٨٩", "01234567890123456789")
 
 
 def require_treasury_access(user: dict = Depends(current_user)) -> dict:
     if user["role"] not in TREASURY_ROLES:
         raise HTTPException(status_code=403, detail="Treasury access required")
+    return user
+
+
+def require_debtors_access(user: dict = Depends(current_user)) -> dict:
+    if user["role"] not in TREASURY_ROLES and not role_has_module_permission(user["role"], "debtors", "can_read"):
+        raise HTTPException(status_code=403, detail="Debtor report access required")
     return user
 
 
@@ -34,14 +42,18 @@ def require_ceo_approval(user: dict = Depends(current_user)) -> dict:
     return user
 
 
-class CashAccountCreate(BaseModel):
+class TreasuryInput(BaseModel):
+    model_config = ConfigDict(allow_inf_nan=False)
+
+
+class CashAccountCreate(TreasuryInput):
     name: str = Field(min_length=2, max_length=150)
     account_type: str
     current_balance: float = 0
     minimum_reserve: float = Field(default=0, ge=0)
 
 
-class FinancialDocumentCreate(BaseModel):
+class FinancialDocumentCreate(TreasuryInput):
     document_type: str
     counterparty: str = Field(min_length=2, max_length=200)
     amount: float = Field(gt=0)
@@ -50,9 +62,10 @@ class FinancialDocumentCreate(BaseModel):
     reference_number: Optional[str] = None
     customer_id: Optional[int] = None
     notes: Optional[str] = None
+    fixed_expense_id: Optional[int] = Field(default=None, gt=0)
 
 
-class FixedExpenseCreate(BaseModel):
+class FixedExpenseCreate(TreasuryInput):
     title: str = Field(min_length=2, max_length=200)
     amount: float = Field(gt=0)
     due_day: int = Field(ge=1, le=31)
@@ -63,18 +76,18 @@ class DocumentStatusUpdate(BaseModel):
     status: str
 
 
-class AccountBalanceUpdate(BaseModel):
+class AccountBalanceUpdate(TreasuryInput):
     current_balance: float
     minimum_reserve: Optional[float] = Field(default=None, ge=0)
 
 
-class FixedExpenseUpdate(BaseModel):
+class FixedExpenseUpdate(TreasuryInput):
     amount: Optional[float] = Field(default=None, gt=0)
     due_day: Optional[int] = Field(default=None, ge=1, le=31)
     is_active: Optional[bool] = None
 
 
-class LiquidityActionExecute(BaseModel):
+class LiquidityActionExecute(TreasuryInput):
     action_type: str
     title: str = Field(min_length=3, max_length=200)
     target_amount: float = Field(gt=0)
@@ -94,6 +107,8 @@ def parse_jalali_date(value: str) -> tuple[Optional[str], Optional[date]]:
     text_value = "/".join(match.groups())
     try:
         jy, jm, jd = map(int, match.groups())
+        import jdatetime
+        jdatetime.date(jy, jm, jd)
         jy += 1595
         days = -355668 + (365 * jy) + ((jy // 33) * 8) + (((jy % 33) + 3) // 4) + jd
         days += (jm - 1) * 31 if jm < 7 else ((jm - 7) * 30) + 186
@@ -132,7 +147,7 @@ def xlsx_column_number(reference: str) -> int:
     return result
 
 
-def read_xlsx_cells(contents: bytes):
+def read_xlsx_cells(contents: bytes, sheet_name: str | None = None):
     main_ns = "http://schemas.openxmlformats.org/spreadsheetml/2006/main"
     rel_ns = "http://schemas.openxmlformats.org/officeDocument/2006/relationships"
     package_rel_ns = "http://schemas.openxmlformats.org/package/2006/relationships"
@@ -144,7 +159,8 @@ def read_xlsx_cells(contents: bytes):
                 item.attrib["Id"]: item.attrib["Target"]
                 for item in relation_root.findall(f"{{{package_rel_ns}}}Relationship")
             }
-            first_sheet = workbook_root.find(f"{{{main_ns}}}sheets/{{{main_ns}}}sheet")
+            sheet_nodes = workbook_root.findall(f"{{{main_ns}}}sheets/{{{main_ns}}}sheet")
+            first_sheet = next((node for node in sheet_nodes if node.attrib.get("name") == sheet_name), None) if sheet_name else next(iter(sheet_nodes), None)
             if first_sheet is None:
                 raise ValueError("فایل هیچ شیتی ندارد.")
             relation_id = first_sheet.attrib.get(f"{{{rel_ns}}}id")
@@ -185,8 +201,10 @@ def read_xlsx_cells(contents: bytes):
                     elif cell_type == "b":
                         value = value_node.text == "1"
                     else:
-                        numeric = float(value_node.text)
-                        value = int(numeric) if numeric.is_integer() else numeric
+                        numeric = Decimal(value_node.text)
+                        if not numeric.is_finite():
+                            raise ValueError("عدد نامحدود در فایل پذیرفته نیست.")
+                        value = int(numeric) if numeric == numeric.to_integral_value() else numeric
                     values[column] = value
                 rows[row_number] = values
     except (BadZipFile, KeyError, ET.ParseError, ValueError) as exc:
@@ -268,7 +286,7 @@ def parse_debtors_workbook(contents: bytes):
         "rows": rows,
         "report_from_text": report_from_text,
         "report_to_text": report_to_text,
-        "snapshot_date": snapshot_date or date.today(),
+        "snapshot_date": snapshot_date or iran_today(),
         "warnings": warnings,
     }
 
@@ -298,14 +316,18 @@ def create_financial_document(
         raise HTTPException(status_code=422, detail="Invalid document type")
     values = data.model_dump()
     with engine.begin() as conn:
+        conn.execute(text("ALTER TABLE financial_documents ADD COLUMN IF NOT EXISTS fixed_expense_id INTEGER"))
+        if data.fixed_expense_id is not None:
+            if data.document_type != "payable" or not conn.execute(text("SELECT id FROM fixed_expenses WHERE id=:id AND is_active=1"), {"id": data.fixed_expense_id}).first():
+                raise HTTPException(status_code=422, detail="هزینهٔ مرتبط باید فعال و سند از نوع پرداختنی باشد.")
         row = conn.execute(
             text("""
                 INSERT INTO financial_documents
                     (document_type, counterparty, amount, due_date, status,
-                     collection_probability, reference_number, customer_id, notes, created_at)
+                     collection_probability, reference_number, customer_id, notes, fixed_expense_id, created_at)
                 VALUES
                     (:document_type, :counterparty, :amount, :due_date, 'open',
-                     :collection_probability, :reference_number, :customer_id, :notes, NOW())
+                     :collection_probability, :reference_number, :customer_id, :notes, :fixed_expense_id, NOW())
                 RETURNING *
             """),
             values,
@@ -423,8 +445,8 @@ def treasury_overview(_: dict = Depends(require_treasury_access)):
                 WHERE snapshot_id=:snapshot_id
                 ORDER BY balance DESC, id LIMIT 20
             """), {"snapshot_id": latest_snapshot["id"]}).mappings().all()
-    open_receivables = sum(float(x["amount"] or 0) for x in documents if x["document_type"] == "receivable" and x["status"] == "open")
-    open_payables = sum(float(x["amount"] or 0) for x in documents if x["document_type"] == "payable" and x["status"] == "open")
+    open_receivables = sum(float(x["amount"] or 0) for x in documents if x["document_type"] in RECEIVABLE_TYPES and x["status"] in OPEN_STATUSES)
+    open_payables = sum(float(x["amount"] or 0) for x in documents if x["document_type"] in PAYABLE_TYPES and x["status"] in OPEN_STATUSES)
     return {
         "summary": {
             "cash_balance": sum(float(x["current_balance"] or 0) for x in accounts),
@@ -440,6 +462,27 @@ def treasury_overview(_: dict = Depends(require_treasury_access)):
             "top_debtors": [dict(x) for x in debtor_rows],
         } if latest_snapshot else None),
     }
+
+
+@router.get("/debtors")
+def debtors_report(_: dict = Depends(require_debtors_access)):
+    """Read-only debtor report, separated from cash, payable and expense data."""
+    with engine.connect() as conn:
+        snapshot = conn.execute(text("""
+            SELECT id, report_from_text, report_to_text, snapshot_date,
+                   total_amount, row_count, created_at
+            FROM receivable_snapshots
+            ORDER BY snapshot_date DESC, id DESC LIMIT 1
+        """)).mappings().first()
+        if not snapshot:
+            return {"snapshot": None, "debtors": []}
+        rows = conn.execute(text("""
+            SELECT counterparty, balance, share_percent, customer_id
+            FROM receivable_balances
+            WHERE snapshot_id=:snapshot_id
+            ORDER BY balance DESC, id LIMIT 100
+        """), {"snapshot_id": snapshot["id"]}).mappings().all()
+    return {"snapshot": dict(snapshot), "debtors": [dict(row) for row in rows]}
 
 
 @router.delete("/import/debtors/{snapshot_id}")
@@ -564,17 +607,15 @@ def execute_liquidity_action(
                 "assigned_to": existing["assigned_to"],
                 "message": "این پیشنهاد قبلاً به تسک عملیاتی تبدیل شده است.",
             }
-        assignee = conn.execute(text("""
+        assignees = conn.execute(text("""
             SELECT u.id
             FROM users u
-            LEFT JOIN sales s ON s.salesperson_id=u.salesperson_id
-                AND (:customer_id IS NULL OR s.customer_id=:customer_id)
+            JOIN sales s ON s.salesperson_id=u.salesperson_id AND s.customer_id=:customer_id
             WHERE u.is_active=1 AND u.role='salesperson'
             GROUP BY u.id
-            ORDER BY COALESCE(SUM(s.total_amount), 0) DESC, u.id
-            LIMIT 1
-        """), {"customer_id": data.customer_id}).mappings().first()
-        assigned_to = assignee["id"] if assignee else user["id"]
+            ORDER BY u.id LIMIT 2
+        """), {"customer_id": data.customer_id}).mappings().all() if data.customer_id else []
+        assigned_to = assignees[0]["id"] if len(assignees) == 1 else user["id"]
         task = conn.execute(text("""
             INSERT INTO tasks
                 (title, description, priority, status, progress, assigned_to,
@@ -589,7 +630,7 @@ def execute_liquidity_action(
             "assigned_to": assigned_to,
             "created_by": user["id"],
             "customer_id": data.customer_id,
-            "due_date": date.today() + timedelta(days=3),
+            "due_date": iran_today() + timedelta(days=3),
         }).mappings().first()
     return {
         "status": "task_created",
@@ -600,13 +641,7 @@ def execute_liquidity_action(
 
 
 def expense_dates(start: date, end: date, due_day: int):
-    cursor = date(start.year, start.month, 1)
-    while cursor <= end:
-        day = min(due_day, monthrange(cursor.year, cursor.month)[1])
-        expense_date = date(cursor.year, cursor.month, day)
-        if start <= expense_date <= end:
-            yield expense_date
-        cursor = date(cursor.year + (cursor.month == 12), 1 if cursor.month == 12 else cursor.month + 1, 1)
+    yield from recurring_dates(start, end, due_day)
 
 
 @router.get("/forecast")
@@ -614,7 +649,7 @@ def cashflow_forecast(
     days: int = Query(default=30, ge=1, le=365),
     _: dict = Depends(require_treasury_access),
 ):
-    start = date.today()
+    start = iran_today()
     end = start + timedelta(days=days)
     with engine.connect() as conn:
         accounts = conn.execute(text("""
@@ -623,7 +658,7 @@ def cashflow_forecast(
         documents = conn.execute(
             text("""
                 SELECT * FROM financial_documents
-                WHERE status='open' AND due_date <= :end
+                WHERE due_date <= :end
                 ORDER BY due_date, id
             """),
             {"end": end},
@@ -667,18 +702,30 @@ def cashflow_forecast(
             "is_overdue": bool(original_due_date and original_due_date < start),
         })
 
+    covered_expenses = {}
     for doc in documents:
-        sign = 1 if doc["document_type"] == "receivable" else -1
+        if doc.get("fixed_expense_id") and doc["document_type"] in PAYABLE_TYPES and doc["status"] != "cancelled":
+            key = (doc["fixed_expense_id"], month_of(doc["due_date"]))
+            covered_expenses[key] = covered_expenses.get(key, 0) + float(doc["amount"])
+        if doc["status"] not in OPEN_STATUSES:
+            continue
+        if doc["document_type"] not in RECEIVABLE_TYPES | PAYABLE_TYPES:
+            continue
+        sign = 1 if doc["document_type"] in RECEIVABLE_TYPES else -1
         probability = float(doc["collection_probability"] if sign > 0 else 1)
+        if sign > 0 and doc["status"] == "bounced":
+            probability = 0
         effective_date = max(doc["due_date"], start)
         add_event(
-            effective_date, doc["document_type"], doc["counterparty"],
+            effective_date, "receivable" if sign > 0 else "payable", doc["counterparty"],
             sign * float(doc["amount"]), probability,
             doc["due_date"], doc["reference_number"],
         )
     for expense in expenses:
         for due_date in expense_dates(start, end, int(expense["due_day"])):
-            add_event(due_date, "fixed_expense", expense["title"], -float(expense["amount"]))
+            remaining = max(0, float(expense["amount"]) - covered_expenses.get((expense["id"], month_of(due_date)), 0))
+            if remaining:
+                add_event(due_date, "fixed_expense", expense["title"], -remaining)
 
     expected_balance = opening_balance
     conservative_balance = opening_balance
@@ -748,7 +795,7 @@ def cashflow_forecast(
                 "reason": "بخش باقی‌مانده کسری با وصول پیشنهادی پوشش داده نمی‌شود",
             })
         payable_candidates = sorted(
-            (doc for doc in documents if doc["document_type"] == "payable"),
+            (doc for doc in documents if doc["document_type"] in PAYABLE_TYPES and doc["status"] in OPEN_STATUSES),
             key=lambda doc: float(doc["amount"] or 0), reverse=True,
         )
         if payable_candidates:
@@ -769,7 +816,7 @@ def cashflow_forecast(
         return sum(
             float(doc["amount"] or 0)
             for doc in documents
-            if doc["document_type"] == document_type and doc["due_date"] <= horizon_end
+            if doc["status"] in OPEN_STATUSES and doc["document_type"] in (RECEIVABLE_TYPES if document_type == "receivable" else PAYABLE_TYPES) and doc["due_date"] <= horizon_end
         )
 
     return {
@@ -796,10 +843,10 @@ def cashflow_forecast(
 # === KIARAD BI CHECKS & BALANCE SHEET EXTENSION ===
 from fastapi import UploadFile, File
 
-class ManualCheckCreate(BaseModel):
+class ManualCheckCreate(TreasuryInput):
     check_type: str = Field(..., description="'receivable' (دریافتنی) یا 'payable' (پرداختنی)")
     counterparty: str = Field(..., description="نام طرف حساب / داروخانه / شرکت")
-    amount: float = Field(..., description="مبلغ چک")
+    amount: float = Field(..., gt=0, description="مبلغ چک")
     due_date: str = Field(..., description="تاریخ سررسید (مثلاً 1405/07/20 یا 2026-10-12)")
     reference_number: Optional[str] = Field(None, description="شماره چک یا شناسه صیادی")
     bank_name: Optional[str] = Field(None, description="نام بانک و شعبه")
@@ -812,6 +859,10 @@ class CheckStatusUpdate(BaseModel):
 
 @router.post("/checks/manual", status_code=status.HTTP_201_CREATED)
 def create_manual_check(data: ManualCheckCreate, _: dict = Depends(require_treasury_access)):
+    if data.check_type not in {"receivable", "payable", "receivable_check", "payable_check", "دریافتنی", "پرداختنی"}:
+        raise HTTPException(status_code=422, detail="نوع چک دریافتنی یا پرداختنی مشخص شود.")
+    if data.status not in {"open", "cleared", "bounced", "cancelled"}:
+        raise HTTPException(status_code=422, detail="وضعیت چک معتبر نیست.")
     clean_date_str, parsed_date = parse_jalali_date(data.due_date)
     if not parsed_date:
         try:
@@ -876,7 +927,7 @@ def update_check_status(check_id: int, data: CheckStatusUpdate, _: dict = Depend
 
 @router.get("/checks/balance-sheet")
 def get_checks_balance_sheet(_: dict = Depends(require_treasury_access)):
-    today = date.today()
+    today = iran_today()
     d7 = today + timedelta(days=7)
     d30 = today + timedelta(days=30)
     d60 = today + timedelta(days=60)
@@ -917,11 +968,11 @@ def get_checks_balance_sheet(_: dict = Depends(require_treasury_access)):
         st = (r["status"] or "open").lower()
         due = r["due_date"]
         
-        is_rec = "rec" in dtype.lower() or "دریافت" in dtype
-        is_pay = "pay" in dtype.lower() or "پرداخت" in dtype
+        is_rec = dtype in RECEIVABLE_TYPES
+        is_pay = dtype in PAYABLE_TYPES
         
         if is_rec:
-            if st in ("open", "in_progress", "pending"):
+            if st in ("open", "overdue", "in_progress", "pending"):
                 rec_open += amt
                 rec_open_count += 1
                 if due < today:
@@ -940,7 +991,7 @@ def get_checks_balance_sheet(_: dict = Depends(require_treasury_access)):
                 else:
                     aging_buckets["over_60_days"]["receivable"] += amt
                     aging_buckets["over_60_days"]["count"] += 1
-            elif st in ("cleared", "collected", "paid", "وصول"):
+            elif st in ("cleared", "settled", "collected", "paid", "وصول"):
                 rec_cleared += amt
             elif st in ("bounced", "dishonored", "برگشت"):
                 rec_bounced += amt
@@ -948,9 +999,13 @@ def get_checks_balance_sheet(_: dict = Depends(require_treasury_access)):
                 high_risk_checks.append({**dict(r), "risk_reason": "چک برگشتی"})
                 
         elif is_pay:
-            if st in ("open", "in_progress", "pending"):
+            if st in ("open", "overdue", "bounced", "dishonored", "برگشت", "in_progress", "pending"):
                 pay_open += amt
                 pay_open_count += 1
+                if st in ("bounced", "dishonored", "برگشت"):
+                    pay_bounced += amt
+                    pay_bounced_count += 1
+                    high_risk_checks.append({**dict(r), "risk_reason": "چک پرداختنی برگشتی؛ تعهد پرداخت همچنان باز است"})
                 if due < today:
                     aging_buckets["overdue"]["payable"] += amt
                     aging_buckets["overdue"]["count"] += 1
@@ -966,14 +1021,14 @@ def get_checks_balance_sheet(_: dict = Depends(require_treasury_access)):
                 else:
                     aging_buckets["over_60_days"]["payable"] += amt
                     aging_buckets["over_60_days"]["count"] += 1
-            elif st in ("cleared", "paid", "پاس"):
+            elif st in ("cleared", "settled", "paid", "پاس"):
                 pay_cleared += amt
             elif st in ("bounced", "dishonored", "برگشت"):
                 pay_bounced += amt
                 pay_bounced_count += 1
 
     net_position = (cash_res + rec_open) - pay_open
-    status_label = "مازاد نقدینگی" if net_position >= 0 else "کسری نقدینگی"
+    status_label = "ماندهٔ اسمی مثبت" if net_position >= 0 else "ماندهٔ اسمی منفی"
     
     return {
         "summary": {
@@ -993,114 +1048,108 @@ def get_checks_balance_sheet(_: dict = Depends(require_treasury_access)):
             "is_deficit": net_position < 0,
             "deficit_amount": abs(net_position) if net_position < 0 else 0.0
         },
+        "method_note": "ماندهٔ اسمی حساب و اسناد، بدون زمان‌بندی و احتمال وصول است و تأیید کفایت نقدینگی نیست. دریافتنی برگشتی در وصول منظور نشده؛ پرداختنی برگشتی همچنان تعهد باز است. مبالغ برگشتی زیرمجموعهٔ وضعیت مربوط‌اند و نباید دوباره جمع شوند.",
         "aging_buckets": aging_buckets,
         "high_risk_checks": high_risk_checks[:50]
     }
 
 
+def parse_checks_workbook(content: bytes):
+    """Explicit columns only; validate every row before opening a transaction."""
+    rows, _, _ = read_xlsx_cells(content)
+    nonempty = [(n, row) for n, row in sorted(rows.items()) if any(v not in (None, "") for v in row.values())]
+    if not nonempty:
+        raise HTTPException(422, "فایل چک خالی است.")
+    aliases = {
+        "طرف حساب": "counterparty", "نام طرف حساب": "counterparty",
+        "نوع چک": "direction", "نوع": "direction", "جهت": "direction",
+        "مبلغ ریال": "amount_rial", "مبلغ (ریال)": "amount_rial", "مبلغ به ریال": "amount_rial",
+        "مبلغ تومان": "amount_toman", "مبلغ (تومان)": "amount_toman", "مبلغ به تومان": "amount_toman",
+        "سررسید": "due", "تاریخ سررسید": "due",
+        "شماره چک": "reference", "شناسه صیادی": "reference", "شماره مرجع": "reference",
+    }
+    columns = {}
+    for column, value in nonempty[0][1].items():
+        key = aliases.get(normalize_text(value).replace("\u200c", " "))
+        if key:
+            if key in columns:
+                raise HTTPException(422, "سرستون تکراری در فایل چک وجود دارد.")
+            columns[key] = column
+    amounts = [key for key in ("amount_rial", "amount_toman") if key in columns]
+    if not all(key in columns for key in ("counterparty", "direction", "due", "reference")) or len(amounts) != 1:
+        raise HTTPException(422, "سطر نخست باید سرستون‌های طرف حساب، نوع چک، تاریخ سررسید، شماره چک یا شناسه صیادی، و دقیقاً یکی از مبلغ ریال یا مبلغ تومان را داشته باشد.")
+    result, references = [], set()
+    directions = {"دریافتنی": "receivable_check", "دریافتی": "receivable_check", "دریافت": "receivable_check", "receivable": "receivable_check", "receivable_check": "receivable_check", "پرداختنی": "payable_check", "پرداختی": "payable_check", "پرداخت": "payable_check", "payable": "payable_check", "payable_check": "payable_check"}
+    for number, row in nonempty[1:]:
+        def cell(key):
+            return normalize_text(row.get(columns[key])).translate(PERSIAN_DIGITS)
+        error = f"سطر {number}: "
+        counterparty, direction, reference = cell("counterparty"), directions.get(cell("direction").lower()), cell("reference")
+        if not 2 <= len(counterparty) <= 200 or not direction or not 1 <= len(reference) <= 100:
+            raise HTTPException(422, error + "طرف حساب، جهت دریافتنی یا پرداختنی، و شناسهٔ یکتای چک باید صریح و معتبر باشند.")
+        if reference in references:
+            raise HTTPException(422, error + "شناسهٔ چک در همین فایل تکرار شده است؛ هیچ ردیفی ثبت نشد.")
+        references.add(reference)
+        amount_text = cell(amounts[0]).replace(",", "").replace("٬", "")
+        if not re.fullmatch(r"\d+(?:\.\d+)?", amount_text):
+            raise HTTPException(422, error + "مبلغ باید عدد مثبت با واحد صریح سرستون باشد.")
+        try:
+            amount = Decimal(amount_text) * (10 if amounts[0] == "amount_toman" else 1)
+        except InvalidOperation:
+            raise HTTPException(422, error + "مبلغ معتبر نیست.")
+        if not amount.is_finite() or amount <= 0 or amount > 10**15 or amount != amount.to_integral_value():
+            raise HTTPException(422, error + "مبلغ باید تعداد صحیح ریال، مثبت و حداکثر یک میلیون میلیارد ریال باشد.")
+        due_text = cell("due").replace("-", "/")
+        if not re.fullmatch(r"\d{4}/\d{1,2}/\d{1,2}", due_text):
+            raise HTTPException(422, error + "تاریخ باید صریح مانند ۱۴۰۵/۰۷/۲۷ یا ۲۰۲۶/۱۰/۱۹ باشد؛ تاریخ حدس زده نمی‌شود.")
+        year, month, day = map(int, due_text.split("/"))
+        try:
+            if 1200 <= year <= 1600:
+                import jdatetime
+                due = jdatetime.date(year, month, day).togregorian()
+            elif 1900 <= year <= 2200:
+                due = date(year, month, day)
+            else:
+                raise ValueError("year")
+        except ValueError:
+            raise HTTPException(422, error + "تاریخ سررسید معتبر نیست؛ هیچ ردیفی ثبت نشد.")
+        result.append({"doc_type": direction, "counterparty": counterparty, "amount": int(amount), "due_date": due, "ref_num": reference})
+    if not result:
+        raise HTTPException(422, "فایل فقط سرستون دارد و چکی برای ورود ندارد.")
+    if len(result) > 10000:
+        raise HTTPException(422, "حداکثر ده هزار چک در هر فایل پذیرفته می‌شود.")
+    return result
+
+
 @router.post("/checks/import-excel", status_code=status.HTTP_201_CREATED)
 async def import_checks_excel(file: UploadFile = File(...), _: dict = Depends(require_treasury_access)):
-    content = await file.read()
+    content = await file.read(5 * 1024 * 1024 + 1)
+    if len(content) > 5 * 1024 * 1024:
+        raise HTTPException(422, "حجم فایل باید حداکثر پنج مگابایت باشد.")
     try:
-        cells = read_xlsx_cells(content)
-    except Exception as e:
-        raise HTTPException(status_code=400, detail=f"خطا در خواندن فایل اکسل: {str(e)}")
-        
-    rows_by_idx = {}
-    for cell in cells:
-        rows_by_idx.setdefault(cell["row"], {})[cell["col"]] = str(cell["value"]).strip()
-        
-    inserted_count = 0
+        with ZipFile(BytesIO(content)) as archive:
+            if sum(item.file_size for item in archive.infolist()) > 50 * 1024 * 1024:
+                raise HTTPException(422, "حجم بازشدهٔ فایل بیش از حد مجاز است.")
+    except BadZipFile:
+        raise HTTPException(422, "فقط فایل اکسل با ساختار معتبر پذیرفته می‌شود.")
+    values = parse_checks_workbook(content)
     with engine.begin() as conn:
-        for r_idx in sorted(rows_by_idx.keys()):
-            r_data = rows_by_idx[r_idx]
-            vals = list(r_data.values())
-            if any("مبلغ" in v or "طرف" in v or "چک" in v for v in vals):
-                continue
-                
-            counterparty, amount, due_str, ref_num = "", 0.0, "", ""
-            check_type = "receivable_check"
-            
-            for col_i, v in r_data.items():
-                clean_v = v.translate(PERSIAN_DIGITS).replace(",", "").replace("/", "-")
-                if not amount and re.match(r"^\d{4,12}$", clean_v):
-                    amount = float(clean_v)
-                elif not due_str and re.search(r"(13|14)\d{2}[-/]\d{1,2}[-/]\d{1,2}", v.translate(PERSIAN_DIGITS)):
-                    due_str = v
-                elif not counterparty and len(v) > 2 and not v.isdigit():
-                    if "پرداخت" in v:
-                        check_type = "payable_check"
-                    elif "دریافت" in v:
-                        check_type = "receivable_check"
-                    else:
-                        counterparty = v
-                elif not ref_num and re.match(r"^\d{6,16}$", clean_v):
-                    ref_num = clean_v
-                    
-            if counterparty and amount > 0:
-                _, parsed_d = parse_jalali_date(due_str) if due_str else (None, date.today() + timedelta(days=30))
-                if not parsed_d:
-                    parsed_d = date.today() + timedelta(days=30)
-                    
-                conn.execute(
-                    text("""
-                        INSERT INTO financial_documents (
-                            document_type, counterparty, amount, due_date, status,
-                            reference_number, notes, collection_probability, created_at
-                        ) VALUES (
-                            :doc_type, :counterparty, :amount, :due_date, 'open',
-                            :ref_num, 'ورود از اکسل', 1.0, NOW()
-                        )
-                    """),
-                    {
-                        "doc_type": check_type,
-                        "counterparty": counterparty,
-                        "amount": amount,
-                        "due_date": parsed_d,
-                        "ref_num": ref_num or None
-                    }
-                )
-                inserted_count += 1
-                
-    return {
-        "success": True,
-        "message": f"تعداد {inserted_count} فقره چک با موفقیت از اکسل ثبت گردید",
-        "inserted_count": inserted_count
-    }
+        conn.execute(text("SELECT pg_advisory_xact_lock(hashtextextended('treasury-check-import', 0))"))
+        existing = conn.execute(text("SELECT reference_number FROM financial_documents WHERE reference_number IS NOT NULL")).scalars().all()
+        known = {normalize_text(value).translate(PERSIAN_DIGITS) for value in existing}
+        if any(row["ref_num"] in known for row in values):
+            raise HTTPException(422, "شناسهٔ یک یا چند چک قبلاً در خزانه ثبت شده است؛ هیچ ردیفی وارد نشد.")
+        for value in values:
+            conn.execute(text("""INSERT INTO financial_documents
+                (document_type, counterparty, amount, due_date, status, reference_number, notes, collection_probability, created_at)
+                VALUES (:doc_type, :counterparty, :amount, :due_date, 'open', :ref_num, 'ورود اعتبارسنجی‌شده از اکسل؛ وضعیت باز', 1, NOW())"""), value)
+    return {"success": True, "inserted_count": len(values), "message": f"{len(values)} چک با سررسید و جهت صریح ثبت شد؛ ماندهٔ بانک تغییر نکرد."}
 
 
 @router.post("/checks/sync-holoo")
 def sync_checks_from_holoo(_: dict = Depends(require_treasury_access)):
-    import holo_api
-    import requests
-    
-    try:
-        token = holo_api.login()
-    except Exception as e:
-        return {
-            "success": False,
-            "connected": False,
-            "message": "عدم دسترسی به سرور هلو در دفتر (احتمالاً خارج از شبکه دفتر هستید یا آی‌پی هلو پاسخ نمی‌دهد).",
-            "error": str(e)
-        }
-        
-    headers = {"Authorization": token}
-    holo_url = holo_api.HOLO_URL
-    for endpoint in ["/Sanad/Cheque", "/Cheque", "/Sanad"]:
-        try:
-            resp = requests.get(f"{holo_url}{endpoint}", headers=headers, timeout=10)
-            if resp.status_code == 200:
-                return {
-                    "success": True,
-                    "connected": True,
-                    "message": "اتصال به هلو با موفقیت برقرار شد.",
-                    "data": resp.json()
-                }
-        except Exception:
-            continue
-            
     return {
-        "success": True,
-        "connected": True,
-        "message": "اتصال به هلو برقرار شد اما رکورد جدیدی در اندپوینت چک‌ها یافت نشد."
+        "success": False, "status": "unsupported", "supported": False,
+        "connected": None, "inserted_count": 0,
+        "message": "مسیر مستند دریافت چک‌ها در قرارداد فعلی وب‌سرویس هلو وجود ندارد. هیچ درخواست، ثبت یا تغییر مالی انجام نشد؛ فایل اکسل با سرستون‌های صریح یا مستند مسیر چک لازم است."
     }

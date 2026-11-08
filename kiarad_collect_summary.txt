@@ -1,0 +1,57 @@
+=== kiarad dashcollect 20261105_142938 ===
+root D:\project\kiaradbi
+files scanned 1644
+sources collected 334 rawchars 2200366
+zip D:\project\kiaradbi\kiarad_dashcollect_20261105_142938.zip  size 818615
+TIME 2026-11-05 14:29:55
+OK   http://localhost:3000/management  status=200  len=7303
+OK   http://localhost:3000/  status=200  len=7303
+OK   http://localhost:8000/openapi.json  status=200  len=187220
+OK   http://localhost:8000/docs  status=200  len=1012
+OK   http://localhost:8000/health  status=200  len=38
+FAIL http://localhost:8000/api/health  ::  The remote server returned an error: (401) Unauthorized.
+FAIL http://192.168.1.105:8080/  ::  The operation has timed out.
+
+   Id ProcessName StartTime           
+   -- ----------- ---------           
+ 2268 node        11/5/2026 2:14:18 PM
+19088 node        11/5/2026 1:29:49 PM
+ 3992 python      11/5/2026 2:29:54 PM
+ 4364 python      11/5/2026 2:29:54 PM
+
+
+
+
+  TCP    100.95.236.49:54512    100.99.182.6:8080      SYN_SENT        3992
+  TCP    127.0.0.1:3000         127.0.0.1:50992        CLOSED          0
+  TCP    127.0.0.1:3000         127.0.0.1:54517        ESTABLISHED     19088
+  TCP    127.0.0.1:3000         127.0.0.1:59363        TIME_WAIT       0
+  TCP    127.0.0.1:5432         127.0.0.1:49675        ESTABLISHED     18064
+  TCP    127.0.0.1:5432         127.0.0.1:49678        ESTABLISHED     18064
+  TCP    127.0.0.1:5432         127.0.0.1:50998        ESTABLISHED     18064
+  TCP    127.0.0.1:5432         127.0.0.1:51987        ESTABLISHED     18064
+  TCP    127.0.0.1:5432         127.0.0.1:51989        ESTABLISHED     18064
+  TCP    127.0.0.1:5432         127.0.0.1:54337        ESTABLISHED     18064
+  TCP    127.0.0.1:5432         127.0.0.1:54511        ESTABLISHED     18064
+  TCP    127.0.0.1:8000         127.0.0.1:50997        TIME_WAIT       0
+  TCP    127.0.0.1:8000         127.0.0.1:54518        ESTABLISHED     18064
+  TCP    127.0.0.1:8000         127.0.0.1:59364        TIME_WAIT       0
+  TCP    127.0.0.1:49675        127.0.0.1:5432         ESTABLISHED     18064
+  TCP    127.0.0.1:49678        127.0.0.1:5432         ESTABLISHED     18064
+  TCP    127.0.0.1:50998        127.0.0.1:5432         ESTABLISHED     3992
+  TCP    127.0.0.1:51987        127.0.0.1:5432         ESTABLISHED     18064
+  TCP    127.0.0.1:51989        127.0.0.1:5432         ESTABLISHED     18064
+  TCP    127.0.0.1:54337        127.0.0.1:5432         ESTABLISHED     18064
+  TCP    127.0.0.1:54511        127.0.0.1:5432         ESTABLISHED     3992
+  TCP    127.0.0.1:54516        127.0.0.1:5432         TIME_WAIT       0
+  TCP    127.0.0.1:54517        127.0.0.1:3000         ESTABLISHED     2020
+  TCP    127.0.0.1:54518        127.0.0.1:8000         ESTABLISHED     2020
+
+
+
+CONTAINER ID   IMAGE                     COMMAND                  CREATED       STATUS                       PORTS                                     NAMES
+9b0bd6c4f322   kiaradbi-backend:latest   "python -m uvicorn aÙ?Î"   2 days ago    Up About an hour             127.0.0.1:8000->8000/tcp                  kiarad-backend
+898011d3cf4d   postgres:16               "docker-entrypoint.sÙ?Î"   12 days ago   Up About an hour (healthy)   127.0.0.1:5432->5432/tcp                  kiarad-postgres
+aeed51d044d1   dpage/pgadmin4            "/entrypoint.sh"         2 weeks ago   Up About an hour             0.0.0.0:5050->80/tcp, [::]:5050->80/tcp   kiarad-pgadmin
+
+

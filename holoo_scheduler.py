@@ -3,6 +3,7 @@ import sys
 import time
 import subprocess
 from datetime import datetime
+from iran_time import iran_now
 
 # زمان‌بندی: ۳۶۰۰ ثانیه = ۱ ساعت کامل
 INTERVAL = 3600
@@ -18,7 +19,7 @@ print(f"  زمان‌بندی: هر ۶۰ دقیقه یک‌بار (INTERVAL = {I
 print("==================================================")
 
 while True:
-    now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    now_str = iran_now().strftime("%Y-%m-%d %H:%M:%S")
     print(f"\n[{now_str}] شروع همگام‌سازی خودکار دوره‌ای...")
 
     # ۱. همگام‌سازی هلو

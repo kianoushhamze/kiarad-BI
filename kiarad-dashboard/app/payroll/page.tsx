@@ -1,199 +1,50 @@
 "use client";
-
-import React, { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
+import { PortalShell, Surface, fieldClass } from "../../components/portal-shell";
+import { IranDateInput } from "../../components/IranDateInput";
+import { secureApi } from "../../lib/secure-api";
+import { formatIranDateTime, iranTodayIso } from "../../lib/iran-date";
+import { currentPersianMonth, inputMoney, normalizeNumberText, validPersianMonth } from "../../lib/payroll-contract";
 
-export default function PayrollPage() {
-  const [selectedVisitor, setSelectedVisitor] = useState<any>(null);
+type Person={id:number;name:string};
+type Blocker={code:string;message:string};
+type Approval={revision?:number;approved_total:number;additions:number;deductions:number;note?:string;approved_at:string};
+type Payroll={worked_hours:number;worked_days?:number;verified_visit_days:number;base_pay:number;overtime_pay?:number;sales_commission?:number;collection_commission?:number;content_pay?:number;mileage_allowance?:number;reward_pay?:number;verified_visit_allowance:number;provisional_total:number;can_approve?:boolean;blockers?:Blocker[];approval?:Approval|null;note:string;rule_version?:number};
+type Fact={id:number;event_date:string;event_key:string;kind:string;amount:number;quantity:number;source_note:string};
+type Source={source:string;complete:boolean;note:string};
+const kinds:Record<string,string>={reward:"پاداش تأییدشده",workday:"روز کارکرد",sale:"فروش",return:"برگشت فروش",collection:"وصول پول یا چک",collection_reversal:"برگشت وصول",content_post:"پست تولید، ویرایش و منتشرشده",content_story:"استوری منتشرشده",mileage:"کیلومتر مأموریت مصوب"};
+const sources:Record<string,string>={rewards:"پاداش ماه",workdays:"روزهای کارکرد",sales:"فروش خالص شخص",collections:"وصول شخص",content:"خروجی محتوا",mileage:"مأموریت"};
+const money=(value:number)=>new Intl.NumberFormat("fa-IR",{maximumFractionDigits:0}).format(Number(value||0)/10)+" تومان";
+const errorText=(value:unknown)=>value instanceof Error?value.message:"دریافت پاسخ ناموفق بود";
 
-  const [payrollList] = useState([
-    {
-      id: 1,
-      name: "امیرانی",
-      region: "سیرجان",
-      baseSalary: 12000000,
-      grossSales: 65000000,
-      returns: 2000000,
-      netSales: 63000000,
-      target: 50000000,
-      achievement: 126,
-      rate: 4.5,
-      commission: 2835000,
-      collectionBonus: 1200000,
-      focusBonus: 800000,
-      deductions: 1500000,
-      netPay: 15335000,
-    },
-    {
-      id: 2,
-      name: "کریمی",
-      region: "جیرفت و کهنوج",
-      baseSalary: 12000000,
-      grossSales: 48000000,
-      returns: 3000000,
-      netSales: 45000000,
-      target: 45000000,
-      achievement: 100,
-      rate: 3.5,
-      commission: 1575000,
-      collectionBonus: 600000,
-      focusBonus: 500000,
-      deductions: 1200000,
-      netPay: 13475000,
-    },
-    {
-      id: 3,
-      name: "محمدی",
-      region: "رفسنجان و زرند",
-      baseSalary: 12000000,
-      grossSales: 59000000,
-      returns: 1500000,
-      netSales: 57500000,
-      target: 50000000,
-      achievement: 115,
-      rate: 4.0,
-      commission: 2300000,
-      collectionBonus: 900000,
-      focusBonus: 700000,
-      deductions: 1400000,
-      netPay: 14500000,
-    },
-    {
-      id: 4,
-      name: "رضا کرمانی",
-      region: "کرمان مرکزی",
-      baseSalary: 12000000,
-      grossSales: 35000000,
-      returns: 1000000,
-      netSales: 34000000,
-      target: 50000000,
-      achievement: 68,
-      rate: 2.5,
-      commission: 850000,
-      collectionBonus: 0,
-      focusBonus: 200000,
-      deductions: 1200000,
-      netPay: 11850000,
-    },
-  ]);
-
-  const totalPayroll = payrollList.reduce((sum, v) => sum + v.netPay, 0);
-  const totalCommission = payrollList.reduce((sum, v) => sum + v.commission + v.collectionBonus + v.focusBonus, 0);
-
-  return (
-    <div dir="rtl" className="min-h-screen bg-[#0d0b18] text-white p-6 font-sans">
-      <header className="flex flex-col md:flex-row justify-between items-start md:items-center pb-6 border-b border-purple-900/40 mb-8 gap-4">
-        <div>
-          <h1 className="text-2xl font-bold bg-gradient-to-r from-purple-400 to-indigo-300 bg-clip-text text-transparent">
-            سیستم حقوق، دستمزد و پورسانت ویزیتورها (کیاراد بی‌آی)
-          </h1>
-          <p className="text-xs text-gray-400 mt-1">محاسبه خودکار کارکرد، فروش خالص، پورسانت پلکانی و پاداش شلف</p>
-        </div>
-        <Link href="/management" className="px-4 py-2 bg-purple-950/60 border border-purple-800/40 text-purple-300 rounded-xl hover:bg-purple-900/50 text-xs transition">
-          ← بازگشت به داشبورد مدیرعامل
-        </Link>
-      </header>
-
-      {/* کارت‌های شاخص‌های کلیدی مالی حقوق */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
-        <div className="bg-[#17142b] p-5 rounded-2xl border border-purple-900/30">
-          <h3 className="text-xs text-gray-400">جمع کل حقوق و پورسانت پرداختی</h3>
-          <p className="text-2xl font-bold text-emerald-400 mt-2">{totalPayroll.toLocaleString("fa-IR")} تومان</p>
-          <span className="text-xs text-gray-400 mt-1 inline-block">۴ ویزیتور فعال استان کرمان</span>
-        </div>
-        <div className="bg-[#17142b] p-5 rounded-2xl border border-purple-900/30">
-          <h3 className="text-xs text-gray-400">کل پورسانت و پاداش‌های تولیدشده</h3>
-          <p className="text-2xl font-bold text-purple-400 mt-2">{totalCommission.toLocaleString("fa-IR")} تومان</p>
-          <span className="text-xs text-purple-300 mt-1 inline-block">فروش خالص + وصولی مطالبات</span>
-        </div>
-        <div className="bg-[#17142b] p-5 rounded-2xl border border-purple-900/30">
-          <h3 className="text-xs text-gray-400">بالاترین نرخ تحقق تارگت</h3>
-          <p className="text-2xl font-bold text-indigo-400 mt-2">۱۲۶٪ (امیرانی - سیرجان)</p>
-          <span className="text-xs text-emerald-400 mt-1 inline-block">پورسانت پلکانی سطح طلایی</span>
-        </div>
-        <div className="bg-[#17142b] p-5 rounded-2xl border border-purple-900/30">
-          <h3 className="text-xs text-gray-400">فرمول فعال پورسانت کیاراد</h3>
-          <p className="text-base font-bold text-amber-400 mt-2">۲.۵٪ تا ۴.۵٪ پلکانی</p>
-          <span className="text-xs text-gray-400 mt-1 inline-block">+ پاداش شلف سوآلین ویرا</span>
-        </div>
-      </div>
-
-      {/* جدول تفصیلی حقوق و پورسانت */}
-      <div className="bg-[#17142b] p-6 rounded-2xl border border-purple-900/30 mb-8">
-        <h2 className="text-base font-semibold text-purple-200 mb-4">جدول کارکرد و محاسبه حقوق ماهانه ویزیتورها (شهریور ۱۴۰۵)</h2>
-        <div className="overflow-x-auto">
-          <table className="w-full text-right text-xs md:text-sm">
-            <thead className="bg-[#0a0814] text-gray-400 border-b border-purple-900/30">
-              <tr>
-                <th className="p-3">ویزیتور و منطقه</th>
-                <th className="p-3">حقوق پایه</th>
-                <th className="p-3">فروش ناخالص</th>
-                <th className="p-3">برگشتی</th>
-                <th className="p-3">خالص فروش</th>
-                <th className="p-3">تحقق تارگت</th>
-                <th className="p-3">درصد پورسانت</th>
-                <th className="p-3">پورسانت فروش</th>
-                <th className="p-3">پاداش وصول و شلف</th>
-                <th className="p-3">کسورات</th>
-                <th className="p-3 text-emerald-400 font-bold">خالص دریافتی</th>
-                <th className="p-3 text-center">فیش حقوقی</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-purple-900/20">
-              {payrollList.map((v) => (
-                <tr key={v.id} className="hover:bg-purple-950/20 transition">
-                  <td className="p-3 font-semibold text-gray-100">{v.name} ({v.region})</td>
-                  <td className="p-3 text-gray-300">{v.baseSalary.toLocaleString("fa-IR")}</td>
-                  <td className="p-3 text-gray-300">{v.grossSales.toLocaleString("fa-IR")}</td>
-                  <td className="p-3 text-red-400">{v.returns > 0 ? `-${v.returns.toLocaleString("fa-IR")}` : "۰"}</td>
-                  <td className="p-3 font-bold text-gray-100">{v.netSales.toLocaleString("fa-IR")}</td>
-                  <td className="p-3">
-                    <span className={`px-2 py-0.5 rounded-lg text-xs ${v.achievement >= 100 ? "bg-emerald-950/60 text-emerald-300 border border-emerald-500/30" : "bg-amber-950/60 text-amber-300 border border-amber-500/30"}`}>
-                      {v.achievement}٪
-                    </span>
-                  </td>
-                  <td className="p-3 font-bold text-purple-300">{v.rate}٪</td>
-                  <td className="p-3 text-purple-300">{v.commission.toLocaleString("fa-IR")}</td>
-                  <td className="p-3 text-indigo-300">{(v.collectionBonus + v.focusBonus).toLocaleString("fa-IR")}</td>
-                  <td className="p-3 text-red-400">-{v.deductions.toLocaleString("fa-IR")}</td>
-                  <td className="p-3 font-bold text-emerald-400 text-base">{v.netPay.toLocaleString("fa-IR")} تومان</td>
-                  <td className="p-3 text-center">
-                    <button onClick={() => setSelectedVisitor(v)} className="px-3 py-1 bg-purple-950/70 border border-purple-800 text-purple-300 hover:bg-purple-900/60 rounded-lg text-xs transition">
-                      مشاهده فیش
-                    </button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </div>
-
-      {/* مودال مشاهده و چاپ فیش حقوقی */}
-      {selectedVisitor && (
-        <div className="fixed inset-0 bg-black/75 flex items-center justify-center p-4 z-50">
-          <div className="bg-[#17142b] border border-purple-800/60 rounded-2xl max-w-lg w-full p-6 shadow-2xl">
-            <div className="flex justify-between items-center pb-4 border-b border-purple-900/40">
-              <h3 className="font-bold text-lg text-purple-300">فیش حقوق و پورسانت: {selectedVisitor.name}</h3>
-              <button onClick={() => setSelectedVisitor(null)} className="text-gray-400 hover:text-white">✕</button>
-            </div>
-            <div className="py-4 space-y-3 text-xs md:text-sm">
-              <div className="flex justify-between py-1 border-b border-purple-900/20"><span>منطقه تحت پوشش:</span><span>{selectedVisitor.region}</span></div>
-              <div className="flex justify-between py-1 border-b border-purple-900/20"><span>حقوق پایه قانون کار:</span><span>{selectedVisitor.baseSalary.toLocaleString("fa-IR")} تومان</span></div>
-              <div className="flex justify-between py-1 border-b border-purple-900/20"><span>خالص فروش محقق‌شده:</span><span>{selectedVisitor.netSales.toLocaleString("fa-IR")} تومان</span></div>
-              <div className="flex justify-between py-1 border-b border-purple-900/20"><span>پورسانت فروش ({selectedVisitor.rate}٪):</span><span className="text-purple-300 font-bold">{selectedVisitor.commission.toLocaleString("fa-IR")} تومان</span></div>
-              <div className="flex justify-between py-1 border-b border-purple-900/20"><span>پاداش وصول مطالبات:</span><span>{selectedVisitor.collectionBonus.toLocaleString("fa-IR")} تومان</span></div>
-              <div className="flex justify-between py-1 border-b border-purple-900/20"><span>پاداش فروش سوآلین ویرا:</span><span>{selectedVisitor.focusBonus.toLocaleString("fa-IR")} تومان</span></div>
-              <div className="flex justify-between py-1 border-b border-purple-900/20 text-red-400"><span>کسورات بیمه و مالیات:</span><span>-{selectedVisitor.deductions.toLocaleString("fa-IR")} تومان</span></div>
-              <div className="flex justify-between py-3 border-t border-purple-700/50 font-bold text-base text-emerald-400"><span>مبلغ خالص قابل واریز:</span><span>{selectedVisitor.netPay.toLocaleString("fa-IR")} تومان</span></div>
-            </div>
-            <div className="flex gap-3 pt-4">
-              <button onClick={() => window.print()} className="flex-1 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-semibold">چاپ فیش حقوقی</button>
-              <button onClick={() => setSelectedVisitor(null)} className="px-5 py-2.5 bg-gray-800 text-gray-300 rounded-xl text-xs">بستن</button>
-            </div>
-          </div>
-        </div>
-      )}
-    </div>
-  );
+export default function PayrollPage(){
+ const [people,setPeople]=useState<Person[]>([]),[person,setPerson]=useState(""),[month,setMonth]=useState(currentPersianMonth());
+ const [canManage,setCanManage]=useState(false),[payroll,setPayroll]=useState<Payroll|null>(null),[facts,setFacts]=useState<Fact[]>([]),[checks,setChecks]=useState<Source[]>([]);
+ const [loading,setLoading]=useState(true),[busy,setBusy]=useState(false),[message,setMessage]=useState(""),[refresh,setRefresh]=useState(0);
+ const [additions,setAdditions]=useState("0"),[deductions,setDeductions]=useState("0"),[note,setNote]=useState("");
+ const [kind,setKind]=useState("workday"),[eventDate,setEventDate]=useState(iranTodayIso()),[eventKey,setEventKey]=useState(""),[amount,setAmount]=useState("0"),[quantity,setQuantity]=useState("1"),[sourceNote,setSourceNote]=useState("");
+ const [product,setProduct]=useState(""),[brand,setBrand]=useState(""),[contentConfirmed,setContentConfirmed]=useState(false);
+ const [source,setSource]=useState("workdays"),[complete,setComplete]=useState(false),[checkNote,setCheckNote]=useState("");
+ useEffect(()=>{let active=true;secureApi<{items:Person[];can_approve:boolean}>("/api/compensation/payroll-people").then(data=>{if(active){setPeople(data.items||[]);setCanManage(data.can_approve);setPerson(String(data.items?.[0]?.id||""));if(!data.items?.length)setLoading(false);}}).catch(error=>{if(active){setMessage(errorText(error));setLoading(false);}});return()=>{active=false;};},[]);
+ useEffect(()=>{if(!person||!validPersianMonth(month))return;let active=true;void Promise.resolve().then(async()=>{if(!active)return;setLoading(true);setMessage("");try{const [result,inputs]=await Promise.all([secureApi<Payroll>(`/api/compensation/payroll/${person}?month=${month}`),secureApi<{items:Fact[];sources:Source[]}>(`/api/compensation/payroll/${person}/facts?month=${month}`)]);if(active){setPayroll(result);setFacts(inputs.items);setChecks(inputs.sources);setAdditions(String(Number(result.approval?.additions||0)/10));setDeductions(String(Number(result.approval?.deductions||0)/10));setNote(result.approval?.note||"");}}catch(error){if(active){setPayroll(null);setFacts([]);setChecks([]);setMessage(errorText(error));}}finally{if(active)setLoading(false);}});return()=>{active=false;};},[person,month,refresh]);
+ const write=async(path:string,body:Record<string,unknown>)=>{if(busy)return;setBusy(true);setMessage("");try{await secureApi(path,{method:"POST",body:JSON.stringify(body)});setRefresh(v=>v+1);setMessage("ثبت شد؛ محاسبه با مبنای تازه بازخوانی می‌شود.");}catch(error){setMessage(errorText(error));}finally{setBusy(false);}};
+ const addFact=async()=>{if(!validPersianMonth(month)){setMessage("ماه شمسی معتبر را انتخاب کنید.");return;}await write(`/api/compensation/payroll/${person}/facts`,{kind,event_date:eventDate,event_key:eventKey,amount:inputMoney(amount,"toman"),quantity:normalizeNumberText(quantity),product_id:product,brand,source_note:sourceNote,produced:contentConfirmed,edited:contentConfirmed,published:contentConfirmed});};
+ const approval=payroll?.approval;
+ const rows:Array<[string,number|undefined]>=[["پایهٔ کارکرد",payroll?.base_pay],["پاداش",payroll?.reward_pay],["اضافه‌کاری",payroll?.overtime_pay],["پورسانت فروش",payroll?.sales_commission],["پورسانت وصول",payroll?.collection_commission],["حق محتوای تأییدشده",payroll?.content_pay],["ویزیت معتبر",payroll?.verified_visit_allowance],["مسافت مصوب",payroll?.mileage_allowance]];
+ return <PortalShell title="حقوق و پورسانت ماهانه" eyebrow="کارکرد، مبنا و تأیید"><div className="space-y-5" dir="rtl">
+  <Surface className="p-5"><p className="mb-4 rounded-xl bg-violet-500/10 p-4 text-sm leading-8 text-violet-100">پیش‌نویس به‌صورت خودکار از داده‌های موجود پر می‌شود؛ اطلاعات ناقص مشخص می‌شوند، اصلاح مدیر جدا ثبت می‌شود.</p><div className="flex flex-wrap gap-4"><label className="flex-1 text-sm text-slate-300">پرسنل<select className={`${fieldClass} mt-2`} value={person} onChange={e=>setPerson(e.target.value)}>{people.map(p=><option key={p.id} value={p.id}>{p.name}</option>)}</select></label><label className="text-sm text-slate-300">ماه شمسی<input className={`${fieldClass} mt-2`} value={month} dir="ltr" placeholder="۱۴۰۵-۰۷" onChange={e=>setMonth(normalizeNumberText(e.target.value).replace("/","-"))}/></label></div>{!validPersianMonth(month)&&<p className="mt-3 text-sm text-amber-300">ماه شمسی را به شکل ۱۴۰۵-۰۷ بنویسید.</p>}<p className="mt-3 text-xs text-slate-400">مبلغ‌ها به تومان نمایش داده می‌شوند. هر شخص فرمول و نسخهٔ ماهانهٔ خودش را دارد.</p></Surface>
+  {message&&<p role="status" className="rounded-xl bg-violet-500/10 p-4 text-sm text-violet-200">{message}</p>}
+  {loading?<Surface className="p-6 text-slate-400">در حال محاسبه…</Surface>:payroll&&<>
+   <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">{rows.map(([label,value])=><Surface key={label} className="p-4"><p className="text-xs text-slate-400">{label}</p><p className="mt-2 text-lg text-white">{money(value||0)}</p></Surface>)}</div>
+   <Surface className="p-5"><h2 className="font-bold text-white">{approval?`نسخهٔ تأییدشده ${approval.revision||1}`:"پیش‌نمایش کارکرد"}</h2><p className="mt-3 text-sm text-slate-300">کارکرد: {Number(payroll.worked_days||0).toLocaleString("fa-IR")} روز، {payroll.worked_hours.toLocaleString("fa-IR")} ساعت؛ نسخهٔ فرمول: {payroll.rule_version||"هنوز مصوب نشده"}</p><p className="mt-3 text-xl text-emerald-300">جمع: {money(approval?Number(approval.approved_total):payroll.provisional_total)}</p><p className="mt-3 text-xs leading-7 text-slate-400">{payroll.note}</p>{approval&&<p className="mt-2 text-xs text-slate-400">زمان تأیید: {formatIranDateTime(approval.approved_at)}؛ این نسخه با تغییر فرمول آینده بازنویسی نمی‌شود.</p>}{!!payroll.blockers?.length&&<div className="mt-4 rounded-xl bg-amber-500/10 p-4"><p className="text-sm font-bold text-amber-200">پیش از تأیید باید تکمیل شود:</p><ul className="mt-2 list-inside list-disc text-sm leading-8 text-amber-200">{payroll.blockers.map((b,i)=><li key={b.code+i}>{b.message}</li>)}</ul></div>}</Surface>
+   {canManage&&<Surface className="p-5"><h2 className="font-bold text-white">تأیید و بازبینی ماه</h2><div className="mt-4 grid gap-3 sm:grid-cols-2"><label className="text-xs text-slate-300">افزوده (تومان)<input className={`${fieldClass} mt-2`} value={additions} onChange={e=>setAdditions(e.target.value)} inputMode="decimal"/></label><label className="text-xs text-slate-300">کسورات (تومان)<input className={`${fieldClass} mt-2`} value={deductions} onChange={e=>setDeductions(e.target.value)} inputMode="decimal"/></label><label className="sm:col-span-2 text-xs text-slate-300">علت تأیید یا بازبینی<textarea className={`${fieldClass} mt-2`} value={note} onChange={e=>setNote(e.target.value)}/></label></div><button type="button" disabled={busy||!payroll.can_approve} onClick={()=>void write(`/api/compensation/payroll/${person}/approve?month=${month}`,{additions:inputMoney(additions,"toman"),deductions:inputMoney(deductions,"toman"),note})} className="mt-4 rounded-xl bg-emerald-600 px-5 py-3 text-sm text-white disabled:opacity-40">{approval?"ثبت نسخهٔ بازبینی جدید":"تأیید محاسبهٔ ماه"}</button></Surface>}
+  </>}
+  <Surface className="p-5"><h2 className="font-bold text-white">اسناد و اصلاح‌های ثبت‌شدهٔ این ماه</h2><p className="mt-2 text-xs leading-7 text-slate-400">فروش بدون انتساب، روز کاری بدون تأیید و پست تولیدنشده مبنای پرداخت قطعی نمی‌شود. دریافت چک یا پول با شناسهٔ یکتای وصول ثبت می‌شود؛ نقدشدن دوبارهٔ همان چک نباید وصول تازه شمرده شود.</p><div className="mt-4 overflow-x-auto"><table className="w-full text-right text-xs"><thead className="text-slate-400"><tr><th className="p-2">نوع</th><th>شناسه</th><th>تعداد/روز/کیلومتر</th><th>مبلغ</th><th>منبع</th></tr></thead><tbody>{facts.map(f=><tr key={f.id} className="border-t border-white/5 text-slate-300"><td className="p-2">{kinds[f.kind]||f.kind}</td><td>{f.event_key}</td><td>{Number(f.quantity).toLocaleString("fa-IR")}</td><td>{money(f.amount)}</td><td>{f.source_note}</td></tr>)}</tbody></table>{!facts.length&&<p className="p-3 text-xs text-slate-500">سند اصلاحی جداگانه‌ای برای این دوره ثبت نشده است؛ کارکرد خودکار و نقص منابع در پیش‌نمایش بالا مشخص می‌شود.</p>}</div></Surface>
+  {canManage&&!approval&&person&&validPersianMonth(month)&&<details className="rounded-2xl border border-white/10 bg-[#111015]"><summary className="cursor-pointer p-5 text-sm font-bold text-violet-200">اصلاح و تکمیل اختیاری مبنای محاسبه</summary><div className="space-y-5 p-4 pt-0"><p className="text-xs leading-7 text-slate-400">برای دیدن و تأیید پیش‌نویس نیازی به پرکردن این فرم‌ها نیست. اگر سندی ناقص است یا پاداش و اصلاح مستندی دارید، آن را جدا ثبت کنید تا محاسبه دوباره انجام شود.</p>
+   <Surface className="p-5"><h2 className="font-bold text-white">ثبت مبنای تأییدشده</h2><div className="mt-4 grid gap-3 sm:grid-cols-2"><label className="text-xs text-slate-300">نوع<select className={`${fieldClass} mt-2`} value={kind} onChange={e=>{setKind(e.target.value);setContentConfirmed(false);}}>{Object.entries(kinds).map(([id,title])=><option key={id} value={id}>{title}</option>)}</select></label><label className="text-xs text-slate-300">تاریخ سند<IranDateInput className={`${fieldClass} mt-2`} value={eventDate} onChange={setEventDate}/></label><label className="text-xs text-slate-300">شناسهٔ یکتای سند یا نشانی پست<input className={`${fieldClass} mt-2`} value={eventKey} onChange={e=>setEventKey(e.target.value)}/></label><label className="text-xs text-slate-300">تعداد، سهم روز یا کیلومتر<input className={`${fieldClass} mt-2`} value={quantity} onChange={e=>setQuantity(e.target.value)} inputMode="decimal"/></label><label className="text-xs text-slate-300">مبلغ (تومان)<input className={`${fieldClass} mt-2`} value={amount} onChange={e=>setAmount(e.target.value)} inputMode="decimal"/></label><label className="text-xs text-slate-300">شناسهٔ کالا<input className={`${fieldClass} mt-2`} value={product} onChange={e=>setProduct(e.target.value)}/></label><label className="text-xs text-slate-300">برند<input className={`${fieldClass} mt-2`} value={brand} onChange={e=>setBrand(e.target.value)}/></label><label className="sm:col-span-2 text-xs text-slate-300">مدرک و توضیح تأیید<textarea className={`${fieldClass} mt-2`} value={sourceNote} onChange={e=>setSourceNote(e.target.value)} placeholder="شناسه رسید، مستند کارکرد یا نشانی خروجی منتشرشده"/></label>{kind.startsWith("content_")&&<label className="sm:col-span-2 text-sm text-slate-300"><input type="checkbox" checked={contentConfirmed} onChange={e=>setContentConfirmed(e.target.checked)}/> تولید، ویرایش و انتشار پست یا انتشار استوری را بررسی و تأیید کردم.</label>}</div><button type="button" disabled={busy||!eventKey||sourceNote.length<8} onClick={()=>void addFact()} className="mt-4 rounded-xl bg-violet-600 px-5 py-3 text-sm text-white disabled:opacity-40">ثبت سند مبنا</button></Surface>
+   <Surface className="p-5"><h2 className="font-bold text-white">تطبیق کامل منابع ماه</h2><p className="mt-2 text-xs leading-7 text-slate-400">پس از بررسی همهٔ اسناد این شخص در این ماه، کامل‌بودن هر منبع را تأیید کنید. نبود داده به‌تنهایی به معنی صفر واقعی نیست.</p><div className="mt-3 flex flex-wrap gap-2">{Object.entries(sources).map(([key,title])=><span key={key} className="rounded-lg bg-white/5 px-3 py-2 text-xs text-slate-300">{title}: {checks.find(s=>s.source===key)?.complete?"تطبیق‌شده":"تأیید نشده"}</span>)}</div><select className={`${fieldClass} mt-4`} value={source} onChange={e=>setSource(e.target.value)}>{Object.entries(sources).map(([key,title])=><option key={key} value={key}>{title}</option>)}</select><textarea aria-label="مدرک تطبیق منبع" className={`${fieldClass} mt-3`} value={checkNote} onChange={e=>setCheckNote(e.target.value)} placeholder="مدرک و توضیح تطبیق منبع با کل اسناد ماه"/><label className="mt-3 block text-sm text-slate-300"><input type="checkbox" checked={complete} onChange={e=>setComplete(e.target.checked)}/> همهٔ اسناد این منبع بررسی شده و کامل است.</label><button type="button" disabled={busy||checkNote.length<8} onClick={()=>void write(`/api/compensation/payroll/${person}/sources?month=${month}`,{source,complete,note:checkNote})} className="mt-4 rounded-xl bg-violet-600 px-5 py-3 text-sm text-white disabled:opacity-40">ثبت نتیجهٔ تطبیق</button></Surface>
+  </div></details>}
+  <Surface className="p-5"><p className="text-xs leading-7 text-amber-200">قواعد قانونی، بیمه و مالیات بدون نرخ مصوب محاسبه نمی‌شوند؛ تأیید این صفحه نیز به معنی پرداخت بانکی نیست.</p><Link href="/compensation" className="mt-4 inline-block rounded-xl bg-violet-600 px-4 py-2 text-sm text-white">قراردادها و فرمول هر شخص</Link></Surface>
+ </div></PortalShell>;
 }

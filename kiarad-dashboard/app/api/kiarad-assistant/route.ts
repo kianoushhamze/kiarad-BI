@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 
 export const dynamic = "force-dynamic";
 
-const BACKEND_URL = "http://127.0.0.1:8000/assistant/chat";
+const BACKEND_URL = (process.env.KIARAD_API_URL ?? "http://127.0.0.1:8000").replace(/\/$/, "") + "/assistant/chat";
 
 export async function POST(request: NextRequest) {
   try {

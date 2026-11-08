@@ -3,6 +3,7 @@
 import React, { useState } from "react";
 import { useRouter } from "next/navigation";
 import { saveSession } from "../../lib/secure-api";
+import { API_URL } from "../../lib/api";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -17,8 +18,7 @@ export default function LoginPage() {
     setLoading(true);
 
     try {
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
-      const res = await fetch(`${apiUrl}/auth/login`, {
+      const res = await fetch(`${API_URL}/auth/login`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ username, password }),
@@ -31,13 +31,13 @@ export default function LoginPage() {
       const data = await res.json();
       saveSession(data.access_token, data.user);
 
-      if (data.user?.role === "salesperson") {
-        router.push("/personnel");
+      if (data.user?.role === "salesperson" || data.user?.role === "visitor") {
+        router.push("/visitors");
       } else {
         router.push("/management");
       }
-    } catch (err: any) {
-      setError(err.message || "خطا در اتصال به سرور");
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "خطا در اتصال به سرور");
     } finally {
       setLoading(false);
     }

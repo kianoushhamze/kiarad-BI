@@ -18,14 +18,25 @@ _quarantine/
 # Logs
 logs/
 *.log
+audit-*/
+_*.txt
+all_code.txt
 
 # Next.js
 kiarad-dashboard/node_modules/
+scripts/artifacts/treasury-template/node_modules/
 kiarad-dashboard/.next/
+kiarad-dashboard/.next-qa-build/
 
 # Database backups
 *.sql
 *.dump
+backups/
+_kiarad_backups/
+private_exports/
+private_uploads/
+kiarad-dashboard/public/uploads/
+kiarad-dashboard-backup-before-ui-refactor/
 
 # Temp files
 *.bak
@@ -35,3 +46,57 @@ _scripts_archive/
 # OS
 Thumbs.db
 .DS_Store
+
+# Offline speech weights stay local; source and verification metadata are versioned.
+data/speech-models/**/model.bin
+data/speech-models/**/.cache/
+
+# Source repository only
+.env
+.env.*
+!.env.example
+!**/.env.*.example
+secrets/
+data/
+private_uploads/
+private_exports/
+backups/
+_kiarad_backups/
+_quarantine/
+_senf_pages/
+audit-*/
+**/node_modules/
+**/.next/
+**/.next-qa-build/
+.venv/
+venv/
+**/__pycache__/
+*.pyc
+*.log
+*.zip
+*.7z
+*.rar
+*.dump
+*.db
+*.db-*
+*.sqlite*
+*.pem
+*.key
+*.pfx
+*.p12
+*.bak*
+*.bafix*
+*.backup*
+*.before_*
+*.tsbuildinfo
+kiarad-dashboard-backup-before-ui-refactor/
+playwright-report/
+test-results/
+coverage/
+# Legacy utility contains an embedded password; keep local only.
+/reset_admin.py
+# Keep required migration payloads
+!migrations/
+!migrations/*.sql
+!scripts/*.sql
+!kiarad-dashboard/package-lock.json

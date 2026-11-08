@@ -1,0 +1,223 @@
+"use client";
+import { useEffect, useState, type ReactElement } from "react";
+import { PortalShell } from "../../components/portal-shell";
+import { authFetch, getSavedUser } from "../../lib/secure-api";
+import { iranDateInputToIso } from "../../lib/iran-date";
+import { IranDateInput } from "../../components/IranDateInput";
+
+type AgentResult = { key: string; title: string; icon: string; answer: string };
+type Result = { question: string; agents: AgentResult[]; final: string; action?: {label: string; href: string} };
+type UserRow = { id: number; full_name?: string; username?: string; role?: string; is_active?: boolean | number };
+
+const EXAMPLES = [
+  "چطور فروش این ماه رو ۲۰٪ بالا ببرم؟",
+  "برای وصول مطالبات چیکار کنم؟",
+  "کدوم کالاها انبار مونده؟",
+  "کدوم مشتری‌ها در خطر ریزش هستن؟",
+  "چطور فروش درمالیست رو دو برابر کنم؟",
+  "مشکلات جریان نقدی چیه؟",
+];
+
+function renderMarkdown(text: string) {
+  const lines = text.split("\n");
+  return lines.map((line, i) => {
+    const t = line.trim();
+    if (!t) return <div key={i} style={{ height: "6px" }} />;
+    const parts: (string | ReactElement)[] = [];
+    const re = /\*\*(.+?)\*\*/g;
+    let last = 0, k = 0, m: RegExpExecArray | null;
+    while ((m = re.exec(line)) !== null) {
+      if (m.index > last) parts.push(line.slice(last, m.index));
+      parts.push(<b key={k++} className="text-white">{m[1]}</b>);
+      last = m.index + m[0].length;
+    }
+    if (last < line.length) parts.push(line.slice(last));
+    return <div key={i} className="mb-1 leading-6">{parts}</div>;
+  });
+}
+
+export default function AdvisoryPage() {
+  const [question, setQuestion] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [result, setResult] = useState<Result | null>(null);
+  const [error, setError] = useState("");
+  const [teamInfo, setTeamInfo] = useState<{role: string; agents: Array<{key: string; title: string; icon: string}>} | null>(null);
+  const [users, setUsers] = useState<UserRow[]>([]);
+  const [assignee, setAssignee] = useState("");
+  const [taskTitle, setTaskTitle] = useState("");
+  const [taskDue, setTaskDue] = useState("");
+  const [taskMessage, setTaskMessage] = useState("");
+  const [taskSaving, setTaskSaving] = useState(false);
+  const currentUser = getSavedUser();
+  const canApprove = currentUser?.role === "ceo" || currentUser?.role === "sales_manager";
+
+  useEffect(() => {
+    authFetch("/assistant/advisory/team")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => { if (d) setTeamInfo(d); })
+      .catch(() => {});
+    if (canApprove) {
+      authFetch("/users").then(r => r.ok ? r.json() : []).then(data => {
+        const list = Array.isArray(data) ? data : (data?.users || []);
+        setUsers(list.filter((u: UserRow) => Boolean(u.is_active)));
+      }).catch(() => {});
+    }
+  }, [canApprove]);
+
+  const ask = async (q?: string) => {
+    const msg = (q ?? question).trim();
+    if (!msg || loading) return;
+    setLoading(true);
+    setError("");
+    setResult(null);
+    try {
+      const r = await authFetch("/assistant/advisory/ask", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ question: msg }),
+      });
+      if (r.ok) {
+        const next = await r.json();
+        setResult(next);
+        setTaskTitle("اقدام پیشنهادی دستیار: " + msg.slice(0, 80));
+        setTaskMessage("");
+      } else {
+        const e = await r.json().catch(() => ({}));
+        setError(e.detail || "خطا در پاسخ");
+      }
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : "خطای شبکه");
+    }
+    setLoading(false);
+  };
+
+  const approveAsTask = async () => {
+    if (!result || !assignee || !taskTitle.trim() || taskSaving) return;
+    setTaskSaving(true); setTaskMessage("");
+    try {
+      const r = await authFetch("/tasks", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          title: taskTitle.trim(), description: result.final, priority: "normal",
+          assigned_to: Number(assignee), customer_id: null,
+          due_date: taskDue ? iranDateInputToIso(taskDue) : null,
+        })
+      });
+      const data = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error(data.detail || "ثبت وظیفه ناموفق بود");
+      setTaskMessage("✓ پیشنهاد با تأیید مدیر به وظیفه تبدیل و برای فرد انتخاب‌شده ثبت شد.");
+    } catch (err: unknown) { setTaskMessage("خطا: " + (err instanceof Error ? err.message : "ثبت انجام نشد")); }
+    finally { setTaskSaving(false); }
+  };
+
+  return (
+    <PortalShell title="تیم مشاوره هوشمند" eyebrow="چهار تحلیل‌گر + یک ایجنت ارشد">
+      <div className="kskin">
+        <div className="mb-5 rounded-2xl border border-violet-400/20 bg-gradient-to-br from-violet-500/[0.08] to-indigo-500/[0.04] p-5">
+          <div className="flex items-center justify-between">
+            <b className="text-base text-white">🎓 تیم مشاوره‌ی کیاراد</b>
+            {teamInfo && <span className="rounded-full bg-violet-500/20 px-3 py-1 text-[10px] text-violet-200">{teamInfo.role}</span>}
+          </div>
+          {teamInfo && teamInfo.agents ? (
+            <div className="mt-3">
+              <p className="mb-3 text-[11px] text-slate-400">تیم شما برای تحلیل‌های تخصصی:</p>
+              <div className="flex flex-wrap gap-2">
+                {teamInfo.agents.map((a) => (
+                  <div key={a.key} className="flex items-center gap-2 rounded-lg border border-white/[0.08] bg-black/20 px-3 py-1.5">
+                    <span>{a.icon}</span>
+                    <span className="text-[11px] text-slate-200">{a.title}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ) : (
+            <p className="mt-2 text-[12px] leading-6 text-slate-400">
+              تحلیل‌گران تخصصی موازی روی سؤالت کار می‌کنن و ایجنت ارشد نتایج رو ترکیب می‌کنه.
+            </p>
+          )}
+        </div>
+
+        <div className="mb-5 rounded-2xl border border-white/[0.07] bg-[#0f1222] p-4">
+          <div className="flex flex-wrap gap-2">
+            <textarea
+              value={question}
+              onChange={(e) => setQuestion(e.target.value)}
+              onKeyDown={(e) => { if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) { e.preventDefault(); ask(); } }}
+              placeholder="سؤالت رو بنویس..."
+              rows={2}
+              className="flex-1 resize-none rounded-xl border border-white/[0.08] bg-black/30 px-4 py-3 text-xs text-white outline-none placeholder:text-slate-600 focus:border-violet-400/40"
+            />
+            <button
+              onClick={() => ask()}
+              disabled={loading || !question.trim()}
+              className="rounded-xl bg-gradient-to-br from-violet-500 to-indigo-700 px-6 py-3 text-xs font-bold text-white disabled:opacity-40"
+            >
+              {loading ? "..." : "🔍 تحلیل کن"}
+            </button>
+          </div>
+          <div className="mt-3 flex flex-wrap gap-1">
+            {EXAMPLES.map((e) => (
+              <button
+                key={e}
+                onClick={() => { setQuestion(e); ask(e); }}
+                disabled={loading}
+                className="rounded-lg border border-white/[0.06] bg-white/[0.02] px-3 py-1.5 text-[10px] text-slate-400 hover:border-violet-400/30 hover:text-white disabled:opacity-40"
+              >
+                {e}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {error && <div className="mb-4 rounded-xl bg-rose-500/10 px-4 py-3 text-xs text-rose-300">{error}</div>}
+
+        {loading && (
+          <div className="rounded-2xl border border-white/[0.07] bg-[#0f1222] p-10 text-center">
+            <div className="mb-3 text-2xl">🤔</div>
+            <b className="text-sm text-white">تیم مشاوره در حال تحلیل...</b>
+            <p className="mt-2 text-[11px] text-slate-500">۴ ایجنت + ارشد — ۳۰ تا ۶۰ ثانیه</p>
+          </div>
+        )}
+
+        {result && (
+          <>
+            <div className="mb-5 grid gap-3 md:grid-cols-2 lg:grid-cols-3">
+              {result.agents.map((a) => (
+                <div key={a.key} className="rounded-2xl border border-white/[0.07] bg-[#0f1222] p-4">
+                  <div className="mb-3 flex items-center gap-2 border-b border-white/[0.06] pb-3">
+                    <span className="text-xl">{a.icon}</span>
+                    <b className="text-xs text-white">{a.title}</b>
+                  </div>
+                  <div className="text-[11px] leading-6 text-slate-300">{renderMarkdown(a.answer)}</div>
+                </div>
+              ))}
+            </div>
+
+            <div className="rounded-2xl border border-violet-400/30 bg-gradient-to-br from-violet-500/[0.12] to-indigo-500/[0.06] p-5">
+              <div className="mb-3 flex items-center gap-2 border-b border-violet-400/20 pb-3">
+                <span className="text-2xl">🎯</span>
+                <div>
+                  <b className="text-sm text-white">نتیجه‌ی ایجنت ارشد</b>
+                  <p className="text-[10px] text-violet-300">ترکیب ۴ تحلیل + پیشنهاد نهایی</p>
+                </div>
+              </div>
+              <div className="text-[12px] leading-7 text-slate-200">{renderMarkdown(result.final)}</div>
+              {result.action && /^\/(catalog|person-targets)(\?|$)/.test(result.action.href) ? <a href={result.action.href} target="_blank" rel="noopener noreferrer" className="mt-3 block text-sky-300 underline">{result.action.label}</a> : null}
+              {canApprove ? <div className="mt-5 border-t border-violet-400/20 pt-4">
+                <b className="text-xs text-white">تأیید مدیر و ثبت برای ویزیتور</b>
+                <p className="mt-1 text-[10px] text-slate-400">تا زمانی که دکمهٔ تأیید را نزنید، پیشنهاد دستیار هیچ وظیفه‌ای ایجاد نمی‌کند.</p>
+                <div className="mt-3 grid gap-2 md:grid-cols-3">
+                  <input value={taskTitle} onChange={e => setTaskTitle(e.target.value)} placeholder="عنوان وظیفه" className="rounded-xl border border-white/10 bg-black/20 px-3 py-2 text-xs text-white" />
+                  <select value={assignee} onChange={e => setAssignee(e.target.value)} className="rounded-xl border border-white/10 bg-[#11152a] px-3 py-2 text-xs text-white"><option value="">— انتخاب مسئول —</option>{users.map(u => <option key={u.id} value={u.id}>{u.full_name || u.username}</option>)}</select>
+                  <IranDateInput aria-label="سررسید شمسی وظیفه" value={taskDue} onChange={setTaskDue} className="rounded-xl border border-white/10 bg-black/20 px-3 py-2 text-xs text-white" />
+                </div>
+                <button onClick={approveAsTask} disabled={!assignee || !taskTitle.trim() || taskSaving} className="mt-3 rounded-xl bg-emerald-600 px-4 py-2.5 text-xs font-bold text-white disabled:opacity-40">{taskSaving ? "در حال ثبت..." : "تأیید و ثبت وظیفه"}</button>
+                {taskMessage ? <div className="mt-3 text-xs text-emerald-300">{taskMessage}</div> : null}
+              </div> : null}
+            </div>
+          </>
+        )}
+      </div>
+    </PortalShell>
+  );
+}

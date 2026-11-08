@@ -1,0 +1,1 @@
+COPY (SELECT coalesce(holoo_code,''), price_selling, stock, to_char(updated_at, 'YYYY-MM-DD HH24:MI') FROM digikala_variants WHERE holoo_code IS NOT NULL AND price_selling IS NOT NULL) TO STDOUT WITH (FORMAT csv)

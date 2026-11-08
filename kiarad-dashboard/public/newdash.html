@@ -8,13 +8,13 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Vazirmatn:wght@200;400;600;800&display=swap" rel="stylesheet">
 <style>
-:root{--bg:#0a0a12;--surface:#12121e;--surface2:#181828;--stroke:rgba(255,255,255,.08);
---violet:#8b5cf6;--violet-soft:rgba(139,92,246,.16);--indigo:#6366f1;--emerald:#10b981;
---emerald-soft:rgba(16,185,129,.14);--gold:#d9a441;--text:#e9e9f4;--muted:#9a9ab4;
+:root{--bg:#07080f;--surface:#0f1222;--surface2:#161a30;--stroke:rgba(255,255,255,.08);
+--violet:#4f5fc4;--violet-soft:rgba(79,95,196,.16);--indigo:#3a4aa8;--emerald:#12a57a;
+--emerald-soft:rgba(18,165,122,.14);--gold:#d9a441;--text:#e8eaf6;--muted:#9aa0c3;
 --radius:16px;--pill:9999px;--font:'Vazirmatn',Tahoma,sans-serif}
 *{box-sizing:border-box;margin:0;padding:0}
 body{font-family:var(--font);background:var(--bg);color:var(--text);line-height:1.7;font-size:15px;
-background-image:radial-gradient(700px 420px at 85% -5%,rgba(139,92,246,.13),transparent 65%),
+background-image:radial-gradient(700px 420px at 85% -5%,rgba(79,95,196,.13),transparent 65%),
 radial-gradient(600px 400px at 5% 105%,rgba(99,102,241,.10),transparent 60%);background-attachment:fixed}
 .wrap{max-width:1240px;margin:0 auto;padding:20px}
 .top{display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin-bottom:14px}
@@ -67,7 +67,7 @@ border-radius:var(--pill);padding:7px 18px;cursor:pointer;transition:background 
 .staffrow{display:flex;justify-content:space-between;align-items:center;padding:9px 0;border-bottom:1px solid var(--stroke);font-size:13px}
 .staffrow:last-child{border-bottom:none}
 .staffrow .amt{color:#6ee7b7;font-weight:600}
-.msgbox{border:1px solid rgba(139,92,246,.35);background:rgba(139,92,246,.10);color:#c4b5fd;border-radius:12px;padding:14px 18px;margin-bottom:18px;font-size:13px;display:none;align-items:center;gap:12px;flex-wrap:wrap}
+.msgbox{border:1px solid rgba(79,95,196,.35);background:rgba(79,95,196,.10);color:#c4b5fd;border-radius:12px;padding:14px 18px;margin-bottom:18px;font-size:13px;display:none;align-items:center;gap:12px;flex-wrap:wrap}
 footer{margin-top:28px;padding-top:16px;border-top:1px solid var(--stroke);color:var(--muted);font-size:12px;display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;font-weight:200}
 
 /* ---- assistant chat ---- */
@@ -251,7 +251,7 @@ background:#0a0a12;display:block}
   var mbtext = document.getElementById("mbtext");
   function fail(msg){ mb.style.display="flex"; mbtext.textContent = msg; document.getElementById("st").textContent="اتصال برقرار نشد";
     document.getElementById("lnk-login").style.display="inline-block"; }
-  var h = new Date().getHours();
+  var h = Number(new Intl.DateTimeFormat("en-US", {timeZone:"Asia/Tehran",hour:"2-digit",hourCycle:"h23"}).format(new Date()));
   document.getElementById("gt").textContent = h<12 ? "صبح بخیر" : (h<18 ? "وقت بخیر" : "شب بخیر");
 
   /* tabs */
@@ -285,7 +285,7 @@ background:#0a0a12;display:block}
   }
   document.getElementById("btn-logout").style.display = "inline-block";
 
-  var api = "http://" + window.location.hostname + ":8000";
+  var api = ((window.location.protocol === "https:") ? (window.location.origin + "/api") : ("http://" + window.location.hostname + ":8000"));
   var headers = { "Content-Type": "application/json", "Authorization": "Bearer " + tok };
 
   /* ===== live numbers ===== */
@@ -321,7 +321,7 @@ background:#0a0a12;display:block}
         });
         box.innerHTML = out;
       }
-      document.getElementById("st").textContent = "اتصال زنده — " + new Date().toLocaleTimeString("fa-IR");
+      document.getElementById("st").textContent = "اتصال زنده — " + new Intl.DateTimeFormat("fa-IR-u-ca-persian-nu-arabext", {timeZone:"Asia/Tehran",hour:"2-digit",minute:"2-digit"}).format(new Date());
     })
     .catch(function(e){ fail(e.message || "خطای اتصال به بک‌اند."); });
 

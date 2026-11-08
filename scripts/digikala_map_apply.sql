@@ -1,0 +1,1 @@
+UPDATE digikala_variants v SET holoo_code = m.holoo_code FROM variant_map m WHERE v.holoo_code IS NULL AND v.dkp_id::text = m.supplier_code;

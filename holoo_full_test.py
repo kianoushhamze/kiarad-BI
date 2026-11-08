@@ -3,6 +3,7 @@ import json
 import requests
 from datetime import datetime
 from dotenv import load_dotenv
+from iran_time import iran_now
 
 load_dotenv()
 
@@ -72,7 +73,7 @@ def get_data(endpoint, token):
 def main():
 
     result = {
-        "time": str(datetime.now()),
+        "time": iran_now().isoformat(timespec="seconds"),
         "customers": {},
         "products": {}
     }

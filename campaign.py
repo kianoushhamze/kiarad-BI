@@ -1,8 +1,9 @@
 
 # -*- coding: utf-8 -*-
 """Campaigns: team reward campaigns with live progress - raw SQL, zero ORM, zero path params."""
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 from db import get_connection
+from operations import require_manager
 
 router = APIRouter(prefix="/campaigns", tags=["Campaigns"])
 
@@ -34,7 +35,7 @@ def list_campaigns():
 
 
 @router.post("")
-def create_campaign(data: dict):
+def create_campaign(data: dict, _: dict = Depends(require_manager)):
     title = str(data.get("title", "")).strip()
     if not title:
         raise HTTPException(status_code=422, detail="title is required")
@@ -91,7 +92,7 @@ def leaderboard(campaign_id: int = 0):
 
 
 @router.post("/close")
-def close_campaign(data: dict):
+def close_campaign(data: dict, _: dict = Depends(require_manager)):
     cid = int(data.get("campaign_id", 0) or 0)
     if not cid:
         raise HTTPException(status_code=422, detail="campaign_id is required")

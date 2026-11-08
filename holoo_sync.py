@@ -1,18 +1,21 @@
-﻿from datetime import datetime
+from datetime import datetime
 import os
 import requests
+from holoo_transport import holoo_request as _holoo_request
 
 from dotenv import load_dotenv
 from sqlalchemy.orm import sessionmaker
 
 from db import engine
 from models import Customer, Product
+from holoo_mappings import ensure_holoo_entity_mappings, save_holoo_entity_mapping
 
 load_dotenv()
 
-HOLO_URL = os.getenv("HOLO_API_URL").rstrip("/")
+HOLO_URL = os.getenv("HOLO_API_URL", "").rstrip("/")
 USERNAME = os.getenv("HOLO_USERNAME", "web")
 PASSWORD = os.getenv("HOLO_PASSWORD", "MQ==")
+DBNAME = os.getenv("HOLO_DBNAME", "Holoo2")
 
 
 SessionLocal = sessionmaker(
@@ -21,14 +24,16 @@ SessionLocal = sessionmaker(
 
 
 def holoo_login():
+    if not HOLO_URL:
+        raise ValueError("HOLO_API_URL is not configured")
 
-    r = requests.post(
+    r = _holoo_request('POST',
         HOLO_URL + "/Login",
         json={
             "userinfo": {
                 "username": USERNAME,
                 "userpass": PASSWORD,
-                "dbname": "Holoo2"
+                "dbname": DBNAME
             }
         },
         timeout=30
@@ -36,12 +41,16 @@ def holoo_login():
 
     r.raise_for_status()
 
-    return r.json()["Login"]["Token"]
+    login = r.json().get("Login")
+    state = login.get("State") if isinstance(login, dict) else None
+    if str(state).strip().lower() not in {"true", "1"} or not login.get("Token"):
+        raise ValueError("Holoo login did not return an active session")
+    return login["Token"]
 
 
 def holoo_get(path, token):
 
-    r = requests.get(
+    r = _holoo_request('GET',
         HOLO_URL + path,
         headers={
             "Authorization": token
@@ -56,18 +65,23 @@ def holoo_get(path, token):
 
 def sync_customers(db, token):
 
+    ensure_holoo_entity_mappings(db)
+
     data = holoo_get(
         "/Customer",
         token
     )
 
-    items = data.get("Customer", [])
+    items = (data.get("customer") if "customer" in data else data.get("Customer")) if isinstance(data, dict) else None
+    if not isinstance(items, list):
+        raise ValueError("Holoo customer response has an unexpected shape")
 
     total = 0
 
     for x in items:
 
-        code = x.get("Code") or x.get("ErpCode")
+        erp_code = str(x.get("ErpCode") or "").strip()
+        code = x.get("Code") or erp_code
 
         if not code:
             continue
@@ -75,6 +89,8 @@ def sync_customers(db, token):
         obj = db.query(Customer).filter_by(
             code=code
         ).first()
+        if not obj and erp_code and code != erp_code:
+            obj = db.query(Customer).filter_by(code=erp_code).first()
 
         if not obj:
             obj = Customer(
@@ -85,6 +101,9 @@ def sync_customers(db, token):
         obj.name = x.get("Name")
         obj.phone = x.get("Mobile") or x.get("Tel")
         obj.city = x.get("CityName")
+        if erp_code:
+            db.flush()
+            save_holoo_entity_mapping(db, "customer", obj.id, erp_code)
 
         total += 1
 
@@ -95,24 +114,32 @@ def sync_customers(db, token):
 
 def sync_products(db, token):
 
+    ensure_holoo_entity_mappings(db)
+
     data = holoo_get(
         "/Product",
         token
     )
 
-    items = data.get("product", [])
+    items = data.get("product") if isinstance(data, dict) else None
+    if not isinstance(items, list):
+        raise ValueError("Holoo product response has an unexpected shape")
 
     total = 0
 
     for x in items:
 
-        code = str(
-            x.get("Code") or x.get("ArticleId")
-        )
+        erp_code = str(x.get("ErpCode") or "").strip()
+        raw_code = x.get("Code") or x.get("ArticleId") or erp_code
+        if not raw_code:
+            continue
+        code = str(raw_code)
 
         obj = db.query(Product).filter_by(
             code=code
         ).first()
+        if not obj and erp_code and code != erp_code:
+            obj = db.query(Product).filter_by(code=erp_code).first()
 
         if not obj:
             obj = Product(
@@ -126,6 +153,9 @@ def sync_products(db, token):
         obj.stock = x.get("Few", 0)
         obj.is_active = 1 if x.get("IsActive") else 0
         obj.updated_at = datetime.utcnow()
+        if erp_code:
+            db.flush()
+            save_holoo_entity_mapping(db, "product", obj.id, erp_code)
 
         total += 1
 
@@ -175,6 +205,7 @@ def main():
 
         print("SYNC ERROR:")
         print(e)
+        raise SystemExit(1)
 
     finally:
 

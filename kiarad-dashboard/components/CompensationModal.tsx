@@ -1,84 +1,56 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import Link from "next/link";
+import { useEffect, useId, useRef } from "react";
+import type { Salesperson } from "../lib/compensation-types";
 
-export default function CompensationModal({ salesperson, onClose }: { salesperson: any; onClose: () => void }) {
-  const [hourlyRate, setHourlyRate] = useState(0);
-  const [minHours, setMinHours] = useState(176);
-  const [settlementPercent, setSettlementPercent] = useState(0);
-  const [dailyMission, setDailyMission] = useState(0);
-  const [perKmRate, setPerKmRate] = useState(0);
-  const [targets, setTargets] = useState<any[]>([]);
+export default function CompensationModal({ salesperson, onClose }: { salesperson: Salesperson; onClose: () => void }) {
+  const dialogRef = useRef<HTMLDialogElement>(null);
+  const titleId = useId();
+  const descriptionId = useId();
+  const personName = salesperson.full_name?.trim() || salesperson.name?.trim() || "پرسنل انتخاب‌شده";
+  const hasValidId = Number.isSafeInteger(salesperson.id) && salesperson.id > 0;
 
   useEffect(() => {
-    fetch(`/api/compensation/contract/${salesperson.id}`)
-      .then((r) => r.json())
-      .then((d) => {
-        if (d.configured) {
-          setHourlyRate(d.hourly_rate);
-          setMinHours(d.min_monthly_hours);
-          setSettlementPercent(d.settlement_commission_percent);
-          setDailyMission(d.daily_mission_allowance);
-          setPerKmRate(d.per_km_rate);
-          setTargets(d.targets || []);
-        }
-      });
-  }, [salesperson.id]);
-
-  const addTarget = (type: "brand" | "product") => {
-    setTargets([...targets, { target_type: type, item_identifier: "", item_title: "", target_amount: 0, target_quantity: 0, commission_percent: 0 }]);
-  };
-
-  const handleSave = async () => {
-    await fetch(`/api/compensation/contract/${salesperson.id}`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        hourly_rate: Number(hourlyRate),
-        min_monthly_hours: Number(minHours),
-        settlement_commission_percent: Number(settlementPercent),
-        daily_mission_allowance: Number(dailyMission),
-        per_km_rate: Number(perKmRate),
-        targets,
-      }),
-    });
-    alert("قرارداد با موفقیت ذخیره شد.");
-    onClose();
-  };
+    const dialog = dialogRef.current;
+    if (!dialog) return;
+    dialog.showModal();
+    return () => { dialog.close(); };
+  }, []);
 
   return (
-    <div className="fixed inset-0 bg-black/70 flex items-center justify-center p-4 z-50">
-      <div className="bg-slate-900 border border-purple-500/40 w-full max-w-2xl rounded-2xl p-6 text-right space-y-4">
-        <div className="flex justify-between border-b border-slate-800 pb-2">
-          <h3 className="font-bold text-white">تنظیم فرمول حقوق: {salesperson.full_name}</h3>
-          <button onClick={onClose} className="text-slate-400">✕</button>
+    <dialog
+      ref={dialogRef}
+      dir="rtl"
+      aria-labelledby={titleId}
+      aria-describedby={descriptionId}
+      onCancel={(event) => { event.preventDefault(); onClose(); }}
+      className="m-auto w-[calc(100%-2rem)] max-w-xl rounded-2xl border border-purple-500/40 bg-slate-900 p-6 text-right text-white shadow-2xl backdrop:bg-black/70"
+    >
+      <div className="space-y-5">
+        <div className="flex items-center justify-between gap-4 border-b border-slate-800 pb-3">
+          <h3 id={titleId} className="font-bold">حقوق و پورسانت {personName}</h3>
+          <button type="button" onClick={onClose} aria-label="بستن" className="rounded px-2 py-1 text-slate-300 hover:bg-slate-800">✕</button>
         </div>
-        <div className="grid grid-cols-2 gap-3">
-          <div>
-            <label className="text-xs text-slate-300 block mb-1">دستمزد ساعتی قانون کار (ریال):</label>
-            <input type="number" value={hourlyRate} onChange={(e) => setHourlyRate(Number(e.target.value))} className="w-full bg-slate-800 p-2 rounded text-white text-sm" />
-          </div>
-          <div>
-            <label className="text-xs text-slate-300 block mb-1">درصد پورسانت تسویه هلو (%):</label>
-            <input type="number" value={settlementPercent} onChange={(e) => setSettlementPercent(Number(e.target.value))} className="w-full bg-slate-800 p-2 rounded text-white text-sm" />
-          </div>
-        </div>
-        <div className="flex justify-between items-center pt-2">
-          <span className="text-xs text-purple-300 font-bold">تارگت‌های برندی و کالایی</span>
-          <button onClick={() => addTarget("brand")} className="bg-purple-600 text-white text-xs px-2 py-1 rounded">+ تارگت برند</button>
-        </div>
-        {targets.map((t, i) => (
-          <div key={i} className="flex gap-2 items-center text-xs">
-            <input placeholder="نام برند یا کد کالا" value={t.item_title} onChange={(e) => { const u = [...targets]; u[i].item_title = e.target.value; u[i].item_identifier = e.target.value; setTargets(u); }} className="bg-slate-800 p-1.5 rounded text-white w-1/3" />
-            <input type="number" placeholder="مبلغ تارگت" value={t.target_amount} onChange={(e) => { const u = [...targets]; u[i].target_amount = Number(e.target.value); setTargets(u); }} className="bg-slate-800 p-1.5 rounded text-white w-1/3" />
-            <input type="number" placeholder="درصد پورسانت %" value={t.commission_percent} onChange={(e) => { const u = [...targets]; u[i].commission_percent = Number(e.target.value); setTargets(u); }} className="bg-slate-800 p-1.5 rounded text-white w-1/4" />
-          </div>
-        ))}
-        <div className="flex justify-end gap-2 pt-4">
-          <button onClick={onClose} className="px-3 py-1.5 bg-slate-800 text-white rounded text-sm">انصراف</button>
-          <button onClick={handleSave} className="px-4 py-1.5 bg-purple-600 text-white rounded font-bold text-sm">ذخیره</button>
+        <dl className="grid grid-cols-2 gap-3 rounded-xl bg-slate-800 p-4 text-sm">
+          <dt className="text-slate-300">نام پرسنل</dt>
+          <dd>{personName}</dd>
+          <dt className="text-slate-300">شناسهٔ پرسنل</dt>
+          <dd>{hasValidId ? salesperson.id.toLocaleString("fa-IR") : "نامشخص"}</dd>
+        </dl>
+        <p id={descriptionId} className="text-sm leading-7 text-slate-300">
+          قواعد حقوق و پورسانت هر نفر برای ماه شمسی مشخص تنظیم و تأیید می‌شود. برای مشاهدهٔ نسخهٔ مربوط به ماه و تنظیم قواعد، صفحهٔ حقوق و پورسانت را باز کنید.
+        </p>
+        {!hasValidId && <p role="alert" className="text-sm text-red-300">شناسهٔ معتبر پرسنل دریافت نشده است. این پنجره را ببندید و فرد را دوباره انتخاب کنید.</p>}
+        <div className="flex flex-wrap justify-end gap-3 border-t border-slate-800 pt-4">
+          <button type="button" onClick={onClose} className="rounded bg-slate-800 px-4 py-2 text-sm">بستن</button>
+          {hasValidId && (
+            <Link href={`/compensation?salesperson_id=${salesperson.id}`} onClick={onClose} className="rounded bg-purple-600 px-4 py-2 text-sm font-bold hover:bg-purple-500">
+              تنظیم قواعد ماهانه
+            </Link>
+          )}
         </div>
       </div>
-    </div>
+    </dialog>
   );
 }

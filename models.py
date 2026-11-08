@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Float, DateTime, ForeignKey, Date, Text, UniqueConstraint
+from sqlalchemy import Column, Integer, String, Float, DateTime, ForeignKey, Date, Text, UniqueConstraint, Numeric
 from sqlalchemy.orm import declarative_base, relationship
 from datetime import datetime
 
@@ -123,6 +123,9 @@ class Target(Base):
     created_at = Column(DateTime, default=datetime.utcnow)
 
     target_type = Column(String)
+    period_type = Column(String(50))
+    product_focus = Column(String(150))
+    bonus_reward = Column(Numeric(15, 2))
 
     start_date = Column(Date)
     end_date = Column(Date)
@@ -247,6 +250,10 @@ class Task(Base):
     due_date = Column(DateTime, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
     updated_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    review_status = Column(String(30), default="not_submitted", nullable=False)
+    reviewed_by = Column(Integer, ForeignKey("users.id"), nullable=True)
+    reviewed_at = Column(DateTime, nullable=True)
+    review_note = Column(Text)
 
 
 class TaskUpdate(Base):
@@ -309,6 +316,7 @@ class FinancialDocument(Base):
     collection_probability = Column(Float, default=1, nullable=False)
     reference_number = Column(String(100))
     customer_id = Column(Integer, ForeignKey("customers.id"), nullable=True)
+    fixed_expense_id = Column(Integer, nullable=True)
     notes = Column(Text)
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
 

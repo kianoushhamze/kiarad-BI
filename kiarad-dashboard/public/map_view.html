@@ -4,13 +4,14 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>نقشه استان کرمان</title>
-    <link rel="stylesheet" href="https://static.neshan.org/sdk/leaflet/v1.9.4/neshan-sdk/v1.0.8/index.css" />
-    <script src="https://static.neshan.org/sdk/leaflet/v1.9.4/neshan-sdk/v1.0.8/index.js"></script>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="">
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
     <style>
-        body, html { margin: 0; padding: 0; height: 100%; font-family: tahoma; background: #0F172A; }
+        body, html { margin: 0; padding: 0; height: 100%; font-family: Vazirmatn, Tahoma, Arial, sans-serif; background: #080b16; }
         #map { height: 100%; width: 100%; }
+        #map-status { position: absolute; top: 12px; right: 55px; left: 12px; z-index: 1000; border: 1px solid #ffffff20; border-radius: 12px; background: #111015ed; color: #e2e8f0; padding: 10px 14px; font-size: 12px; line-height: 1.8; pointer-events: none; }
         .visitor-badge {
-            background: #7C3AED;
+            background: #6668d9;
             color: #FFFFFF;
             padding: 4px 10px;
             border-radius: 20px;
@@ -31,66 +32,77 @@
             display: inline-block;
         }
     </style>
+<script>var KAPI = window.location.origin + "/api";</script>
 </head>
 <body>
     <div id="map"></div>
+    <div id="map-status" role="status" aria-live="polite">در حال دریافت نقشه و آخرین موقعیت‌های مجاز…</div>
     <script>
+      (function () {
+        const status = document.getElementById('map-status');
+        if (typeof L === 'undefined') {
+            status.textContent = 'دریافت لایهٔ نقشه ممکن نشد؛ دسترسی اینترنت به سرویس نقشه را بررسی کنید.';
+            return;
+        }
         const map = L.map('map', {
             center: [30.2839, 57.0834],
             zoom: 8,
             zoomControl: true
         });
 
-        // لایه نقشه استاندارد خیابانی و جاده‌ای (بدون واترمارک و بدون نیاز به کلید)
-        const esriStreet = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}', {
+        // لایه نقشه خیابانی عمومی
+        const streetMap = L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
             maxZoom: 19,
-            attribution: 'نقشه استان کرمان - کیاراد'
+            attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
         }).addTo(map);
 
-        // لایه دوم OpenStreetMap جهت جزئیات کوچه‌ها
-        const osmHot = L.tileLayer('https://tile.openstreetmap.fr/hot/{z}/{x}/{y}.png', {
-            maxZoom: 19,
-            attribution: 'OpenStreetMap'
-        });
-
-        // تصویر ماهواره‌ای
-        const satellite = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
-            maxZoom: 18,
-            attribution: 'ماهواره‌ای'
-        });
-
-        L.control.layers({
-            "نقشه خیابان‌ها و شهرستان‌ها": esriStreet,
-            "نقشه شهری و محله‌ها (OSM)": osmHot,
-            "تصویر ماهواره‌ای": satellite
-        }, null, { position: 'topright' }).addTo(map);
-
-        // نشانگرهای ویزیتورها
-        fetch('http://127.0.0.1:8000/operations/locations/latest')
-            .then(r => r.json())
-            .then(data => {
+        const markers = L.layerGroup().addTo(map);
+        const safe = value => String(value ?? '').replace(/[&<>"']/g, char => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char]));
+        const activityLabels = {shift_start:'شروع شیفت',shift_end:'پایان شیفت',base_checkin:'ثبت بازدید'};
+        let pending = false;
+        let fitted = false;
+        async function refreshLocations() {
+            if (pending || document.hidden) return;
+            let token = '';
+            try { token = localStorage.getItem('kiarad_access_token') || ''; } catch (_) {}
+            if (!token) { markers.clearLayers(); status.textContent = 'برای دیدن موقعیت‌های مجاز، وارد حساب شوید.'; return; }
+            pending = true;
+            const controller = new AbortController();
+            const timeout = setTimeout(() => controller.abort(), 15000);
+            try {
+                const response = await fetch(KAPI + '/operations/locations/latest', {headers:{Authorization:'Bearer ' + token},cache:'no-store',signal:controller.signal});
+                if (!response.ok) {
+                    if (response.status === 401 || response.status === 403) markers.clearLayers();
+                    throw new Error(response.status === 401 ? 'نشست منقضی شده است؛ دوباره وارد حساب شوید.' : response.status === 403 ? 'این حساب مجوز مشاهدهٔ موقعیت‌ها را ندارد.' : 'دریافت موقعیت‌ها ناموفق بود؛ دوباره تلاش می‌شود.');
+                }
+                const data = await response.json();
+                if (!Array.isArray(data)) throw new Error('پاسخ موقعیت‌ها معتبر نیست.');
+                markers.clearLayers();
+                const points = [];
                 data.forEach(v => {
-                    if (v.latitude && v.longitude) {
-                        const icon = L.divIcon({
-                            className: 'custom-div-icon',
-                            html: `<div class="visitor-badge"><span class="pulse-dot"></span> 👤 ${v.name}</div>`,
-                            iconSize: [130, 30],
-                            iconAnchor: [65, 15]
-                        });
-
-                        L.marker([v.latitude, v.longitude], { icon: icon })
-                            .addTo(map)
-                            .bindPopup(`
-                                <div style="direction:rtl; text-align:right; font-family:tahoma; font-size:13px;">
-                                    <strong style="color:#7C3AED; font-size:14px;">${v.name}</strong><br/>
-                                    <span style="color:#475569;">فعالیت:</span> ${v.activity || 'ویزیت فعال'}<br/>
-                                    <span style="color:#475569;">باتری:</span> <strong>${v.battery_level || 85}%</strong><br/>
-                                    <span style="color:#475569;">تلفن:</span> <a href="tel:${v.phone}">${v.phone}</a>
-                                </div>
-                            `);
-                    }
+                    if (v.latitude == null || v.longitude == null || !v.recorded_at) return;
+                    const lat = Number(v.latitude), lng = Number(v.longitude);
+                    const recorded = new Date(v.recorded_at), age = Date.now() - recorded.getTime();
+                    if (!Number.isFinite(lat) || !Number.isFinite(lng) || Math.abs(lat)>90 || Math.abs(lng)>180 || !Number.isFinite(age) || age < -60000 || age > 3600000) return;
+                    const ended = v.activity === 'shift_end';
+                    const icon = L.divIcon({className:'custom-div-icon',html:`<div class="visitor-badge"><span class="pulse-dot" style="background:${ended?'#94a3b8':'#38bdf8'}"></span> 👤 ${safe(v.name)}</div>`,iconSize:[130,30],iconAnchor:[65,15]});
+                    const time = new Intl.DateTimeFormat('fa-IR-u-ca-persian',{timeZone:'Asia/Tehran',dateStyle:'short',timeStyle:'short'}).format(recorded);
+                    L.marker([lat,lng],{icon}).addTo(markers).bindPopup(`<div style="direction:rtl;text-align:right;font-family:tahoma;font-size:13px;line-height:1.9"><strong>${safe(v.name)}</strong><br>آخرین رویداد: ${safe(activityLabels[v.activity] || v.activity || 'ثبت نشده')}<br>زمان ثبت: ${safe(time)}<br>باتری: ${v.battery_level == null ? 'ثبت نشده' : safe(v.battery_level)+'٪'}</div>`);
+                    points.push([lat,lng]);
                 });
-            }).catch(console.error);
+                if (!fitted && points.length) { map.fitBounds(points,{maxZoom:14,padding:[30,60]}); fitted = true; }
+                status.textContent = points.length ? `${points.length.toLocaleString('fa-IR')} موقعیت ثبت‌شدهٔ یک ساعت اخیر · تازه‌سازی هر ۳۰ ثانیه` : 'موقعیت تازه‌ای برای این حساب ثبت نشده است. برای ثبت موقعیت، شروع شیفت یا ثبت بازدید را انجام دهید.';
+            } catch (error) {
+                status.textContent = error.name === 'AbortError' ? 'دریافت موقعیت‌ها طول کشید؛ دوباره تلاش می‌شود.' : error.message;
+            } finally { clearTimeout(timeout); pending = false; }
+        }
+        void refreshLocations();
+        const timer = setInterval(refreshLocations,30000);
+        document.addEventListener('visibilitychange',refreshLocations);
+        window.addEventListener('beforeunload',()=>clearInterval(timer),{once:true});
+      })();
     </script>
+
+
 </body>
 </html>

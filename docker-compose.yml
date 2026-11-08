@@ -3,24 +3,93 @@ services:
     image: postgres:16
     container_name: kiarad-postgres
     restart: always
+    command: ["postgres", "-c", "timezone=Asia/Tehran"]
     environment:
-      POSTGRES_USER: kiarad
-      POSTGRES_PASSWORD: kiarad123
-      POSTGRES_DB: kiaradbi
+      POSTGRES_USER: ${DB_USER:-kiarad}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
+      POSTGRES_DB: ${DB_NAME:-kiaradbi}
     ports:
-      - "5432:5432"
+      - "127.0.0.1:5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-kiarad} -d ${DB_NAME:-kiaradbi}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile.backend
+    container_name: kiarad-backend
+    restart: always
+    env_file:
+      - .env
+    environment:
+      DB_HOST: postgres
+      DB_PORT: "5432"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    expose:
+      - "8000"
+    ports:
+      - "127.0.0.1:8000:8000"
+    volumes:
+      # Digikala refresh rotates token files atomically; keep them persistent.
+      - ./secrets:/app/secrets
+      - ./data/speech-models:/app/data/speech-models:ro
+      - ./site:/app/site
+      - ./private_uploads:/app/private_uploads
+      - ./private_exports:/app/private_exports
+      - ./kiarad-dashboard/public/uploads:/app/kiarad-dashboard/public/uploads
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=5).read()"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 45s
+
+  frontend:
+    build:
+      context: .
+      dockerfile: kiarad-dashboard/Dockerfile
+      args:
+        KIARAD_API_URL: http://backend:8000
+        NEXT_PUBLIC_API_URL: http://backend:8000
+    container_name: kiarad-dashboard
+    restart: always
+    environment:
+      NODE_ENV: production
+      HOSTNAME: 0.0.0.0
+      PORT: "3000"
+      KIARAD_API_URL: http://backend:8000
+      NEXT_PUBLIC_API_URL: http://backend:8000
+    depends_on:
+      backend:
+        condition: service_healthy
+    ports:
+      - "127.0.0.1:3000:3000"
+    volumes:
+      - ./kiarad-dashboard/public/uploads:/app/public/uploads
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000/login').then(r => { if (!r.ok) process.exit(1) }).catch(() => process.exit(1))"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
 
   pgadmin:
+    profiles: ["tools"]
     image: dpage/pgadmin4
     container_name: kiarad-pgadmin
     restart: always
     environment:
-      PGADMIN_DEFAULT_EMAIL: admin@kiarad.com
-      PGADMIN_DEFAULT_PASSWORD: admin123
+      PGADMIN_DEFAULT_EMAIL: ${PGADMIN_DEFAULT_EMAIL:-admin@localhost}
+      PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_DEFAULT_PASSWORD:-}
     ports:
-      - "5050:80"
+      - "127.0.0.1:5050:80"
 
 volumes:
   postgres_data:

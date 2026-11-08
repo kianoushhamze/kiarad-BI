@@ -7,6 +7,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy import text
 from db import engine
 from operations import current_user, require_manager
+from iran_time import iran_today
 
 router = APIRouter(prefix="/kerman", tags=["kerman_crm_and_planning"])
 OLLAMA_URL = os.getenv("OLLAMA_URL", "http://127.0.0.1:11434/api/generate")
@@ -75,9 +76,16 @@ def get_customers_by_type(customer_type: str = Query(..., description="pharmacy,
 
 @router.get("/action-plan/monthly")
 def get_monthly_action_plan(salesperson_id: Optional[int] = None, user: dict = Depends(current_user)):
+    if user.get("role") not in {"ceo", "sales_manager"}:
+        salesperson_id = user.get("salesperson_id")
+        if not salesperson_id:
+            raise HTTPException(status_code=403, detail="برای این حساب، ویزیتور متصل نشده است.")
     with engine.connect() as conn:
         cities = conn.execute(text("SELECT DISTINCT city FROM customers WHERE city IS NOT NULL")).scalars().all()
-        sp = conn.execute(text("SELECT id, name FROM salespersons ORDER BY name")).mappings().all()
+        if user.get("role") in {"ceo", "sales_manager"}:
+            sp = conn.execute(text("SELECT id, name FROM salespersons ORDER BY name")).mappings().all()
+        else:
+            sp = conn.execute(text("SELECT id, name FROM salespersons WHERE id=:id"), {"id": salesperson_id}).mappings().all()
         
         prompt = f"شهرهای تحت پوشش شرکت کیاراد در استان کرمان: {list(cities)}.\nتیم ویزیتورها: {[dict(s) for s in sp]}.\nیک اکشن‌پلان ۴ هفته‌ای برای پوشش داروخانه‌ها، پزشکان زیبایی و فروشگاه‌های آرایشی استان بنویس."
         system = "تو مدیر ارشد برنامه‌ریزی و سرپرست فروش شرکت پخش کیاراد در استان کرمان هستی. برنامه‌ای دقیق و واقع‌بینانه به تفکیک هفته و مناطق استان ارائه کن."
@@ -86,7 +94,7 @@ def get_monthly_action_plan(salesperson_id: Optional[int] = None, user: dict = D
 
 @router.get("/weekly-meeting-summary")
 def generate_weekly_meeting_summary(_: dict = Depends(require_manager)):
-    week_ago = date.today() - timedelta(days=7)
+    week_ago = iran_today() - timedelta(days=7)
     with engine.connect() as conn:
         reports = conn.execute(text("""
             SELECT s.name as salesperson_name, dr.report_date, dr.visits_count, dr.orders_count, 
