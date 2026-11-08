@@ -4,10 +4,11 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "build": "node --max-old-space-size=6144 node_modules/next/dist/bin/next build --webpack",
+    "build": "node scripts/run-tool.cjs build",
     "prestart": "node scripts/prepare-standalone.mjs",
     "start": "node .next/standalone/server.js",
-    "lint": "eslint"
+    "lint": "node scripts/run-tool.cjs lint",
+    "typecheck": "node scripts/run-tool.cjs typecheck"
   },
   "dependencies": {
     "next": "16.3.1",
