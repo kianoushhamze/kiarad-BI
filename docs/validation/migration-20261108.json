@@ -1,0 +1,31 @@
+{
+  "base_commit": "d2a5c43a10cd935bb3928b0fe6cdb38d393a5772",
+  "environment": "reconstructed uploaded source with reviewed files fetched from GitHub",
+  "offline_tests": {
+    "run": 707,
+    "passed": 526,
+    "skipped": 181,
+    "excluded_live": 14,
+    "failures": 0,
+    "errors": 0
+  },
+  "new_database_guard_tests": 6,
+  "node_runner_tests": "passed including real child exit/heap test",
+  "storefront_scenarios": 14,
+  "lint": {
+    "errors": 0,
+    "existing_warnings": 2,
+    "changed_files_warnings": 0
+  },
+  "typescript": "passed",
+  "build": {
+    "heap_mb": 2048,
+    "result": "passed",
+    "sandbox_metrics_shim": true,
+    "shim_committed": false
+  },
+  "windows_deploy_tested": false,
+  "database_restore_tested": false,
+  "browser_field_tested": false,
+  "deployed": false
+}

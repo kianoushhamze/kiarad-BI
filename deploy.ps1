@@ -33,6 +33,10 @@ do {
 } while ((Get-Date) -lt $deadline)
 if ($health -ne "healthy") { throw "postgres_health_timeout" }
 
+# A fresh volume passes SELECT 1 but does not contain the restored application schema.
+docker compose run --rm --no-deps --pull never backend python scripts/check_release_database.py
+if ($LASTEXITCODE -ne 0) { throw "database_restore_required_or_unavailable" }
+
 if (-not $SkipBackup) {
   & (Join-Path $root "scripts\backup_release.ps1") -ProjectRoot $root
   if ($LASTEXITCODE -ne 0) { throw "predeploy_backup_failed" }
