@@ -15,6 +15,8 @@ class Customer(Base):
     city = Column(String)
     credit_limit = Column(Float, default=0)
     created_at = Column(DateTime, default=datetime.utcnow)
+    # responsible visitor (Holoo invoices do not carry it)
+    salesperson_id = Column(Integer, ForeignKey("salespersons.id"), nullable=True)
 
     sales = relationship("Sale", back_populates="customer")
 
@@ -158,6 +160,13 @@ class Sale(Base):
     date = Column(DateTime, default=datetime.utcnow)
 
     total_amount = Column(Float)
+
+    # Holoo sync fields
+    holoo_code = Column(Integer, nullable=True, unique=True)
+    holoo_sanad_code = Column(Integer, nullable=True)
+    paid_amount = Column(Float, default=0)
+    credit_amount = Column(Float, default=0)
+    discount_amount = Column(Float, default=0)
 
     customer = relationship(
         "Customer",
