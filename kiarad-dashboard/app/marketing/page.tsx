@@ -26,11 +26,13 @@ export default function MarketingPage(){
   const [busy,setBusy]=useState(false);
   const [lastHarvest,setLastHarvest]=useState<Record<string,unknown>|null>(null);
   const [lastDemand,setLastDemand]=useState<Record<string,unknown>|null>(null);
+  const [lastDiscover,setLastDiscover]=useState<Record<string,unknown>|null>(null);
   // leads filters + manual form
   const [fSource,setFSource]=useState("");
   const [fCity,setFCity]=useState("");
   const [fQ,setFQ]=useState("");
   const [newLead,setNewLead]=useState({name:"",city:"",phone:"",address:""});
+  const [fSpecialty,setFSpecialty]=useState("پوست");
 
   const loadQuestions=useCallback(()=>{secureApi<{groups:QuestionGroup[]}>("/marketing/questions")
     .then(v=>{setGroups(v.groups||[]);setError("");}).catch(r=>setError(r instanceof Error?r.message:"دریافت سؤالات ناموفق بود."));},[]);
@@ -60,6 +62,7 @@ export default function MarketingPage(){
   async function refresh(){await run("/marketing/refresh-demand",v=>setLastDemand(v),"بررسی تقاضا کامل شد.");}
   async function generate(){await run("/marketing/generate-content",()=>{},"سه پیش‌نویس محتوا ساخته شد.");}
   async function importLeads(){await run("/marketing/leads/import-files",()=>{},"لیدها از فایل‌های استخراج‌شده وارد شدند (تکراری‌ها رد شدند).");}
+  async function discoverLeads(){await run("/marketing/leads/discover",v=>setLastDiscover(v),"لیدیابی زنده کامل شد؛ نتیجه زیر جدول آمده است.",JSON.stringify({specialty_text:fSpecialty.trim()||"پوست"}));}
   async function saveLead(){
     if(!newLead.name.trim()){setError("نام لید الزامی است.");return;}
     if(busy)return;setBusy(true);setError("");setNotice("");
@@ -98,6 +101,7 @@ export default function MarketingPage(){
         {tab==="demand"&&<button type="button" disabled={busy} onClick={refresh} className={primaryButton}>📊 بررسی تقاضا</button>}
         {tab==="content"&&<button type="button" disabled={busy} onClick={generate} className={primaryButton}>✨ تولید محتوا با دستیار</button>}
         {tab==="leads"&&<button type="button" disabled={busy} onClick={importLeads} className={primaryButton}>⬇️ واردکردن از فایل‌ها (داروخانه‌ها + پزشکان)</button>}
+        {tab==="leads"&&<button type="button" disabled={busy} onClick={discoverLeads} className={primaryButton}>🌐 لیدیابی زنده از پذیرش۲۴</button>}
       </div>
 
       {tab==="questions"&&<Surface className="space-y-4 p-5">
@@ -166,6 +170,7 @@ export default function MarketingPage(){
           <input className={fieldClass} value={fSource} onChange={e=>setFSource(e.target.value)} placeholder="فیلتر منبع (مثلاً shops یا physicians:متخصص)"/>
           <input className={fieldClass} value={fCity} onChange={e=>setFCity(e.target.value)} placeholder="فیلتر شهر"/>
           <input className={fieldClass} value={fQ} onChange={e=>setFQ(e.target.value)} placeholder="جست‌وجو (نام/آدرس/تلفن)"/>
+          <input className={fieldClass} value={fSpecialty} onChange={e=>setFSpecialty(e.target.value)} placeholder="عبارت تخصص برای لیدیابی زنده (مثل: پوست)"/>
         </div>
         {leads.length===0
           ?<p className="text-xs text-slate-500">لیدی یافت نشد؛ فیلترها را پاک کن یا «واردکردن از فایل‌ها» را بزن.</p>
@@ -196,6 +201,10 @@ export default function MarketingPage(){
               </tbody>
             </table>
           </div>}
+        {lastDiscover&&<p className="text-[10px] leading-5 text-slate-400">
+          نتیجهٔ لیدیابی زنده — یافته: {String(lastDiscover.found??"0")} · ثبت‌شده: {String(lastDiscover.inserted??"0")} · تکراری: {String(lastDiscover.skipped??"0")}
+          {Array.isArray(lastDiscover.notes)?` · ${(lastDiscover.notes as string[]).join(" — ")}`:null}
+        </p>}
         <div className="rounded-xl border border-white/10 p-4">
           <h3 className="mb-3 text-xs font-bold text-violet-300">ثبت لید دستی</h3>
           <div className="grid gap-3 sm:grid-cols-4">

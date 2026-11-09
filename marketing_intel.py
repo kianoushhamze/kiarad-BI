@@ -582,3 +582,155 @@ def import_leads_from_files(user: dict = Depends(current_user)):
             per_file[source] = {"file": path.name, "read": len(records),
                                 "inserted": inserted, "skipped": skipped}
     return {"imported": True, "files": per_file}
+
+
+# ------------------------------------------------- live lead discovery (لیدیابی زنده)
+
+P24_SEARCH_URL = "https://apigw.paziresh24.com/seapi/v1/search/{city}/doctor"
+MOJAVEZ_SEARCH_URL = "https://qr.mojavez.ir/api/v1/licenses/search"
+_LEAD_PHONE_RE = re.compile(r"(?:034\d{8}|09\d{9}|0\d{9,10})")
+
+
+class LeadDiscoveryRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    specialty_text: str = "پوست"
+    city_slug: str = "kerman"
+    city_fa: str = "کرمان"
+    mojavez_license_id: int | None = None
+    province_id: int | None = None
+    mojavez_name: str = ""
+    page: int = 1
+    save: bool = True
+
+
+def _p24_search(text_query: str, city_slug: str, page: int = 1) -> list:
+    """جست‌وجوی عمومی پزشکان در گیت‌وی پذیرش۲۴ (read-only، بدون احراز)."""
+    import requests
+    headers = {"User-Agent": "KiaradBI/1.0 (+lead-discovery)"}
+    url = P24_SEARCH_URL.format(city=city_slug.strip() or "kerman")
+    try:
+        resp = requests.get(url, params={"text": text_query, "page": page}, headers=headers, timeout=20)
+    except requests.exceptions.SSLError:
+        # برخی پروکسی‌ها TLS را می‌شکنند؛ این endpoint عمومی و بدون دادهٔ حساس است.
+        resp = requests.get(url, params={"text": text_query, "page": page}, headers=headers, timeout=20, verify=False)
+    resp.raise_for_status()
+    return (resp.json().get("search") or {}).get("result") or []
+
+
+def _p24_items_to_leads(items: list, city_fa: str) -> list[dict]:
+    """تبدیل آیتم‌های پذیرش۲۴ به لید — فقط فیلدهای عمومی (نام/تخصص/آدرس مطب/تلفن)."""
+    leads: list[dict] = []
+    for it in items:
+        if not isinstance(it, dict):
+            continue
+        name = f"{it.get('prefix') or ''} {it.get('display_name') or it.get('title') or ''}".strip()
+        if not name:
+            continue
+        phones: list[str] = []
+        for center in it.get("centers") or []:
+            if not isinstance(center, dict):
+                continue
+            for key in ("phone", "telephone", "tel", "mobile"):
+                if center.get(key):
+                    phones.extend(_LEAD_PHONE_RE.findall(str(center[key])))
+        rate_info = it.get("rate_info") if isinstance(it.get("rate_info"), dict) else {}
+        detail = {
+            "expertise": it.get("display_expertise"),
+            "medical_code": it.get("medical_code"),
+            "url": ("https://paziresh24.com" + str(it["url"])) if it.get("url") else None,
+            "rate": rate_info.get("rate"),
+        }
+        detail = {k: v for k, v in detail.items() if v}
+        leads.append({"source": "paziresh24", "name": name, "city": city_fa or None,
+                      "phone": phones[0] if phones else None,
+                      "address": it.get("display_address") or None, "detail": detail})
+    return leads
+
+
+def _mojavez_search(name_query: str, license_id: int, province_id: int | None, page: int = 1) -> dict:
+    """جست‌وجوی صنفی در درگاه ملی مجوزها (همان APIهای JSON پشت SPA)."""
+    import requests
+    headers = {"User-Agent": "KiaradBI/1.0", "Content-Type": "application/json"}
+    payload = {"license_id": license_id, "province_id": province_id, "name": name_query or "", "page": page}
+    try:
+        resp = requests.post(MOJAVEZ_SEARCH_URL, json=payload, headers=headers, timeout=20)
+    except requests.exceptions.SSLError:
+        resp = requests.post(MOJAVEZ_SEARCH_URL, json=payload, headers=headers, timeout=20, verify=False)
+    resp.raise_for_status()
+    return resp.json()
+
+
+def _normalize_mojavez_items(body: dict, city_fa: str) -> list[dict]:
+    """فرم پاسخ درگاه مجوزها نسخه‌ای است؛ اولین فهرست موجود در پوشه‌های شناخته‌شده خوانده می‌شود."""
+    data = body.get("data") if isinstance(body, dict) else body
+    candidates: list = []
+    if isinstance(data, dict):
+        for key in ("items", "result", "records", "licenses", "list"):
+            if isinstance(data.get(key), list):
+                candidates = data[key]
+                break
+        if not candidates and isinstance(data.get("data"), list):
+            candidates = data["data"]
+    elif isinstance(data, list):
+        candidates = data
+    leads: list[dict] = []
+    for it in candidates:
+        if not isinstance(it, dict):
+            continue
+        name = next((str(it[k]).strip() for k in ("name", "title", "owner_name", "business_name", "subject") if it.get(k)), "")
+        if not name:
+            continue
+        phone_raw = it.get("phone") or it.get("tel") or it.get("mobile") or ""
+        phones = _LEAD_PHONE_RE.findall(str(phone_raw))
+        detail = {k: it[k] for k in ("license_id", "license_title", "province", "province_id", "city") if it.get(k)}
+        leads.append({"source": "mojavez", "name": name,
+                      "city": city_fa or it.get("city") or None,
+                      "phone": phones[0] if phones else None,
+                      "address": it.get("address") or None, "detail": detail})
+    return leads
+
+
+@router.post("/leads/discover")
+def discover_leads(params: LeadDiscoveryRequest, user: dict = Depends(current_user)):
+    """لیدیابی زنده از منابع عمومی: پذیرش۲۴ (پزشکان) و درگاه ملی مجوزها (اصناف).
+
+    گوگل‌مپ/بله/تلگرام نیازمند کلید یا کراول مرورگری‌اند و عمداً اینجا نیستند.
+    ذخیره idempotent است: تکراری‌ها با کلید یکتای name+city رد می‌شوند.
+    """
+    _require_manager(user)
+    found: list[dict] = []
+    notes: list[str] = []
+    try:
+        items = _p24_search(params.specialty_text, params.city_slug, params.page)
+        p24_leads = _p24_items_to_leads(items, params.city_fa)
+        found.extend(p24_leads)
+        with_addr = sum(1 for lead in p24_leads if lead["address"])
+        notes.append(f"پذیرش۲۴: {len(p24_leads)} پزشک ({with_addr} با آدرس)")
+    except Exception as exc:
+        notes.append(f"پذیرش۲۴ در دسترس نیست: {type(exc).__name__}")
+    if params.mojavez_license_id:
+        try:
+            body = _mojavez_search(params.mojavez_name, params.mojavez_license_id, params.province_id, params.page)
+            mj_leads = _normalize_mojavez_items(body, params.city_fa)
+            found.extend(mj_leads)
+            notes.append(f"مجوزها: {len(mj_leads)} مورد")
+        except Exception as exc:
+            notes.append(f"درگاه مجوزها از این شبکه در دسترس نیست: {type(exc).__name__} (از سرور دفتر امتحان شود)")
+    inserted = skipped = 0
+    if params.save and found:
+        with engine.begin() as conn:
+            ensure(conn)
+            for rec in found[:500]:
+                row = conn.execute(text("""INSERT INTO marketing_leads(source, name, city, phone, address, detail, status)
+                    VALUES (:source, :name, :city, :phone, :address, CAST(:detail AS JSONB), 'new')
+                    ON CONFLICT (name, (COALESCE(city, ''))) DO NOTHING
+                    RETURNING id"""), {
+                    "source": rec["source"], "name": rec["name"], "city": rec["city"],
+                    "phone": rec["phone"], "address": rec["address"],
+                    "detail": json.dumps(rec["detail"] or {}, ensure_ascii=False)}).scalar()
+                if row:
+                    inserted += 1
+                else:
+                    skipped += 1
+    return {"found": len(found), "inserted": inserted, "skipped": skipped,
+            "notes": notes, "preview": found[:10]}

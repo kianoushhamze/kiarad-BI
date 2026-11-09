@@ -1,4 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException
+from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 from datetime import datetime
@@ -59,6 +60,56 @@ def list_variants(limit: int = 300):
         "is_active": r["status"] == "active",
         "last_sync_at": r["updated_at"].isoformat() if r["updated_at"] else None,
     } for r in rows]
+
+
+
+def _variants_key_column(conn) -> str:
+    """کلید شناسهٔ دیجی‌کالا در نصب فعلی: dkp_id (اسکیمای جدید) یا variant_id (قدیمی)."""
+    return conn.execute(text("""SELECT CASE
+          WHEN COUNT(*) FILTER (WHERE column_name = 'dkp_id') > 0 THEN 'dkp_id'
+          WHEN COUNT(*) FILTER (WHERE column_name = 'variant_id') > 0 THEN 'variant_id'
+          ELSE '' END
+        FROM information_schema.columns
+        WHERE table_schema = 'public' AND table_name = 'digikala_variants'""")).scalar() or ""
+
+
+class MappingUpdate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    holoo_code: str = Field(min_length=1)
+
+
+@router.patch("/variants/{variant_id}/mapping")
+def set_variant_mapping(variant_id: int, body: MappingUpdate, db_session: Session = Depends(get_db)):
+    """ثبت نگاشت واریانت دیجی‌کالا ← کد هلو (جایگزین جریان دستی variant_map.csv).
+
+    کلید مسیر شناسهٔ دیجی‌کالاست: در اسکیمای فعلی dkp_id و در نصب‌های قدیمی variant_id —
+    هر دو همان شناسهٔ دیجی‌کالا هستند و کد تأمین‌کننده در خروجی اکسل هم همین است.
+    """
+    code = body.holoo_code.strip()
+    if not code:
+        raise HTTPException(422, "کد هلو نمی‌تواند خالی باشد.")
+    with db.engine.connect() as conn:
+        key_col = _variants_key_column(conn)
+    if not key_col:
+        raise HTTPException(503, "جدول digikala_variants یافت نشد؛ ابتدا همگام‌سازی دیجی‌کالا را اجرا کنید.")
+    ts_col = db_session.execute(text("""SELECT CASE
+          WHEN COUNT(*) FILTER (WHERE column_name = 'updated_at') > 0 THEN 'updated_at'
+          WHEN COUNT(*) FILTER (WHERE column_name = 'last_sync_at') > 0 THEN 'last_sync_at'
+          ELSE '' END
+        FROM information_schema.columns
+        WHERE table_schema = 'public' AND table_name = 'digikala_variants'""")).scalar() or ""
+    sets = ["holoo_code = :code"]
+    if ts_col:
+        sets.append(f"{ts_col} = NOW()")
+    result = db_session.execute(text(f"""
+        UPDATE digikala_variants SET {', '.join(sets)} WHERE {key_col} = :vid
+    """), {"code": code, "vid": variant_id})
+    if result.rowcount == 0:
+        db_session.rollback()
+        raise HTTPException(404, f"واریانت {variant_id} در digikala_variants یافت نشد.")
+    db_session.commit()
+    return {"success": True, "variant_id": variant_id, "holoo_code": code, "applied_to_column": key_col}
+
 
 @router.patch("/variants/{variant_id}/stock")
 def update_variant_stock(variant_id: int, count: int, db_session: Session = Depends(get_db)):

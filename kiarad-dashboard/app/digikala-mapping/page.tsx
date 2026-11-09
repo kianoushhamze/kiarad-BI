@@ -130,14 +130,16 @@ export default function DigikalaMappingPage() {
     if (busy) return;
     setBusy(true); setError(""); setNotice("");
     try {
-      // Endpoint /digikala/variants/{id}/mapping does not exist on the backend yet;
-      // try it, but always queue locally so the variant_map CSV flow stays usable.
+      let applied = false;
       try {
         await secureApi(`/digikala/variants/${encodeURIComponent(keyOf(v))}/mapping`, { method: "PATCH", body: JSON.stringify({ holoo_code: code }) });
-      } catch { /* backend endpoint not implemented yet — queue locally */ }
+        applied = true;
+      } catch { /* بدون پاسخ سرور فقط صف محلی معنا دارد */ }
       const entry: QueuedMapping = { variant_id: v.variant_id, holoo_code: code, title: v.title, confirmed_at: new Date().toISOString() };
       persistQueue([entry, ...queue.filter(q => String(q.variant_id) !== String(v.variant_id))]);
-      setNotice(`نگاشت «${v.title}» به صف محلی اضافه شد (فایل CSV قابل کپی).`);
+      setNotice(applied
+        ? `نگاشت «${v.title}» روی سرور ثبت شد و در صف محلی هم ماند (برای CSV).`
+        : `ثبت روی سرور ناموفق بود؛ نگاشت «${v.title}» فقط در صف محلی ماند (CSV قابل کپی).`);
     } finally { setBusy(false); }
   }
 
@@ -169,7 +171,7 @@ export default function DigikalaMappingPage() {
         <h2 className="text-base font-bold text-white">این صفحه چطور کار می‌کند؟ (دو مرحله)</h2>
         <ol className="list-inside list-decimal space-y-1 text-slate-300">
           <li><b className="text-white">مرحله ۱ — تأیید نگاشت‌ها اینجا:</b> نگاشت‌های تأییدشده در «صف محلی» همین مرورگر ذخیره می‌شوند و هنوز روی سایت اعمال نمی‌شوند.</li>
-          <li><b className="text-white">مرحله ۲ — اعمال نهایی:</b> مدیر فنی خروجی CSV صف را در فایل <code className="rounded bg-white/10 px-1">scripts/variant_map.csv</code> اعمال می‌کند و نگاشت‌ها وارد سایت می‌شوند.</li>
+          <li><b className="text-white">مرحله ۲ — اعمال نهایی:</b> با تأیید هر ردیف، نگاشت مستقیماً روی سرور ثبت می‌شود؛ خروجی CSV هم برای جریان دستی اکسل باقی مانده است.</li>
         </ol>
       </Surface>
 
