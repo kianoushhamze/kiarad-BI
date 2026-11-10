@@ -1,0 +1,1062 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl" data-theme="nude">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>کیاراد شفا اندیش | KiaradHealer — استودیو تخصصی درماتولوژی و سلامت</title>
+<meta name="description" content="کیاراد شفا اندیش — نمایندگی انحصاری و فروش آنلاین ۱۰ برند برتر درماتولوژی؛ پورتال B2B داروخانه‌ها و پزشکان متخصص پوست.">
+<meta property="og:title" content="کیاراد شفا اندیش | KiaradHealer">
+<meta property="og:description" content="فروش آنلاین محصولات تخصصی پوست و مو — ویترین ۱۰ برند انحصاری">
+<meta property="og:type" content="website">
+
+  <style>
+@font-face{font-family:'Lalezar';src:url('fonts/lalezar.woff2') format('woff2');font-weight:400;font-style:normal;font-display:swap;}
+@font-face{font-family:'Vazirmatn';src:url('fonts/Vazirmatn-Regular.ttf') format('truetype');font-weight:400;font-style:normal;font-display:swap;}
+@font-face{font-family:'Vazirmatn';src:url('fonts/Vazirmatn-Bold.ttf') format('truetype');font-weight:700;font-style:normal;font-display:swap;}
+</style>
+    <style>
+    :root[data-theme="nude"] {
+      --bg: #FAF7F2;
+      --bg-bar: #F3EDE4;
+      --bg-header: rgba(250, 247, 242, 0.9);
+      --card: #FFFFFF;
+      --card-inner: #FAF7F2;
+      --stage-bg: #FFFFFF;
+      --stage-pod: radial-gradient(circle, #FAF7F2 0%, #EFE8DD 85%);
+      --border: #E6DEC8;
+      --text: #2A2421;
+      --muted: #7D7268;
+      --accent: #6E4B7A;
+      --accent-light: #8E659C;
+      --accent-soft: #EFE8F2;
+      --accent-border: #DFC9E8;
+      --btn-bg: #2A2421;
+      --btn-text: #FAF7F2;
+      --btn-shadow: rgba(42, 36, 33, 0.16);
+      --card-shadow: rgba(140, 120, 95, 0.14);
+      --ring-bg: linear-gradient(145deg, #FFFFFF, #F2ECE1);
+      --switch-bg: #E8E0D5;
+      --hero-glow: rgba(184, 142, 101, 0.12);
+    }
+    :root[data-theme="dark"] {
+      --bg: #030306;
+      --bg-bar: #07070c;
+      --bg-header: rgba(3, 3, 6, 0.88);
+      --card: #0c0c14;
+      --card-inner: #06060b;
+      --stage-bg: linear-gradient(180deg, #11111b 0%, #07070c 100%);
+      --stage-pod: radial-gradient(circle, rgba(124, 58, 237, 0.24) 0%, #050509 80%);
+      --border: #1d1d2e;
+      --text: #f3f3f7;
+      --muted: #8e8e9e;
+      --accent: #7c3aed;
+      --accent-light: #a78bfa;
+      --accent-soft: rgba(124, 58, 237, 0.16);
+      --accent-border: rgba(124, 58, 237, 0.38);
+      --btn-bg: linear-gradient(135deg, #7c3aed, #6d28d9);
+      --btn-text: #FFFFFF;
+      --btn-shadow: rgba(124, 58, 237, 0.35);
+      --card-shadow: rgba(0, 0, 0, 0.75);
+      --ring-bg: radial-gradient(circle at 30% 30%, #1e1b36, #0b0b12);
+      --switch-bg: #12121e;
+      --hero-glow: rgba(124, 58, 237, 0.18);
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Vazirmatn', Tahoma, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.85;
+      overflow-x: hidden;
+      scroll-behavior: smooth;
+      transition: background 0.35s ease, color 0.35s ease;
+    }
+    h1, h2, .display-font {
+      font-family: 'Lalezar', cursive, sans-serif;
+      letter-spacing: 0.3px;
+      font-weight: normal;
+    }
+    a { color: inherit; text-decoration: none; }
+    button { font-family: inherit; cursor: pointer; border: none; outline: none; }
+    .container { max-width: 1280px; margin: 0 auto; padding: 0 32px; }
+    .row-between { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 14px; }
+    .top-bar {
+      background: var(--bg-bar); border-bottom: 1px solid var(--border);
+      padding: 10px 0; font-size: 12px; transition: background 0.35s;
+    }
+    .theme-toggle, .auth-btn {
+      display: inline-flex; align-items: center; gap: 8px; padding: 7px 16px;
+      border-radius: 12px; background: var(--card); border: 1px solid var(--border);
+      color: var(--text); font-size: 12px; font-weight: bold;
+      box-shadow: 0 4px 12px var(--card-shadow); transition: 0.25s;
+    }
+    .theme-toggle:hover, .auth-btn:hover { border-color: var(--accent); transform: translateY(-1px); }
+    .auth-btn.logged-in { background: var(--accent-soft); border-color: var(--accent); color: var(--accent-light); }
+    .partner-banner {
+      display: none; background: linear-gradient(90deg, rgba(124,58,237,0.14), rgba(16,185,129,0.12));
+      border-bottom: 1px solid var(--accent-border); padding: 10px 0; font-size: 12.5px;
+    }
+    .partner-banner.show { display: block; }
+    header {
+      position: sticky; top: 0; z-index: 40; background: var(--bg-header);
+      backdrop-filter: blur(22px); border-bottom: 1px solid var(--border); padding: 18px 0;
+    }
+    .brand-logo { display: flex; align-items: center; gap: 14px; }
+    .logo-mark {
+      width: 44px; height: 44px; border-radius: 14px;
+      background: linear-gradient(135deg, var(--accent), var(--accent-light));
+      display: flex; align-items: center; justify-content: center;
+      font-family: 'Lalezar', cursive; font-size: 24px; color: #fff;
+      box-shadow: 0 8px 20px var(--btn-shadow);
+    }
+    .search-header { flex: 1; max-width: 400px; }
+    .search-header input {
+      width: 100%; background: var(--card); border: 1px solid var(--border);
+      color: var(--text); padding: 12px 20px; border-radius: 16px; font-family: inherit; font-size: 13px;
+    }
+    .nav { display: flex; gap: 26px; font-size: 14px; color: var(--muted); font-weight: 500; }
+    .nav a:hover { color: var(--accent); }
+    .btn-primary {
+      background: var(--btn-bg); color: var(--btn-text); padding: 12px 24px;
+      border-radius: 14px; font-weight: bold; font-size: 13px;
+      box-shadow: 0 10px 24px var(--btn-shadow); transition: 0.3s;
+    }
+    .btn-primary:hover { transform: translateY(-2px); opacity: 0.94; }
+    .btn-locked {
+      background: var(--switch-bg); color: var(--muted); border: 1px dashed var(--border);
+      padding: 10px 18px; border-radius: 12px; font-weight: bold; font-size: 12px;
+    }
+    .btn-locked:hover { border-color: var(--accent); color: var(--accent-light); }
+    .hero { padding: 65px 0 40px; text-align: center; position: relative; }
+    .hero-glow {
+      position: absolute; top: 10px; left: 50%; transform: translateX(-50%);
+      width: 680px; height: 280px; background: var(--hero-glow);
+      filter: blur(140px); pointer-events: none; border-radius: 50%;
+    }
+    .hero-badge {
+      display: inline-block; padding: 6px 18px; border-radius: 99px;
+      background: var(--accent-soft); border: 1px solid var(--accent-border);
+      color: var(--accent-light); font-size: 12px; font-weight: bold; margin-bottom: 18px;
+    }
+    .hero h1 { font-size: 50px; line-height: 1.25; color: var(--text); margin-bottom: 16px; }
+    .hero h1 span { display: block; color: var(--accent-light); }
+    .hero p { color: var(--muted); max-width: 680px; margin: 0 auto 38px; font-size: 15.5px; }
+    .cat-circles { display: flex; justify-content: center; gap: 28px; flex-wrap: wrap; margin: 10px 0 50px; }
+    .cat-item { display: flex; flex-direction: column; align-items: center; gap: 10px; cursor: pointer; }
+    .cat-ring {
+      width: 80px; height: 80px; border-radius: 50%; background: var(--ring-bg);
+      border: 2px solid var(--border); display: flex; align-items: center; justify-content: center;
+      font-size: 27px; transition: 0.3s; box-shadow: 0 10px 25px var(--card-shadow);
+    }
+    .cat-item:hover .cat-ring, .cat-item.active .cat-ring {
+      border-color: var(--accent); transform: translateY(-5px) scale(1.05);
+      box-shadow: 0 14px 28px var(--btn-shadow);
+    }
+    .cat-label { font-size: 13px; font-weight: bold; color: var(--text); }
+    .brand-bar { display: flex; gap: 10px; overflow-x: auto; padding: 6px 0 42px; justify-content: center; flex-wrap: wrap; }
+    .brand-pill {
+      padding: 10px 22px; border-radius: 14px; background: var(--card); color: var(--muted);
+      border: 1px solid var(--border); font-size: 13px; font-weight: bold; transition: 0.25s;
+    }
+    .brand-pill:hover { border-color: var(--accent); color: var(--text); }
+    .brand-pill.active {
+      background: var(--accent); color: #fff; border-color: var(--accent-light);
+      box-shadow: 0 8px 22px var(--btn-shadow);
+    }
+    .stage {
+      background: var(--stage-bg); border: 1px solid var(--border); border-radius: 36px; padding: 48px;
+      display: grid; grid-template-columns: 1.15fr 0.85fr; gap: 48px; align-items: center; text-align: right;
+      margin-bottom: 90px; box-shadow: 0 25px 60px -15px var(--card-shadow);
+    }
+    @media (max-width: 920px) { .stage { grid-template-columns: 1fr; padding: 28px; } .nav, .search-header { display: none; } }
+    .sec-head { margin: 80px 0 38px; text-align: center; }
+    .sec-head h2 { font-size: 38px; color: var(--text); }
+    .sec-head p { color: var(--muted); font-size: 15px; margin-top: 6px; }
+    .grid-store { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 28px; }
+    .card {
+      background: var(--card); border: 1px solid var(--border); border-radius: 28px; padding: 24px;
+      display: flex; flex-direction: column; justify-content: space-between; transition: 0.35s; position: relative;
+    }
+    .card:hover { border-color: var(--accent); transform: translateY(-6px); box-shadow: 0 22px 45px -15px var(--card-shadow); }
+    .card-img {
+      background: var(--stage-pod); border: 1px solid var(--border); border-radius: 22px;
+      padding: 22px; text-align: center; margin: 14px 0 18px; cursor: pointer; position: relative;
+    }
+    .card-img img { height: 190px; width: auto; object-fit: contain; transition: 0.35s; }
+    .card:hover .card-img img { transform: scale(1.06); }
+    .grid-3 { display: grid; grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); gap: 30px; }
+    .corp-card {
+      background: var(--card); border: 1px solid var(--border); border-radius: 28px;
+      padding: 34px; transition: 0.3s; box-shadow: 0 12px 30px -10px var(--card-shadow);
+    }
+    .modal-backdrop {
+      position: fixed; inset: 0; background: rgba(0, 0, 0, 0.65); backdrop-filter: blur(10px);
+      z-index: 120; display: none; align-items: center; justify-content: center; padding: 20px;
+    }
+    .modal-backdrop.open { display: flex; }
+    .modal-box {
+      width: 100%; max-width: 480px; background: var(--card); border: 1px solid var(--border);
+      border-radius: 30px; padding: 34px; box-shadow: 0 30px 70px rgba(0,0,0,0.45);
+    }
+    .auth-tabs {
+      display: grid; grid-template-columns: 1fr 1fr; gap: 8px; background: var(--card-inner);
+      padding: 5px; border-radius: 14px; border: 1px solid var(--border); margin-bottom: 22px;
+    }
+    .auth-tab {
+      padding: 9px; border-radius: 10px; font-size: 12.5px; font-weight: bold;
+      color: var(--muted); background: transparent; transition: 0.2s;
+    }
+    .auth-tab.active { background: var(--card); color: var(--text); box-shadow: 0 4px 12px var(--card-shadow); }
+    .form-group { margin-bottom: 16px; text-align: right; }
+    .form-group label { display: block; font-size: 12px; font-weight: bold; color: var(--muted); margin-bottom: 6px; }
+    .form-input {
+      width: 100%; background: var(--card-inner); border: 1px solid var(--border); color: var(--text);
+      padding: 12px 16px; border-radius: 14px; font-family: inherit; font-size: 13px;
+    }
+    .form-input:focus { outline: none; border-color: var(--accent); }
+    .drawer {
+      position: fixed; inset: 0; background: rgba(0, 0, 0, 0.55); backdrop-filter: blur(8px);
+      z-index: 110; display: none; justify-content: flex-end;
+    }
+    .drawer.open { display: flex; }
+    .drawer-panel {
+      width: 100%; max-width: 460px; background: var(--bg); border-right: 1px solid var(--border);
+      height: 100%; padding: 30px; display: flex; flex-direction: column; justify-content: space-between; overflow-y: auto;
+    }
+    footer {
+      background: var(--bg-bar); border-top: 1px solid var(--border); padding: 50px 0;
+      margin-top: 90px; text-align: center; font-size: 13.5px; color: var(--muted);
+    }
+  </style>
+<style id="polish">
+/* ---- Hoosha visual polish v1 (2026-11-10) ---- */
+html { scroll-behavior: smooth; }
+::selection { background: var(--accent); color: #fff; }
+* { scrollbar-width: thin; scrollbar-color: var(--border) transparent; }
+*::-webkit-scrollbar { width: 9px; height: 9px; }
+*::-webkit-scrollbar-thumb { background: var(--border); border-radius: 99px; }
+*::-webkit-scrollbar-thumb:hover { background: var(--accent-light); }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 6px; }
+.form-input:focus { box-shadow: 0 0 0 3px var(--accent-soft); }
+body, header, .card, .drawer-panel, .modal-box, footer, .brand-pill, .cat-ring {
+  transition: background-color .35s ease, border-color .35s ease, color .35s ease;
+}
+header::after {
+  content: ''; display: block; height: 2px; width: min(1200px, 92%);
+  margin: 12px auto 0; border-radius: 2px; opacity: .5;
+  background: linear-gradient(90deg, transparent, var(--accent-border) 22%, var(--accent) 50%, var(--accent-border) 78%, transparent);
+}
+.btn-primary { will-change: transform; }
+.btn-primary:active { transform: translateY(0) scale(.985); }
+.card { contain: paint; }
+.drawer-panel { animation: khDrawerIn .28s cubic-bezier(.2,.7,.3,1); }
+@keyframes khDrawerIn { from { transform: translateX(-26px); opacity: .5; } }
+@media (max-width: 920px) {
+  .sec-head { margin: 48px 0 26px; }
+  .sec-head h2 { font-size: 26px; }
+  .btn-primary, .auth-btn, .theme-toggle { min-height: 44px; }
+  .modal-backdrop { padding: 14px; overflow-y: auto; }
+  .modal-box { margin: 6vh auto; padding: 24px; border-radius: 20px; max-height: 86vh; overflow-y: auto; }
+  .drawer-panel { max-width: 100%; }
+  footer { font-size: 12px; }
+}
+@media (max-width: 560px) {
+  .grid-3 { grid-template-columns: 1fr; }
+  .sec-head h2 { font-size: 22px; }
+}
+@media print {
+  header, footer, .drawer, .modal-backdrop, .theme-toggle, .auth-btn { display: none !important; }
+  body { background: #fff; }
+}
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation: none !important; transition: none !important; }
+  html { scroll-behavior: auto; }
+}
+</style>
+</head>
+<body>
+
+  <div class="top-bar">
+    <div class="container row-between">
+      <div style="display:flex; align-items:center; gap:12px;">
+        <span style="color:var(--accent-light); font-weight:bold;">✦ شرکت کیاراد شفا اندیش (KiaradHealer)</span>
+        <span style="color:var(--muted);">| تامین‌کننده تخصصی مراکز درمانی، داروخانه‌ها و گالری‌ها</span>
+      </div>
+
+      <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
+        <button id="themeBtn" class="theme-toggle" onclick="toggleTheme()">
+          <span id="themeIcon">🌙</span>
+          <span id="themeLabel">پوسته شب (Dark Pro)</span>
+        </button>
+
+        <button id="authTriggerBtn" class="auth-btn" onclick="toggleAuthModal(true)">
+          <span>🔐</span>
+          <span id="authBtnText">پرتال همکاران (داروخانه / پزشکان)</span>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <div id="partnerBanner" class="partner-banner">
+    <div class="container row-between">
+      <div style="display:flex; align-items:center; gap:14px; flex-wrap:wrap;">
+        <span id="partnerBadgeTitle" style="font-weight:900; color:var(--accent-light);"></span>
+        <span style="padding:3px 12px; border-radius:99px; font-size:11.5px; font-weight:bold; background:rgba(16,185,129,0.18); color:#10b981;">
+          تعرفه عمده‌فروشی همکار فعال است
+        </span>
+      </div>
+      <button onclick="logoutPartner()" style="background:transparent; color:#ef4444; font-size:12px; font-weight:bold;">
+        خروج از پنل همکار ✕
+      </button>
+    </div>
+  </div>
+
+  <header>
+    <div class="container row-between">
+      <div class="brand-logo">
+        <div class="logo-mark">K</div>
+        <div>
+          <div class="display-font" style="font-size:25px; color:var(--text); line-height:1.1;">کیاراد شفا اندیش</div>
+          <div style="font-size:11.5px; color:var(--muted);">KiaradHealer • استودیو تخصصی درماتولوژی و زیبایی</div>
+        </div>
+      </div>
+
+      <div class="search-header">
+        <input id="searchBox" oninput="renderStore()" type="text" placeholder="جستجو در میان ۱۰ برند، نام محصول یا ترکیبات کلینیکال..." />
+      </div>
+
+      <nav class="nav">
+        <a href="#stage-sec">ویترین ویژه</a>
+        <a href="#store-sec">فروشگاه</a>
+        <a href="#corp-sec">درباره کیاراد</a>
+        <a href="#cat-sec">کاتالوگ و مقالات</a>
+      </nav>
+
+      <button class="btn-primary" onclick="toggleCart(true)">
+        سبد سفارش (<span id="cartCount">۲</span>)
+      </button>
+    </div>
+  </header>
+
+  <main class="container">
+    <section id="stage-sec" class="hero">
+      <div class="hero-glow"></div>
+      <span class="hero-badge">CLINICAL & DERMATOLOGY SKINCARE COLLECTION</span>
+      <h1>
+        اصالت علمی در لطافت زیبایی طبیعی.
+        <span>نمایندگی انحصاری و فروش آنلاین ۱۰ برند برتر.</span>
+      </h1>
+      <p>
+        خرید آنلاین مستقیم برای مصرف‌کنندگان و پرتال اختصاصی عمده‌فروشی ویژه داروخانه‌ها، کلینیک‌های پوست و گالری‌های منتخب.
+      </p>
+
+      <div class="cat-circles">
+        <div class="cat-item active" onclick="filterByCategory('ALL', this)">
+          <div class="cat-ring">✨</div>
+          <span class="cat-label">همه دسته‌ها</span>
+        </div>
+        <div class="cat-item" onclick="filterByCategory('مراقبت پوست', this)">
+          <div class="cat-ring">🧴</div>
+          <span class="cat-label">مراقبت پوست</span>
+        </div>
+        <div class="cat-item" onclick="filterByCategory('مراقبت مو', this)">
+          <div class="cat-ring">🌿</div>
+          <span class="cat-label">ضدریزش و مو</span>
+        </div>
+        <div class="cat-item" onclick="filterByCategory('ضدآفتاب تخصصی', this)">
+          <div class="cat-ring">☀️</div>
+          <span class="cat-label">ضدآفتاب کلینیکال</span>
+        </div>
+        <div class="cat-item" onclick="filterByCategory('ترمیم‌کننده و ضدلک', this)">
+          <div class="cat-ring">🧬</div>
+          <span class="cat-label">ترمیم و ضدلک</span>
+        </div>
+        <div class="cat-item" onclick="filterByCategory('مزوتراپی کلینیکال', this)">
+          <div class="cat-ring">💉</div>
+          <span class="cat-label">مزوتراپی پزشکان</span>
+        </div>
+      </div>
+
+      <div id="brandBar" class="brand-bar"></div>
+
+      <div class="stage">
+        <div>
+          <div style="display:flex; gap:10px; align-items:center; margin-bottom:16px; flex-wrap:wrap;">
+            <span id="stBrand" style="background:var(--accent-soft); color:var(--accent-light); border:1px solid var(--accent-border); padding:5px 16px; border-radius:99px; font-size:12.5px; font-weight:bold;"></span>
+            <span id="stCat" style="color:var(--muted); font-size:13px; font-weight:bold;"></span>
+            <span id="stOfferBadge" style="display:none; background:rgba(16,185,129,0.15); color:#10b981; padding:4px 12px; border-radius:99px; font-size:11.5px; font-weight:bold;"></span>
+          </div>
+
+          <h2 id="stTitle" style="font-size:36px; color:var(--text); line-height:1.25; margin-bottom:10px;"></h2>
+          <div id="stEn" style="color:var(--accent-light); font-size:13px; font-family:monospace; font-weight:bold; margin-bottom:18px;"></div>
+          <p id="stDesc" style="color:var(--muted); font-size:15px; margin-bottom:24px;"></p>
+
+          <div style="background:var(--card-inner); border:1px solid var(--border); border-radius:20px; padding:18px 22px; margin-bottom:22px;">
+            <div class="row-between" style="font-size:12px; color:var(--muted); margin-bottom:6px;">
+              <span>ترکیبات کلیدی فعال (Active Formula):</span>
+              <strong id="stVol" style="color:var(--accent-light); font-family:monospace;"></strong>
+            </div>
+            <div id="stIng" style="font-size:14px; font-weight:bold; color:var(--text);"></div>
+          </div>
+
+          <div id="stB2BProfitBox" style="display:none; background:rgba(16,185,129,0.08); border:1px solid rgba(16,185,129,0.3); border-radius:16px; padding:12px 18px; margin-bottom:22px; font-size:12.5px;"></div>
+
+          <div class="row-between">
+            <div id="stPriceContainer">
+              <span id="stPriceLabel" style="font-size:12px; color:var(--muted); display:block;">قیمت مصرف‌کننده آنلاین:</span>
+              <span id="stPrice" style="font-size:34px; font-weight:900; color:var(--text);"></span>
+              <span id="stCurrency" style="font-size:13px; color:var(--accent-light); font-weight:bold;">تومان</span>
+            </div>
+            <button id="stAddBtn" class="btn-primary" style="padding:14px 28px; font-size:14px;">+ افزودن به سبد سفارش</button>
+          </div>
+        </div>
+
+        <div style="background:var(--stage-pod); border:1px solid var(--border); border-radius:28px; padding:40px; text-align:center;">
+          <img id="stImg" src="" alt="Product Stage" style="max-height:330px; width:auto; filter:drop-shadow(0 20px 28px rgba(0,0,0,0.28)); transition:0.4s;" />
+          <div class="row-between" style="margin-top:20px; padding-top:14px; border-top:1px solid var(--border); font-size:12px; color:var(--muted);">
+            <span>ضمانت اصالت و رهگیری سری ساخت</span>
+            <span style="color:#10b981; font-weight:bold;">✓ تاییدیه علمی کیاراد شفا اندیش</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="store-sec">
+      <div class="sec-head">
+        <h2>ویترین فروشگاهی ۱۰ برند انحصاری</h2>
+        <p id="storeSubTitle">نمایش قیمت‌های تک‌فروشی آنلاین — همکاران گرامی (داروخانه‌ها، پزشکان و گالری‌ها) جهت مشاهده تعرفه عمده از بالای صفحه وارد حساب خود شوند.</p>
+      </div>
+      <div id="storeGrid" class="grid-store"></div>
+    </section>
+
+    <section id="corp-sec">
+      <div class="sec-head">
+        <h2>استاندارد سازمانی کیاراد شفا اندیش</h2>
+        <p>قطب تخصصی تامین و توزیع محصولات درماتولوژی، داروخانه‌ای و کلینیکال</p>
+      </div>
+      <div class="grid-3">
+        <div class="corp-card">
+          <span style="font-size:12px; color:var(--accent-light); font-weight:bold;">شبکه توزیع گسترده</span>
+          <h3 class="display-font" style="font-size:26px; color:var(--text); margin:10px 0;">پوشش بیش از ۴۷۷ مرکز</h3>
+          <p style="font-size:14px; color:var(--muted);">تامین پایدار و سریع داروخانه‌ها، کلینیک‌های تخصصی پوست و گالری‌های برتر با ناوگان توزیع اختصاصی و استاندارد.</p>
+        </div>
+        <div class="corp-card">
+          <span style="font-size:12px; color:#10b981; font-weight:bold;">استاندارد لجستیک دارویی</span>
+          <h3 class="display-font" style="font-size:26px; color:var(--text); margin:10px 0;">تضمین اصالت و کیفیت</h3>
+          <p style="font-size:14px; color:var(--muted);">نگهداری در شرایط استاندارد دمایی و رطوبتی همراه با پایش دقیق تاریخ انقضا و سری ساخت جهت تضمین بالاترین کیفیت بالینی.</p>
+        </div>
+        <div class="corp-card">
+          <span style="font-size:12px; color:#f59e0b; font-weight:bold;">مرجعیت علمی و کلینیکال</span>
+          <h3 class="display-font" style="font-size:26px; color:var(--text); margin:10px 0;">همکاری با متخصصین پوست</h3>
+          <p style="font-size:14px; color:var(--muted);">برگزاری پنل‌های علمی و تامین انحصاری کوکتل‌های مزوتراپی استریل MC Cosmetics اسپانیا و سرم‌های تخصصی HLM ویژه پزشکان.</p>
+        </div>
+      </div>
+    </section>
+
+    <section id="cat-sec">
+      <div class="sec-head">
+        <h2>کاتالوگ‌های رسمی و مقالات کلینیکال</h2>
+        <p>دریافت مستندات علمی، لیست قیمت مصوب و پروتکل‌های درمانی ۱۰ برند</p>
+      </div>
+      <div class="grid-3">
+        <div class="corp-card">
+          <span style="font-size:11.5px; color:#10b981; font-weight:bold;">ویژه داروخانه‌ها و گالری‌ها</span>
+          <h3 class="display-font" style="font-size:24px; color:var(--text); margin:10px 0;">کاتالوگ جامع پوست و مو ۱۴۰۵</h3>
+          <p style="font-size:13.5px; color:var(--muted); margin-bottom:22px;">شامل معرفی کامل برندهای V&amp;V، Dermalist، Laboren، Solamor، Elvatan، OldStop، CIP و Lufente به همراه جدول آفرهای پلکانی.</p>
+          <button class="btn-primary" style="width:100%;" onclick="alert('فایل PDF کاتالوگ جامع کیاراد شفا اندیش آماده دانلود شد.')">دانلود کاتالوگ PDF</button>
+        </div>
+        <div class="corp-card">
+          <span style="font-size:11.5px; color:var(--accent-light); font-weight:bold;">ویژه پزشکان و کلینیک‌ها</span>
+          <h3 class="display-font" style="font-size:24px; color:var(--text); margin:10px 0;">پروتکل مزوتراپی MC Cosmetics</h3>
+          <p style="font-size:13.5px; color:var(--muted); margin-bottom:22px;">راهنمای بالینی تزریق، میکرونیدلینگ و ترکیب کوکتل‌های استریل بارسلونا اسپانیا در کنار سرم‌های کلینیکال HLM.</p>
+          <button class="btn-primary" style="width:100%;" onclick="alert('پروتکل کلینیکال پزشکان دانلود شد.')">دریافت پروتکل کلینیکال</button>
+        </div>
+        <div class="corp-card">
+          <span style="font-size:11.5px; color:#f59e0b; font-weight:bold;">ژورنال علمی کیاراد</span>
+          <h3 class="display-font" style="font-size:24px; color:var(--text); margin:10px 0;">مقالات تخصصی درماتولوژی</h3>
+          <p style="font-size:13.5px; color:var(--muted); margin-bottom:22px;">بررسی بالینی مکانیسم کافئین کپسوله درمالیست در مهار DHT و نقش PDRN سالمون الواتان در بازسازی سلولی پوست.</p>
+          <button class="btn-primary" style="width:100%;" onclick="alert('بخش مقالات علمی باز شد.')">مطالعه ژورنال علمی</button>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <div id="authModal" class="modal-backdrop">
+    <div class="modal-box">
+      <div class="row-between" style="padding-bottom:16px; border-bottom:1px solid var(--border); margin-bottom:20px;">
+        <div>
+          <h3 class="display-font" style="font-size:26px; color:var(--text);">پرتال همکاران تجاری (B2B)</h3>
+          <p style="font-size:12px; color:var(--muted);">ویژه داروخانه‌ها، پزشکان متخصص پوست و گالری‌های طرف قرارداد</p>
+        </div>
+        <button onclick="toggleAuthModal(false)" style="background:var(--switch-bg); color:var(--text); padding:6px 12px; border-radius:10px; font-weight:bold;">✕</button>
+      </div>
+
+      <div class="auth-tabs">
+        <button id="tabLoginBtn" class="auth-tab active" onclick="switchAuthTab('login')">ورود همکاران دارای اشتراک</button>
+        <button id="tabRegBtn" class="auth-tab" onclick="switchAuthTab('register')">درخواست پنل همکاری جدید</button>
+      </div>
+
+      <div id="loginFormArea">
+        <div class="form-group">
+          <label>نوع مرکز درمانی / تجاری:</label>
+          <select id="partnerTypeSelect" class="form-input">
+            <option value="pharmacy">داروخانه یا گالری آرایشی و بهداشتی</option>
+            <option value="clinic">پزشک متخصص پوست / کلینیک زیبایی (دسترسی کلینیکال)</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>شماره موبایل یا کد اشتراک همکاری:</label>
+          <input id="phoneInput" type="text" class="form-input" placeholder="مثلاً 09130000000" />
+        </div>
+        <div class="form-group">
+          <label>رمز عبور یا کد تایید پیامکی:</label>
+          <input id="passInput" type="password" class="form-input" placeholder="••••••••" />
+        </div>
+        <button class="btn-primary" style="width:100%; padding:14px; margin-top:6px;" onclick="handlePartnerLogin()">
+          ورود به پنل عمده‌فروشی همکاران
+        </button>
+      </div>
+
+      <div id="registerFormArea" style="display:none;">
+        <div class="form-group">
+          <label>نام داروخانه / کلینیک / گالری:</label>
+          <input type="text" class="form-input" placeholder="نام مرکز تجاری یا درمانی..." />
+        </div>
+        <div class="form-group">
+          <label>شماره نظام پزشکی / پروانه تاسیس یا جواز کسب:</label>
+          <input type="text" class="form-input" placeholder="شماره مجوز جهت احراز هویت همکار..." />
+        </div>
+        <div class="form-group">
+          <label>شماره موبایل مسئول خرید و نام شهر:</label>
+          <input type="text" class="form-input" placeholder="مثلاً: 09130000000 - کرمان" />
+        </div>
+        <button class="btn-primary" style="width:100%; padding:14px; margin-top:6px;" onclick="alert('درخواست پنل همکاری شما ثبت شد. پس از بررسی واحد فروش کیاراد شفا اندیش، رمز ورود به پنل عمده برایتان پیامک خواهد شد.'); toggleAuthModal(false);">
+          ارسال مدارک و درخواست فعال‌سازی پنل عمده
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <div id="cartDrawer" class="drawer">
+    <div class="drawer-panel">
+      <div>
+        <div class="row-between" style="padding-bottom:18px; border-bottom:1px solid var(--border);">
+          <div>
+            <strong style="font-size:18px; color:var(--text);">سبد سفارش KiaradHealer</strong>
+            <div id="cartSub" style="font-size:12px; color:var(--accent-light); margin-top:2px; font-weight:bold;">خرید آنلاین مستقیم (تک‌فروشی)</div>
+          </div>
+          <button onclick="toggleCart(false)" style="background:var(--switch-bg); color:var(--text); padding:7px 14px; border-radius:10px; font-weight:bold;">بستن ✕</button>
+        </div>
+        <div id="cartItems" style="margin-top:20px; display:flex; flex-direction:column; gap:12px;"></div>
+      </div>
+
+      <div style="padding-top:20px; border-top:1px solid var(--border);">
+        <div id="cartPartnerSummary" style="display:none; background:var(--card-inner); border:1px solid var(--border); border-radius:14px; padding:12px; margin-bottom:14px; font-size:12px;"></div>
+
+        <div class="row-between" style="margin-bottom:16px;">
+          <span style="color:var(--muted); font-size:14px;">جمع کل قابل پرداخت:</span>
+          <strong id="cartTotal" style="font-size:22px; color:var(--text);"></strong>
+        </div>
+
+        <div id="checkoutButtonsArea" style="display:flex; flex-direction:column; gap:10px;">
+          <button class="btn-primary" style="width:100%; padding:14px;" onclick="submitOrder('cash')">
+            💳 پرداخت آنلاین نقدی و ثبت سفارش
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <footer>
+    شرکت پخش کیاراد شفا اندیش (<strong>KiaradHealer.com</strong>) • مرجع تخصصی توزیع ۱۰ برند برتر درماتولوژی و زیبایی
+  </footer>
+
+  <script>
+    // === CONFIG: آدرس بک‌اند داشبورد کیاراد برای ثبت زندهٔ سفارش‌ها ===
+    // تا وقتی خالی است سفارش‌ها فقط در همین مرورگر بایگانی می‌شوند.
+    // بعد از راه‌اندازی داشبورد مقدار را بگذار: window.KIARAD_API_URL = 'http://127.0.0.1:8000';
+    window.KIARAD_API_URL = '';
+
+    // === CONFIG: آدرس بک‌اند داشبورد کیاراد برای ثبت زندهٔ سفارش‌ها ===
+    // تا وقتی خالی است سفارش‌ها فقط در همین مرورگر بایگانی می‌شوند.
+    // بعد از راه‌اندازی داشبورد مقدار را بگذار: window.KIARAD_API_URL = 'http://127.0.0.1:8000';
+    window.KIARAD_API_URL = '';
+
+    let currentTheme = 'nude';
+
+    let activeUser = {
+      isB2B: false,
+      canBuyClinical: false,
+      title: 'خرید آنلاین مستقیم (تک‌فروشی)',
+      moq: 1
+    };
+
+    function switchAuthTab(tab) {
+      const isLogin = tab === 'login';
+      document.getElementById('tabLoginBtn').className = isLogin ? 'auth-tab active' : 'auth-tab';
+      document.getElementById('tabRegBtn').className = !isLogin ? 'auth-tab active' : 'auth-tab';
+      document.getElementById('loginFormArea').style.display = isLogin ? 'block' : 'none';
+      document.getElementById('registerFormArea').style.display = !isLogin ? 'block' : 'none';
+    }
+
+    function handlePartnerLogin() {
+      const type = document.getElementById('partnerTypeSelect').value;
+      const phone = (document.getElementById('phoneInput').value || '').trim();
+      if (!phone) {
+        alert('لطفاً شماره موبایل یا کد اشتراک همکاری خود را وارد نمایید.');
+        return;
+      }
+      const pass = (document.getElementById('passInput').value || '').trim();
+      if (!pass) {
+        alert('رمز عبور یا کد تایید پیامکی را وارد کنید.');
+        return;
+      }
+
+      const isClinic = type === 'clinic' || phone === '2';
+      activeUser = {
+        isB2B: true,
+        canBuyClinical: isClinic,
+        title: isClinic ? 'پنل کلینیک و پزشک متخصص (VIP)' : 'پنل همکاری داروخانه و گالری (B2B)',
+        moq: isClinic ? 3 : 6,
+        partnerCode: 'کد اشتراک: KH-' + phone.slice(-4).padStart(4, '0'),
+        creditLimit: isClinic ? 120000000 : 50000000,
+        hasDebtLock: false
+      };
+
+      toggleAuthModal(false);
+      document.getElementById('authTriggerBtn').className = 'auth-btn logged-in';
+      document.getElementById('authBtnText').textContent = activeUser.title;
+      document.getElementById('partnerBanner').className = 'partner-banner show';
+      document.getElementById('partnerBadgeTitle').textContent = '✓ خوش آمدید • ' + activeUser.title + ' • ' + activeUser.partnerCode;
+      const banner = document.getElementById('partnerBanner');
+      if (banner && !document.getElementById('partnerCreditBadge')) {
+        const d = document.createElement('div');
+        d.id = 'partnerCreditBadge';
+        d.style.cssText = 'margin-top:6px; font-size:11.5px; font-weight:bold; padding:4px 10px; border-radius:999px; display:inline-block; background:rgba(16,185,129,0.18); color:#10b981;';
+        banner.appendChild(d);
+      }
+      const cb = document.getElementById('partnerCreditBadge');
+      if (cb) cb.textContent = 'سقف خرید اعتباری فعال (آزمایشی): ' + fa(activeUser.creditLimit) + ' تومان';
+      document.getElementById('storeSubTitle').textContent =
+        'پرتال عمده‌فروشی فعال است • تعرفه‌های همکاری، حاشیه سود و آفرهای حجمی بر اساس سطح دسترسی شما نمایش داده می‌شوند.';
+
+      const found = PRODUCTS.find(x => x.id === currentProdId) || PRODUCTS[0];
+      updateStage(found);
+      renderStore();
+      renderCart();
+    }
+
+    function logoutPartner() {
+      activeUser = {
+        isB2B: false,
+        canBuyClinical: false,
+        title: 'خرید آنلاین مستقیم (تک‌فروشی)',
+        moq: 1
+      };
+      document.getElementById('authTriggerBtn').className = 'auth-btn';
+      document.getElementById('authBtnText').textContent = 'پرتال همکاران (داروخانه / پزشکان)';
+      document.getElementById('partnerBanner').className = 'partner-banner';
+      const cb = document.getElementById('partnerCreditBadge');
+      if (cb) cb.textContent = '';
+      document.getElementById('storeSubTitle').textContent =
+        'نمایش قیمت‌های تک‌فروشی آنلاین — همکاران گرامی (داروخانه‌ها، پزشکان و گالری‌ها) جهت مشاهده تعرفه عمده از بالای صفحه وارد حساب خود شوند.';
+
+      const found = PRODUCTS.find(x => x.id === currentProdId) || PRODUCTS[0];
+      updateStage(found);
+      renderStore();
+      renderCart();
+    }
+
+    function makeBottleSvg(brand, model, sub, accentColor, capColor, shape) {
+      const isDark = currentTheme === 'dark';
+      const bodyStart = isDark ? '#252538' : '#FFFFFF';
+      const bodyMid   = isDark ? '#141420' : '#F5EFE6';
+      const bodyEnd   = isDark ? '#08080e' : '#E5DAC9';
+      const strokeCol = isDark ? accentColor : '#D5C7B2';
+      const labelBg   = isDark ? '#050509' : '#FFFFFF';
+      const labelBorder = isDark ? '#252538' : '#E2D6C3';
+      const brandTextCol = isDark ? '#FFFFFF' : '#2A2421';
+
+      const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 360 400" width="360" height="400">
+        <defs>
+          <radialGradient id="g" cx="50%" cy="45%" r="55%">
+            <stop offset="0%" stop-color="${accentColor}" stop-opacity="${isDark ? '0.4' : '0.22'}"/>
+            <stop offset="100%" stop-color="#000000" stop-opacity="0"/>
+          </radialGradient>
+          <linearGradient id="body" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" stop-color="${bodyStart}"/>
+            <stop offset="55%" stop-color="${bodyMid}"/>
+            <stop offset="100%" stop-color="${bodyEnd}"/>
+          </linearGradient>
+          <linearGradient id="cap" x1="0%" y1="0%" x2="100%" y2="0%">
+            <stop offset="0%" stop-color="${accentColor}"/>
+            <stop offset="100%" stop-color="${capColor}"/>
+          </linearGradient>
+        </defs>
+        <circle cx="180" cy="195" r="150" fill="url(#g)"/>
+        <ellipse cx="180" cy="362" rx="75" ry="11" fill="rgba(0,0,0,0.28)"/>
+        ${shape === 'tube' ? `
+          <path d="M120 85 L240 85 L225 295 L135 295 Z" fill="url(#body)" stroke="${strokeCol}" stroke-width="2"/>
+          <rect x="120" y="70" width="120" height="16" rx="4" fill="url(#cap)"/>
+          <rect x="148" y="295" width="64" height="36" rx="8" fill="#2A2421"/>
+        ` : shape === 'vial' ? `
+          <rect x="164" y="42" width="32" height="38" rx="10" fill="#2A2421"/>
+          <rect x="150" y="78" width="60" height="22" rx="6" fill="url(#cap)"/>
+          <rect x="125" y="102" width="110" height="230" rx="26" fill="url(#body)" stroke="${strokeCol}" stroke-width="2"/>
+        ` : `
+          <rect x="152" y="45" width="56" height="28" rx="7" fill="url(#cap)"/>
+          <rect x="118" y="75" width="124" height="260" rx="30" fill="url(#body)" stroke="${strokeCol}" stroke-width="2"/>
+        `}
+        <rect x="134" y="135" width="92" height="128" rx="14" fill="${labelBg}" stroke="${labelBorder}"/>
+        <text x="180" y="168" text-anchor="middle" fill="${brandTextCol}" font-family="sans-serif" font-size="12" font-weight="900">${brand}</text>
+        <text x="180" y="196" text-anchor="middle" fill="${accentColor}" font-family="sans-serif" font-size="11" font-weight="800">${model}</text>
+        <text x="180" y="218" text-anchor="middle" fill="#8e8e9e" font-family="sans-serif" font-size="9">${sub}</text>
+        <rect x="150" y="240" width="60" height="3.5" rx="2" fill="${accentColor}"/>
+      </svg>`;
+      return 'data:image/svg+xml;utf8,' + encodeURIComponent(svg);
+    }
+
+    const RAW_PRODUCTS = [
+      { id: 'VV1', brand: 'V&V', model: 'BRIGHT FOAM', sub: 'Whitening 150ml', shape: 'bottle', c1: '#8b5cf6', c2: '#B88E65', cat: 'مراقبت پوست', vol: '150 ml', name: 'فوم شستشوی روشن‌کننده صورت BrightFoam', en: 'V&V Vigorous & Vitality BrightFoam Cleanser', price: 1513000, b2bPrice: 1210000, offer: 'آفر همکار: ۱۰ + ۱ عدد اشانتیون', ing: 'نیاسینامید، ویتامین C پایدار، عصاره شیرین‌بیان و B5', desc: 'پاک‌کننده عمقی و روشن‌کننده پوست تحت لیسانس انگلیس؛ حذف آلودگی‌ها و مهار لک‌های تیره بدون ایجاد خشکی.' },
+      { id: 'DRM1', brand: 'Dermalist', model: 'CAFFURATE', sub: 'Caffeine 200ml', shape: 'bottle', c1: '#ef4444', c2: '#B88E65', cat: 'مراقبت مو', vol: '200 ml', name: 'شامپو ضدریزش کافئینه Caffurate', en: 'Dermalist Caffurate Anti-Hair Loss Shampoo', price: 474500, b2bPrice: 365000, offer: 'آفر همکار: ۱۲ + ۲ عدد اشانتیون', ing: 'کافئین میکروکپسوله، عصاره سائوپالمیتو و بیوتین B7', desc: 'درمان تخصصی ریزش موی آندروژنیک؛ مهار آنزیم 5-آلفا ردوکتاز در ریشه مو و افزایش ضخامت تارهای نازک.' },
+      { id: 'LAB1', brand: 'Laboren', model: 'SPF 50+ 6in1', sub: 'Oil-Free 50ml', shape: 'tube', c1: '#d97706', c2: '#D4A373', cat: 'ضدآفتاب تخصصی', vol: '50 ml', name: 'کرم ضدآفتاب ۶ کاره رنگی SPF50', en: 'Laboren 6-in-1 Tinted Sunscreen SPF 50+', price: 759000, b2bPrice: 598000, offer: 'آفر همکار: ۱۰ + ۱ عدد اشانتیون', ing: 'کلاژن هیدرولیزشده، روغن درخت چای و نیاسینامید', desc: 'ضدآفتاب ۶ کاره با پوشش مات مخملی؛ کنترل‌کننده چربی و جوش، ضدلک و محافظت کامل UVA/UVB.' },
+      { id: 'SOL1', brand: 'Solamor', model: 'SULFATE FREE', sub: 'Anagain 250ml', shape: 'bottle', c1: '#10b981', c2: '#06b6d4', cat: 'مراقبت مو', vol: '250 ml', name: 'شامپو فاقد سولفات ترمیم‌کننده و تقویت‌کننده', en: 'Solamor Sulfate-Free Repair Shampoo', price: 768600, b2bPrice: 595000, offer: 'آفر همکار: ۶ + ۱ عدد اشانتیون', ing: 'عصاره گیاهی آناگین (Anagain)، جینکوبیلوبا و کراتین', desc: 'مناسب موهای کراتینه‌شده، رنگ‌شده و آسیب‌دیده؛ پاکسازی ملایم کف سر همراه با تقویت پیاز مو.' },
+      { id: 'ELV1', brand: 'Elvatan', model: 'PDRN & K5+', sub: 'Salmon DNA', shape: 'tube', c1: '#0284c7', c2: '#3b82f6', cat: 'ترمیم‌کننده و ضدلک', vol: '50 ml', name: 'کرم ضدلک K5+ و ترمیم‌کننده PDRN سالمون', en: 'Elvatan PDRN Salmon DNA & K5+ Cream', price: 890000, b2bPrice: 710000, offer: 'آفر همکار: ۱۰ + ۱ عدد اشانتیون', ing: 'PDRN (DNA ماهی سالمون)، ترانزمیک اسید و هیالورونیک', desc: 'فناوری پیشرفته بازسازی سلولی پس از لیزر و میکرونیدلینگ و رفع لک‌های مقاوم پوستی.' },
+      { id: 'OLD1', brand: 'OldStop', model: 'LG6 VIT-C', sub: 'Lightening 75ml', shape: 'tube', c1: '#9C6B4E', c2: '#C89D7C', cat: 'ترمیم‌کننده و ضدلک', vol: '75 ml', name: 'کرم آبرسان و روشن‌کننده قوی ویتامین C مدل LG6', en: 'OldStop LG6 Vitamin C Lightening Cream', price: 436500, b2bPrice: 340000, offer: 'آفر همکار: ۱۲ + ۱ عدد اشانتیون', ing: 'ویتامین C پایدار، ویتامین E و منیزیم سولفات', desc: 'فرمولاسیون تخصصی جهت رفع لک‌های تیره، تحریک کلاژن‌سازی و شادابی پوست.' },
+      { id: 'CIP1', brand: 'CIP', model: 'CARBON DETOX', sub: '350ml Pro', shape: 'bottle', c1: '#db2777', c2: '#8b5cf6', cat: 'مراقبت پوست', vol: '350 ml', name: 'ژل شستشوی کربن فعال و مراقبت تخصصی CIP', en: 'CIP Activated Carbon Deep Detox Cleanser', price: 865000, b2bPrice: 685000, offer: 'آفر همکار: ۱۰ + ۱ عدد اشانتیون', ing: 'کربن اکتیو دتوکس‌کننده، هیالورونیک اسید و پروتئین ابریشم', desc: 'پاکسازی عمیق منافذ باز و کنترل چربی پوست صورت بدون برهم زدن pH طبیعی.' },
+      { id: 'LUF1', brand: 'Lufente', model: 'LOTION 1015', sub: '400ml Body Care', shape: 'bottle', c1: '#0d9488', c2: '#10b981', cat: 'مراقبت پوست', vol: '400 ml', name: 'لوسیون بدن آبرسان عمیق لوفنته مدل 1015', en: 'Lufente Model 1015 Deep Hydrating Body Lotion', price: 840000, b2bPrice: 665000, offer: 'آفر همکار: ۶ + ۱ عدد اشانتیون', ing: 'عصاره آلوئه‌ورا، شی‌باتر، ویتامین B5، فاقد پارابن', desc: 'لوسیون تخصصی ۴۰۰ میلی‌لیتری با جذب سریع جهت رفع خشکی و التهاب پوست بدن پس از استحمام.' },
+      { id: 'HLM1', brand: 'HLM', model: 'CLINICAL SERUM', sub: 'Niacinamide 10%', shape: 'vial', c1: '#9333ea', c2: '#ec4899', cat: 'مراقبت پوست', vol: '30 ml', name: 'سرم کلینیکال هیالورونیک اسید و نیاسینامید H.L.M', en: 'H.L.M Clinical Concentrated Skin Booster Serum', price: 920000, b2bPrice: 735000, offer: 'آفر همکار: ۱۰ + ۱ عدد اشانتیون', ing: 'هیالورونیک اسید مولکول ریز، نیاسینامید ۱۰٪ و زینک PCA', desc: 'سرم تغلیظ‌شده کلینیکی جهت جمع کردن منافذ باز، کنترل سبوم و آبرسانی عمقی درم.' },
+      { id: 'MCC1', brand: 'MC Cosmetics', model: 'MESO VIAL', sub: 'Made in Spain', shape: 'vial', c1: '#7c3aed', c2: '#B88E65', cat: 'مزوتراپی کلینیکال', vol: '10 x 5 ml', clinicalOnly: true, name: 'ویال و کوکتل مزوتراپی استریل MC Cosmetics اسپانیا', en: 'MC Cosmetics Barcelona Professional Mesotherapy', price: 3850000, b2bPrice: 3150000, offer: 'پروتکل کلینیکال: ۵ پک + ۱ کوکتل رایگان', ing: 'گلوتاتیون خالص، دکسپانتنول، بیوتین و DMAE اسپانیا', desc: 'محصول اورجینال ساخت بارسلونا اسپانیا؛ توزیع انحصاری ویژه پزشکان و کلینیک‌های تخصصی پوست (دسترسی محدود).' }
+    ];
+
+    function getProducts() {
+      return RAW_PRODUCTS.map(p => ({
+        ...p,
+        img: makeBottleSvg(p.brand.toUpperCase(), p.model, p.sub, p.c1, p.c2, p.shape)
+      }));
+    }
+
+    let PRODUCTS = getProducts();
+    const BRANDS = ['ALL', 'V&V', 'Dermalist', 'Laboren', 'Solamor', 'Elvatan', 'OldStop', 'CIP', 'Lufente', 'HLM', 'MC Cosmetics'];
+    let activeBrand = 'ALL';
+    let activeCategory = 'ALL';
+    let currentProdId = 'VV1';
+    let cart = [];
+
+    function fa(n) { return n.toLocaleString('fa-IR'); }
+
+    function toggleTheme() {
+      currentTheme = currentTheme === 'nude' ? 'dark' : 'nude';
+      document.documentElement.setAttribute('data-theme', currentTheme);
+      document.getElementById('themeIcon').textContent = currentTheme === 'nude' ? '🌙' : '☀️';
+      document.getElementById('themeLabel').textContent = currentTheme === 'nude' ? 'پوسته شب (Dark Pro)' : 'پوسته روز (Warm Nude)';
+      PRODUCTS = getProducts();
+      const found = PRODUCTS.find(x => x.id === currentProdId) || PRODUCTS[0];
+      updateStage(found);
+      renderStore();
+    }
+
+    function toggleAuthModal(open) {
+      document.getElementById('authModal').className = open ? 'modal-backdrop open' : 'modal-backdrop';
+    }
+
+    function renderBrandBar() {
+      document.getElementById('brandBar').innerHTML = BRANDS.map(b => `
+        <button class="brand-pill ${activeBrand === b ? 'active' : ''}" onclick="selectBrand('${b}')">
+          ${b === 'ALL' ? 'همه ۱۰ برند' : b}
+        </button>
+      `).join('');
+    }
+
+    function updateStage(p) {
+      currentProdId = p.id;
+      document.getElementById('stBrand').textContent = 'برند: ' + p.brand;
+      document.getElementById('stCat').textContent = p.cat;
+      document.getElementById('stTitle').textContent = p.name;
+      document.getElementById('stEn').textContent = p.en;
+      document.getElementById('stDesc').textContent = p.desc;
+      document.getElementById('stVol').textContent = p.vol;
+      document.getElementById('stIng').textContent = p.ing;
+      document.getElementById('stImg').src = p.img;
+
+      const isLockedClinical = p.clinicalOnly && !activeUser.canBuyClinical;
+      const offerBadge = document.getElementById('stOfferBadge');
+      const profitBox = document.getElementById('stB2BProfitBox');
+      const addBtn = document.getElementById('stAddBtn');
+
+      if (isLockedClinical) {
+        offerBadge.style.display = 'inline-block';
+        offerBadge.style.background = 'rgba(239,68,68,0.15)';
+        offerBadge.style.color = '#ef4444';
+        offerBadge.textContent = '🔒 انحصاری پزشکان و کلینیک‌های پوست';
+        profitBox.style.display = 'none';
+        document.getElementById('stPriceLabel').textContent = 'دسترسی محدود کلینیکال:';
+        document.getElementById('stPrice').textContent = 'ویژه پزشکان متخصص';
+        document.getElementById('stPrice').style.fontSize = '22px';
+        document.getElementById('stCurrency').textContent = '';
+        addBtn.textContent = '🔐 ورود به حساب پزشک / کلینیک';
+        addBtn.onclick = () => toggleAuthModal(true);
+        return;
+      }
+
+      document.getElementById('stPrice').style.fontSize = '34px';
+      document.getElementById('stCurrency').textContent = 'تومان';
+
+      if (activeUser.isB2B) {
+        const profitPerUnit = p.price - p.b2bPrice;
+        const marginPct = Math.round((profitPerUnit / p.price) * 100);
+        offerBadge.style.display = 'inline-block';
+        offerBadge.style.background = 'rgba(16,185,129,0.15)';
+        offerBadge.style.color = '#10b981';
+        offerBadge.textContent = p.offer + ' • حداقل سفارش: ' + fa(activeUser.moq) + ' عدد';
+
+        profitBox.style.display = 'block';
+        profitBox.innerHTML = `
+          <div class="row-between">
+            <span>قیمت فروش مصرف‌کننده: <strong>${fa(p.price)} تومان</strong></span>
+            <span style="color:#10b981; font-weight:bold;">سود خالص همکار در هر عدد: ${fa(profitPerUnit)} تومان (${fa(marginPct)}٪ حاشیه سود)</span>
+          </div>
+        `;
+
+        document.getElementById('stPriceLabel').textContent = 'قیمت خرید عمده همکار (B2B):';
+        document.getElementById('stPrice').textContent = fa(p.b2bPrice);
+        addBtn.textContent = `+ افزودن عمده (${fa(activeUser.moq)} عدد) به پیش‌فاکتور`;
+        addBtn.onclick = () => addToCart(p.id, activeUser.moq);
+      } else {
+        offerBadge.style.display = 'none';
+        profitBox.style.display = 'none';
+        document.getElementById('stPriceLabel').textContent = 'قیمت مصرف‌کننده آنلاین:';
+        document.getElementById('stPrice').textContent = fa(p.price);
+        addBtn.textContent = '+ افزودن به سبد سفارش';
+        addBtn.onclick = () => addToCart(p.id, 1);
+      }
+    }
+
+    function selectBrand(b) {
+      activeBrand = b;
+      renderBrandBar();
+      if (b !== 'ALL') {
+        const found = PRODUCTS.find(x => x.brand === b);
+        if (found) updateStage(found);
+      } else {
+        updateStage(PRODUCTS[0]);
+      }
+      renderStore();
+    }
+
+    function filterByCategory(cat, el) {
+      activeCategory = cat;
+      document.querySelectorAll('.cat-item').forEach(x => x.classList.remove('active'));
+      if (el) el.classList.add('active');
+      renderStore();
+    }
+
+    function renderStore() {
+      const q = (document.getElementById('searchBox').value || '').trim().toLowerCase();
+      const list = PRODUCTS.filter(p => {
+        const mb = activeBrand === 'ALL' || p.brand === activeBrand;
+        const mc = activeCategory === 'ALL' || p.cat === activeCategory;
+        const mq = !q || p.name.toLowerCase().includes(q) || p.brand.toLowerCase().includes(q) || p.en.toLowerCase().includes(q) || p.ing.toLowerCase().includes(q);
+        return mb && mc && mq;
+      });
+
+      document.getElementById('storeGrid').innerHTML = list.map(p => {
+        const isLockedClinical = p.clinicalOnly && !activeUser.canBuyClinical;
+
+        if (isLockedClinical) {
+          return `
+            <div class="card">
+              <div>
+                <div class="row-between">
+                  <span style="background:rgba(239,68,68,0.14); color:#ef4444; padding:4px 12px; border-radius:99px; font-size:11.5px; font-weight:bold;">🔒 انحصاری پزشکان</span>
+                  <span style="font-size:11.5px; color:var(--muted); font-weight:bold;">${p.brand}</span>
+                </div>
+                <div class="card-img" onclick="focusStage('${p.id}')">
+                  <img src="${p.img}" alt="${p.name}" />
+                </div>
+                <div style="font-weight:bold; font-size:15px; cursor:pointer; color:var(--text);" onclick="focusStage('${p.id}')">${p.name}</div>
+                <p style="font-size:12.5px; color:var(--muted); margin-top:8px;">${p.desc}</p>
+              </div>
+              <div style="margin-top:20px; padding-top:16px; border-top:1px solid var(--border);" class="row-between">
+                <span style="font-size:11.5px; color:var(--muted);">ویژه کلینیک‌های پوست</span>
+                <button class="btn-locked" onclick="toggleAuthModal(true)">🔐 ورود پزشک</button>
+              </div>
+            </div>
+          `;
+        }
+
+        const price = activeUser.isB2B ? p.b2bPrice : p.price;
+        const profit = p.price - p.b2bPrice;
+
+        return `
+          <div class="card">
+            <div>
+              <div class="row-between">
+                <span style="background:var(--accent-soft); color:var(--accent-light); padding:4px 12px; border-radius:99px; font-size:12px; font-weight:bold;">${p.brand}</span>
+                <span style="font-size:11.5px; color:var(--muted); font-weight:bold;">${p.cat}</span>
+              </div>
+              <div class="card-img" onclick="focusStage('${p.id}')">
+                <img src="${p.img}" alt="${p.name}" />
+              </div>
+              <div style="font-weight:bold; font-size:15px; cursor:pointer; color:var(--text);" onclick="focusStage('${p.id}')">${p.name}</div>
+              <p style="font-size:12.5px; color:var(--muted); margin-top:8px;">${p.desc}</p>
+              ${activeUser.isB2B ? `
+                <div style="margin-top:10px; padding:6px 10px; border-radius:10px; background:rgba(16,185,129,0.1); color:#10b981; font-size:11.5px; font-weight:bold;">
+                  سود همکار در هر عدد: ${fa(profit)} تومان • ${p.offer}
+                </div>
+              ` : ''}
+            </div>
+            <div style="margin-top:18px; padding-top:14px; border-top:1px solid var(--border);" class="row-between">
+              <div>
+                <span style="font-size:11px; color:var(--muted); display:block;">${activeUser.isB2B ? 'قیمت خرید همکار:' : 'قیمت مصرف‌کننده:'}</span>
+                <strong style="font-size:18px; color:var(--text);">${fa(price)}</strong> <span style="font-size:11.5px; color:var(--accent-light); font-weight:bold;">تومان</span>
+              </div>
+              <button class="btn-primary" style="padding:8px 16px; font-size:12px;" onclick="addToCart('${p.id}', ${activeUser.isB2B ? activeUser.moq : 1})">
+                ${activeUser.isB2B ? `+ افزودن (${fa(activeUser.moq)} تایی)` : '+ خرید'}
+              </button>
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    function focusStage(id) {
+      const found = PRODUCTS.find(x => x.id === id);
+      if (found) {
+        updateStage(found);
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+      }
+    }
+
+    function addToCart(id, stepQty) {
+      const addAmount = stepQty || 1;
+      const ex = cart.find(x => x.id === id);
+      if (ex) ex.qty += addAmount; else cart.push({ id, qty: addAmount });
+      renderCart();
+      toggleCart(true);
+    }
+
+    function renderCart() {
+      document.getElementById('cartCount').textContent = fa(cart.reduce((s, i) => s + i.qty, 0));
+      if (cart.length === 0) {
+        document.getElementById('cartSub').textContent = '—';
+        document.getElementById('cartItems').innerHTML = '<div style="text-align:center; padding:40px 10px; color:var(--muted); font-size:13px;">🛒 سبد خرید خالی است — از ویترین محصولات اضافه کنید</div>';
+        document.getElementById('cartTotal').textContent = fa(0) + ' تومان';
+        document.getElementById('cartPartnerSummary').style.display = 'none';
+        document.getElementById('checkoutButtonsArea').innerHTML = '';
+        return;
+      }
+      document.getElementById('cartSub').textContent = activeUser.title;
+
+      let total = 0;
+      let totalPartnerProfit = 0;
+
+      document.getElementById('cartItems').innerHTML = cart.map(item => {
+        const prod = PRODUCTS.find(x => x.id === item.id) || PRODUCTS[0];
+        const p = activeUser.isB2B ? prod.b2bPrice : prod.price;
+        total += p * item.qty;
+        totalPartnerProfit += (prod.price - prod.b2bPrice) * item.qty;
+
+        return `
+          <div style="background:var(--card); border:1px solid var(--border); border-radius:16px; padding:14px;" class="row-between">
+            <div>
+              <div style="font-size:13px; font-weight:bold; color:var(--text);">${prod.name}</div>
+              <div style="font-size:12px; color:var(--accent-light); margin-top:4px; font-weight:bold;">${fa(p)} تومان × ${fa(item.qty)} عدد</div>
+            </div>
+            <span style="font-size:12px; font-weight:bold; color:var(--muted);">${prod.brand}</span>
+          </div>
+        `;
+      }).join('');
+
+      document.getElementById('cartTotal').textContent = fa(total) + ' تومان';
+
+      const summaryBox = document.getElementById('cartPartnerSummary');
+      const btnArea = document.getElementById('checkoutButtonsArea');
+
+      if (activeUser.isB2B) {
+        summaryBox.style.display = 'block';
+        summaryBox.innerHTML = `
+          <div class="row-between" style="color:#10b981; font-weight:bold;">
+            <span>مجموع سود خالص شما از فروش این فاکتور:</span>
+            <span>${fa(totalPartnerProfit)} تومان</span>
+          </div>
+        `;
+
+        btnArea.innerHTML = `
+          <button class="btn-primary" style="width:100%; padding:14px;" onclick="submitOrder('credit')">
+            📄 ثبت پیش‌فاکتور اعتباری همکاران
+          </button>
+          <button class="theme-toggle" style="width:100%; justify-content:center; padding:12px;" onclick="submitOrder('cash')">
+            💳 پرداخت نقدی آنلاین (با ۴٪ تخفیف تسویه نقدی)
+          </button>
+        `;
+      } else {
+        summaryBox.style.display = 'none';
+        btnArea.innerHTML = `
+          <button class="btn-primary" style="width:100%; padding:14px;" onclick="submitOrder('cash')">
+            💳 پرداخت آنلاین و ثبت سفارش
+          </button>
+        `;
+      }
+    }
+
+    function toggleCart(open) {
+      document.getElementById('cartDrawer').className = open ? 'drawer open' : 'drawer';
+    }
+
+    function submitOrder(payType) {
+      if (!cart.length) { alert('سبد خرید خالی است — ابتدا محصول اضافه کنید.'); return; }
+      const stamp = new Date();
+      const pad = x => String(x).padStart(2, '0');
+      const orderNo = 'KH-' + stamp.getFullYear() + pad(stamp.getMonth() + 1) + pad(stamp.getDate()) + '-' + pad(stamp.getHours()) + pad(stamp.getMinutes()) + pad(stamp.getSeconds());
+      const items = cart.map(item => {
+        const p0 = PRODUCTS.find(x => x.id === item.id) || {};
+        const unit = activeUser.isB2B ? (p0.b2bPrice || p0.price) : (p0.price || 0);
+        return { id: item.id, name: p0.name || item.id, brand: p0.brand || '', qty: item.qty, unit: unit, sum: unit * item.qty };
+      });
+      const total = items.reduce((s, i) => s + i.sum, 0);
+      const order = {
+        orderNo: orderNo, at: stamp.toISOString(), payType: payType,
+        role: activeUser.isB2B ? (activeUser.canBuyClinical ? 'clinic' : 'partner') : 'b2c',
+        customer: activeUser.title, items: items, total: total
+      };
+      try {
+        const list = JSON.parse(localStorage.getItem('kiarad_healer_orders') || '[]');
+        list.push(order);
+        localStorage.setItem('kiarad_healer_orders', JSON.stringify(list));
+      } catch (e) {}
+      try {
+        var api = (window.KIARAD_API_URL || '').replace(/\/$/, '');
+        if (api) {
+          fetch(api + '/site-orders', {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ customer_name: order.customer, pay_type: payType, items: items.map(i => ({ code: i.id, qty: i.qty })) })
+          }).catch(function () {});
+        }
+      } catch (e) {}
+      const rows = items.map(i => '<tr><td>' + i.name + '</td><td>' + fa(i.qty) + '</td><td>' + fa(i.unit) + '</td><td>' + fa(i.sum) + '</td></tr>').join('');
+      const w = window.open('', '_blank');
+      if (w) {
+        w.document.write('<html dir="rtl" lang="fa"><head><meta charset="utf-8"><title>' + orderNo + '</title><style>body{font-family:Tahoma,Vazirmatn,sans-serif;padding:24px;} h2{margin:0 0 4px;} table{width:100%;border-collapse:collapse;margin-top:14px;} td,th{border:1px solid #ddd;padding:8px;font-size:13px;text-align:right;} th{background:#f6f2ec;} .tot{font-size:16px;font-weight:bold;margin-top:12px;} .muted{color:#777;font-size:12px;}</style></head><body>');
+        w.document.write('<h2>پیش‌فاکتور ' + (payType === 'credit' ? 'اعتباری (۶۰ روزه)' : 'نقدی') + ' — ' + orderNo + '</h2>');
+        w.document.write('<div class="muted">خریدار: ' + order.customer + ' • تاریخ ثبت: ' + stamp.toLocaleString('fa-IR') + '</div>');
+        w.document.write('<table><tr><th>محصول</th><th>تعداد</th><th>قیمت واحد (تومان)</th><th>جمع (تومان)</th></tr>' + rows + '</table>');
+        w.document.write('<div class="tot">مبلغ کل: ' + fa(total) + ' تومان</div>');
+        w.document.write('<div class="muted">شرکت پخش کیاراد شفا اندیش — KiaradHealer • این پیش‌فاکتور پس از تأیید واحد فروش نهایی می‌شود.</div>');
+        w.document.write('</body></html>');
+        w.document.close();
+        setTimeout(function () { try { w.print(); } catch (e) {} }, 400);
+      }
+      cart = [];
+      renderCart();
+      toggleCart(false);
+      alert('✓ سفارش ' + orderNo + ' ثبت شد.' + (w ? ' پیش‌فاکتور برای چاپ باز شد.' : ''));
+    }
+
+    renderBrandBar();
+    updateStage(PRODUCTS[0]);
+    renderStore();
+    renderCart();
+  </script>
+</body>
+</html>
