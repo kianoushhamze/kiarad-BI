@@ -62,6 +62,8 @@ app.include_router(treasury_excel_router)
 app.include_router(coach_router)
 app.include_router(inventory_router)
 app.include_router(assistant_router)
+from morning_brief import router as morning_brief_router
+app.include_router(morning_brief_router)
 app.include_router(catalog_router)
 app.include_router(holoo_router)
 from platform_sync import router as platforms_router
@@ -1406,6 +1408,14 @@ def initialize_chat_storage():
         _ensure_chat_table(conn)
         _ensure_crm_table(conn)
     from assistant_automations import ensure as ensure_automations, start_automations_scheduler
+    from morning_brief import ensure as ensure_morning_brief, ensure_and_build_today, start_morning_brief_timer
+    with engine.begin() as conn:
+        ensure_morning_brief(conn)
+    try:
+        ensure_and_build_today()
+    except Exception:
+        pass
+    start_morning_brief_timer()
     with engine.begin() as conn:
         ensure_automations(conn)
     start_automations_scheduler()

@@ -13,6 +13,7 @@ export default function Sidebar() {
       title: "مدیریت و مالی",
       items: [
         { label: "داشبورد مدیرعامل", href: "/management", icon: "📊" },
+        { label: "گزارش صبحگاهی", href: "/morning-brief", icon: "🌅", badge: "جدید" },
         { label: "خزانه", href: "/treasury", icon: "💰" },
         { label: "نرخ‌نامه و کاتالوگ", href: "/catalog", icon: "🏷️" },
         { label: "فروش آنلاین (دیجی‌کالا/ترب)", href: "/online-sales", icon: "🛒", badge: "جدید" }
