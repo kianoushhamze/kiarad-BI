@@ -32,6 +32,24 @@ for (const malformed of [null, {}, {products: {}}]) {
 }
 {
   let online = false;
+  const {ctx, elements} = setup(true, async () => {
+    if (!online) throw Error('network unavailable');
+    return response([{code: 'A'}, {code: 'B'}]);
+  });
+  ctx.products = [{code: 'A'}];
+  ctx.refreshData(); await flush();
+  assert.equal(ctx.products[0].code, 'A', 'network failure retains the previous catalog');
+  assert.equal(ctx.cart.items.length, 2, 'network failure retains the cart');
+  assert.equal(elements.get('empty').hidden, false);
+  assert.match(elements.get('empty').textContent, /خوانده نشد/);
+  online = true;
+  ctx.refreshData(); await flush();
+  assert.equal(ctx.liveMode, true);
+  assert.equal(ctx.cart.items.length, 2);
+  assert.equal(elements.get('empty').textContent, 'محصولی مطابق جستجو پیدا نشد.', 'recovery clears the stale error');
+}
+{
+  let online = false;
   const {ctx, elements} = setup(false, async url => {
     if (url === 'data.json') return response([{code: 'Z'}]);
     if (!online) throw Error('offline');
