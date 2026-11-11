@@ -1,4 +1,4 @@
-"""Task lifecycle with real SQL in an isolated PostgreSQL schema; always rolled back.
+"""Task lifecycle with real SQL in PostgreSQL an isolated schema; always rolled back.
 
 Run with KIARAD_TEST_TASK_WORKFLOW_DB=1. No real accounts or tasks are created.
 Authentication is dependency-overridden; ownership and manager checks run normally.

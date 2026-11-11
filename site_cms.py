@@ -132,14 +132,14 @@ def update_price(code: str, data: PriceUpdate, user: dict = Depends(current_user
         if not row:
             raise HTTPException(404, "کالایی با این کد در هلو پیدا نشد.")
         conn.execute(text("UPDATE products SET price=:p WHERE code=:c"), {"p": data.price_irr, "c": code})
-    # This updates the local catalog only; no price write is sent to Holoo.
+    # This updates the local catalog only; no Holoo write is performed.
     logger.info("site-cms price change: user=%s code=%s name=%s old=%s new=%s",
                 user.get("id"), code, row["name"], row["price"], data.price_irr)
     return {
         "ok": True, "code": code, "old_price_irr": row["price"],
         "new_price_irr": data.price_irr,
         "new_price_toman": round(data.price_irr / 10),
-        "note": "قیمت کاتالوگ محلی تغییر کرد؛ قیمت در نرم‌افزار هلو تغییر نکرده است و همگام‌سازی بعدی هلو ممکن است آن را بازنویسی کند.",
+        "note": "قیمت در سامانهٔ کیاراد تغییر کرد؛ این عملیات قیمت را در هلو تغییر نمی‌دهد.",
     }
 
 
