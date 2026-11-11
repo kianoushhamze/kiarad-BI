@@ -11,7 +11,7 @@ const upstream = createServer((req, res) => {
 upstream.listen(0, '127.0.0.1');
 await once(upstream, 'listening');
 const port = process.env.KIARAD_HTTP_TEST_PORT ?? '18881';
-const child = spawn(process.execPath, [fileURLToPath(new URL('../../site/server.mjs', import.meta.url))], {
+const child = spawn(process.execPath, [fileURLToPath(new URL('../../scripts/serve_kiaradhealer.mjs', import.meta.url))], {
   env: {...process.env, KIARAD_SITE_PORT:port, KIARAD_API_URL:`http://127.0.0.1:${upstream.address().port}`},
   stdio:['ignore','pipe','pipe'],
 });
@@ -28,7 +28,7 @@ try {
     if(method==='HEAD') assert.equal(await res.text(), '');
     else await res.arrayBuffer();
   }
-  const res = await fetch(base+'/api/site-orders', {method:'POST', headers:{Authorization:'Bearer test-only'}});
+  const res = await fetch(base+'/api/site-orders', {method:'POST', headers:{Authorization:'Bearer test-only','Content-Type':'application/json'}, body:'{}'});
   assert.deepEqual(await res.json(), {path:'/site-orders',method:'POST',auth:'Bearer test-only'});
   console.log('PASS: 7 storefront HTTP scenarios; mock upstream only, no real orders');
 } finally {

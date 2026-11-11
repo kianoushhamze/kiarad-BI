@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import vm from 'node:vm';
 import { readFile } from 'node:fs/promises';
-const page = await readFile(new URL('../../site/index.html', import.meta.url), 'utf8');
+const page = await readFile(new URL('../../site-healer/buy.html', import.meta.url), 'utf8');
 const start = page.indexOf('  function submitOrder()');
 const end = page.indexOf('  // --- Auth', start);
 assert.ok(start >= 0 && end > start);

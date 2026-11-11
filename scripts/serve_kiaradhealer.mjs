@@ -22,7 +22,7 @@ const routes = new Map([
 const files = new Map([
   ['/', [root, 'index.html', 'text/html; charset=utf-8']],
   ['/index.html', [root, 'index.html', 'text/html; charset=utf-8']],
-  ['/buy/', [join(repo, 'site'), 'index.html', 'text/html; charset=utf-8']],
+  ['/buy/', [root, 'buy.html', 'text/html; charset=utf-8']],
 ]);
 for (const font of ['Vazirmatn-Bold.ttf', 'Vazirmatn-Regular.ttf', 'lalezar.woff2']) {
   const asset = [root, 'fonts/' + font, font.endsWith('.ttf') ? 'font/ttf' : 'font/woff2'];
