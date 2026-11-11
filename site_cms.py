@@ -109,15 +109,16 @@ def patch_product_meta(code: str, data: ProductMetaPatch, user: dict = Depends(c
             raise HTTPException(404, "کالایی با این کد در هلو پیدا نشد.")
         conn.execute(text("""
             INSERT INTO cms_product_meta(code, site_category, image_url, hidden, discount_price_irr, updated_at)
-            VALUES (:c, :cat, :img, :hid, :disc, NOW())
+            VALUES (:c, :cat, :img, COALESCE(:hid, FALSE), :disc, NOW())
             ON CONFLICT (code) DO UPDATE SET
                 site_category = COALESCE(:cat, cms_product_meta.site_category),
                 image_url = COALESCE(:img, cms_product_meta.image_url),
                 hidden = COALESCE(:hid, cms_product_meta.hidden),
-                discount_price_irr = COALESCE(:disc, cms_product_meta.discount_price_irr),
+                discount_price_irr = CASE WHEN :set_disc THEN :disc ELSE cms_product_meta.discount_price_irr END,
                 updated_at = NOW()
         """), {"c": code, "cat": data.site_category, "img": data.image_url,
-               "hid": data.hidden, "disc": data.discount_price_irr})
+               "hid": data.hidden, "disc": data.discount_price_irr,
+               "set_disc": "discount_price_irr" in data.model_fields_set})
     return {"ok": True, "code": code}
 
 
