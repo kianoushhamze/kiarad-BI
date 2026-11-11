@@ -9,7 +9,7 @@ foreach ($folder in @("scripts", "migrations", "docs")) {
 foreach ($file in @("docker-compose.yml", "deploy.ps1", ".env.example")) {
   Copy-Item -LiteralPath (Join-Path $root $file) -Destination (Join-Path $package $file)
 }
-foreach ($file in @("backup_release.ps1", "restore_release_backup.ps1", "restore_release_media.ps1", "verify_release_package.ps1", "release_health.ps1", "run_migrations.py")) {
+foreach ($file in @("backup_release.ps1", "postgres_container.ps1", "restore_release_backup.ps1", "restore_release_media.ps1", "verify_release_package.ps1", "release_health.ps1", "run_migrations.py")) {
   Copy-Item -LiteralPath (Join-Path $root "scripts\$file") -Destination (Join-Path $package "scripts\$file")
 }
 Get-ChildItem -LiteralPath (Join-Path $root "migrations") -File | Copy-Item -Destination (Join-Path $package "migrations")

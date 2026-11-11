@@ -94,6 +94,6 @@ createServer(async (req, res) => {
     if (res.headersSent) return res.destroy();
     return reply(res, error.code === 'ENOENT' ? 404 : 502, 'Storefront service unavailable');
   }
-}).listen(port, '127.0.0.1', function () {
+}).listen(port, process.env.KIARAD_SITE_HOST || '127.0.0.1', function () {
   console.log('KiaradHealer ready on port ' + this.address().port);
 });

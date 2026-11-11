@@ -1,0 +1,57 @@
+[
+  {
+    "name": "login form rendered",
+    "passed": true,
+    "detail": null
+  },
+  {
+    "name": "incorrect password rejected",
+    "passed": true,
+    "detail": null
+  },
+  {
+    "name": "manager login routes to management",
+    "passed": true,
+    "detail": null
+  },
+  {
+    "name": "manager catalog loaded from real synthetic database",
+    "passed": true,
+    "detail": null
+  },
+  {
+    "name": "CMS discount saved through browser",
+    "passed": true,
+    "detail": null
+  },
+  {
+    "name": "CMS discount cleared through browser",
+    "passed": true,
+    "detail": null
+  },
+  {
+    "name": "morning brief rendered",
+    "passed": true,
+    "detail": null
+  },
+  {
+    "name": "no browser runtime crashes",
+    "passed": true,
+    "detail": []
+  },
+  {
+    "name": "visitor login and CMS denial",
+    "passed": true,
+    "detail": null
+  },
+  {
+    "name": "visitor sees CMS restriction",
+    "passed": true,
+    "detail": null
+  },
+  {
+    "name": "mobile shop live catalog",
+    "passed": true,
+    "detail": null
+  }
+]

@@ -1,0 +1,84 @@
+services:
+  postgres:
+    image: postgres:16
+    restart: unless-stopped
+    command: [postgres, -c, timezone=Asia/Tehran]
+    environment:
+      POSTGRES_USER: ${DB_USER:-kiarad}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD required}
+      POSTGRES_DB: ${DB_NAME:-kiaradbi}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: [CMD-SHELL, 'pg_isready -U ${DB_USER:-kiarad} -d ${DB_NAME:-kiaradbi}']
+      interval: 5s
+      timeout: 5s
+      retries: 30
+  backend:
+    image: kiarad-transfer-backend:${KIARAD_RELEASE_TAG:?Release tag required}
+    restart: unless-stopped
+    env_file: [.env]
+    environment:
+      DB_HOST: postgres
+      DB_PORT: '5432'
+      HOLO_AUTO_REFRESH_ENABLED: ${HOLO_AUTO_REFRESH_ENABLED:-0}
+      KIARAD_AUTOMATIONS_DISABLED: ${KIARAD_AUTOMATIONS_DISABLED:-1}
+    ports: ['127.0.0.1:8800:8000']
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      - ./secrets:/app/secrets
+      - ./data/speech-models:/app/data/speech-models:ro
+      - ./site:/app/site
+      - ./private_uploads:/app/private_uploads
+      - ./private_exports:/app/private_exports
+      - ./kiarad-dashboard/public/uploads:/app/kiarad-dashboard/public/uploads
+    healthcheck:
+      test: [CMD, python, -c, "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=5).read()"]
+      interval: 10s
+      timeout: 10s
+      retries: 12
+      start_period: 30s
+  frontend:
+    image: kiarad-transfer-frontend:${KIARAD_RELEASE_TAG:?Release tag required}
+    restart: unless-stopped
+    environment:
+      KIARAD_API_URL: http://backend:8000
+      NEXT_PUBLIC_API_URL: http://backend:8000
+      HOSTNAME: 0.0.0.0
+      PORT: '3000'
+    ports: ['127.0.0.1:3300:3000']
+    depends_on:
+      backend:
+        condition: service_healthy
+    volumes:
+      - ./kiarad-dashboard/public/uploads:/app/public/uploads
+    healthcheck:
+      test: [CMD, node, -e, "fetch('http://127.0.0.1:3000/login').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+  storefront:
+    image: node:22-slim
+    restart: unless-stopped
+    command: [node, /app/scripts/serve_kiaradhealer.mjs]
+    environment:
+      KIARAD_API_URL: http://backend:8000
+      KIARAD_SITE_DIR: /app/site-healer
+      KIARAD_SITE_PORT: '8090'
+      KIARAD_SITE_HOST: 0.0.0.0
+    ports: ['127.0.0.1:8190:8090']
+    volumes:
+      - ./site-healer:/app/site-healer:ro
+      - ./scripts:/app/scripts:ro
+    depends_on:
+      backend:
+        condition: service_healthy
+    healthcheck:
+      test: [CMD, node, -e, "fetch('http://127.0.0.1:8090/buy/').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+volumes:
+  postgres_data:
