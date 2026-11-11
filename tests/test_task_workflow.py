@@ -1,4 +1,4 @@
-"""Task lifecycle with real SQL in PostgreSQL temporary tables; always rolled back.
+"""Task lifecycle with real SQL in PostgreSQL an isolated schema; always rolled back.
 
 Run with KIARAD_TEST_TASK_WORKFLOW_DB=1. No real accounts or tasks are created.
 Authentication is dependency-overridden; ownership and manager checks run normally.
@@ -6,6 +6,7 @@ Authentication is dependency-overridden; ownership and manager checks run normal
 import os
 import unittest
 from contextlib import nullcontext
+from uuid import uuid4
 from unittest.mock import patch
 
 from fastapi import FastAPI
@@ -23,13 +24,16 @@ class TaskWorkflowTests(unittest.TestCase):
         self.tx = self.conn.begin()
         self.addCleanup(self.conn.close)
         self.addCleanup(self.tx.rollback)
+        schema = "task_test_" + uuid4().hex
+        self.conn.execute(text(f"CREATE SCHEMA {schema}"))
+        self.conn.execute(text(f"SET LOCAL search_path TO {schema}"))
         for statement in (
-            "CREATE TEMP TABLE users (id INTEGER PRIMARY KEY,username TEXT,full_name TEXT,role TEXT,salesperson_id INTEGER,is_active INTEGER)",
-            "CREATE TEMP TABLE customers (id INTEGER PRIMARY KEY,name TEXT)",
-            """CREATE TEMP TABLE tasks (id SERIAL PRIMARY KEY,title TEXT,description TEXT,priority TEXT,
+            "CREATE TABLE users (id INTEGER PRIMARY KEY,username TEXT,full_name TEXT,role TEXT,salesperson_id INTEGER,is_active INTEGER)",
+            "CREATE TABLE customers (id INTEGER PRIMARY KEY,name TEXT)",
+            """CREATE TABLE tasks (id SERIAL PRIMARY KEY,title TEXT,description TEXT,priority TEXT,
                 status TEXT,progress INTEGER,assigned_to INTEGER REFERENCES users(id),created_by INTEGER,
                 customer_id INTEGER,due_date TIMESTAMP,created_at TIMESTAMP,updated_at TIMESTAMP)""",
-            """CREATE TEMP TABLE task_updates (id SERIAL PRIMARY KEY,task_id INTEGER REFERENCES tasks(id),
+            """CREATE TABLE task_updates (id SERIAL PRIMARY KEY,task_id INTEGER REFERENCES tasks(id),
                 user_id INTEGER REFERENCES users(id),progress INTEGER,status VARCHAR(20),note TEXT,created_at TIMESTAMP)""",
         ):
             self.conn.execute(text(statement))
@@ -137,3 +141,4 @@ class TaskWorkflowTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
