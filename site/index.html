@@ -456,6 +456,7 @@
   // to the bundled static JSON so the site also works fully offline.
   var API_BASE = window.SITE_API_BASE || "/api";
   var liveMode = false;
+  var orderPending = false;
   var healerMode = location.pathname === "/buy/";
   if (healerMode) {
     document.title = "فروشگاه کیاراد شفا اندیش";
@@ -495,6 +496,7 @@
   }
 
   function refreshData() {
+    if (healerMode && orderPending) return;
     loadCatalog().then(function (d) {
       if (d.store && !healerMode) {
         document.getElementById("storeName").textContent = d.store.name || document.getElementById("storeName").textContent;
@@ -610,12 +612,14 @@
     }, 0);
   }
   function addToCart(p) {
+    if (healerMode && orderPending) return;
     var it = cart.items.find(function (x) { return x.code === p.code; });
     if (it) it.qty = Math.min(999, it.qty + 1);
     else cart.items.push({ code: p.code, qty: 1 });
     saveCart(); paintCart();
   }
   function setQty(code, qty) {
+    if (healerMode && orderPending) return;
     var it = cart.items.find(function (x) { return x.code === code; });
     if (!it) return;
     it.qty = qty;
@@ -623,6 +627,7 @@
     saveCart(); paintCart();
   }
   function removeFromCart(code, skipPaint) {
+    if (healerMode && orderPending) return;
     cart.items = cart.items.filter(function (x) { return x.code !== code; });
     saveCart();
     if (!skipPaint) paintCart();
@@ -662,6 +667,12 @@
     foot.insertAdjacentHTML("afterbegin", st);
     var err = '<div class="ferr" id="coErr"></div>';
 
+    if (healerMode && orderPending) {
+      title.textContent = "در حال ثبت سفارش";
+      body.textContent = "منتظر تأیید سرور بمانید.";
+      foot.innerHTML = "";
+      return;
+    }
     if (lastOrder) {
       title.textContent = "سفارش ثبت شد";
       body.innerHTML = '<div class="success"><div class="big">✅</div>' +
@@ -779,6 +790,7 @@
   }
 
   function submitOrder() {
+    if (healerMode && orderPending) return;
     if (healerMode && !liveMode) {
       setCoErr("اتصال به کاتالوگ برقرار نیست. پس از اتصال دوباره تلاش کنید.");
       return;
@@ -802,23 +814,30 @@
       items: cart.items.map(function (it) { return { code: it.code, qty: it.qty }; })
     };
     payload.request_id = checkoutRequestId(payload, token);
+    if (healerMode) orderPending = true;
     btn.disabled = true;
     btn.textContent = "در حال ثبت…";
     setCoErr("");
-    fetch(API_BASE + "/site-orders", {
+    return fetch(API_BASE + "/site-orders", {
       method: "POST",
       headers: { "Content-Type": "application/json", Accept: "application/json", Authorization: "Bearer " + token },
       body: JSON.stringify(payload)
     }).then(function (r) {
+      if (healerMode && r.status === 401) {
+        var expired = new Error("نشست شما منقضی شده است. دوباره وارد شوید.");
+        expired.expiredSession = true;
+        throw expired;
+      }
       return r.json().then(function (d) {
-        if (!r.ok) throw new Error(d.detail || "ثبت سفارش انجام نشد.");
+        if (!r.ok) throw new Error(typeof d.detail === "string" ? d.detail : "ثبت سفارش انجام نشد.");
         return d;
       });
     }).then(function (d) {
-      if (healerMode && (!d.ok || !Number.isInteger(d.order_id) || d.order_id <= 0)) {
+      if (healerMode && (!d.ok || !Number.isSafeInteger(d.order_id) || d.order_id <= 0 || !Number.isFinite(d.total_irr) || d.total_irr < 0)) {
         throw new Error("تأیید ثبت سفارش دریافت نشد. دوباره تلاش کنید.");
       }
       if (healerMode) {
+        orderPending = false;
         cart.items = [];
         saveCart();
         paintCart();
@@ -828,6 +847,23 @@
       step = 1;
       renderDrawer();
     }).catch(function (ex) {
+      if (healerMode) {
+        orderPending = false;
+        if (ex.expiredSession) {
+          try {
+            if (localStorage.getItem(TOKEN_KEY) === token) {
+              localStorage.removeItem(TOKEN_KEY);
+              paintAuth("");
+            }
+          } catch (_) {}
+          closeDrawer();
+          toast(ex.message);
+          document.getElementById("authContact")?.focus();
+          return;
+        }
+        step = 3;
+        renderDrawer();
+      }
       setCoErr(ex.message);
       btn.disabled = false;
       btn.textContent = "ثبت سفارش";
