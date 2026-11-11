@@ -11,8 +11,12 @@ from holoo_sync import holoo_login
 try:
     token = login_holoo()
     print(json.dumps({'login_ok': bool(token)}))
+    if not token:
+        raise SystemExit(1)
     legacy_token = holoo_login()
     print(json.dumps({'legacy_login_ok': bool(legacy_token)}))
+    if not legacy_token:
+        raise SystemExit(1)
 except Exception as exc:
     response = getattr(exc, 'response', None)
     print(json.dumps({'login_ok': False, 'error_type': type(exc).__name__,

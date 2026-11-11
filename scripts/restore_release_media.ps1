@@ -15,12 +15,12 @@ try {
     $name=$entry.FullName.Replace('\','/')
     if ($name.EndsWith('/')) { continue }
     if ($name -match '(^/|:|(^|/)\.\.(/|$))') { throw 'unsafe_archive_path' }
-    if ($name.StartsWith('uploads/')) { $target=Join-Path $root ('kiarad-dashboard\public\'+$name) }
+    if ($name.StartsWith('uploads/')) { $target=Join-Path $root ('kiarad-dashboard/public/'+$name) }
     elseif ($name.StartsWith('private_uploads/')) { $target=Join-Path $root $name }
     else { throw 'unknown_media_root' }
     $target=[IO.Path]::GetFullPath($target)
     if (-not $targets.Add($target)) { throw 'duplicate_media_target' }
-    if (-not $target.StartsWith($root+'\',[StringComparison]::OrdinalIgnoreCase)) { throw 'unsafe_target' }
+    if (-not $target.StartsWith($root+[IO.Path]::DirectorySeparatorChar,[StringComparison]::OrdinalIgnoreCase)) { throw 'unsafe_target' }
     if (Test-Path -LiteralPath $target) { throw 'media_target_exists_restore_to_empty_folder' }
     $parent=Split-Path -Parent $target
     while ($parent.StartsWith($root,[StringComparison]::OrdinalIgnoreCase)) {

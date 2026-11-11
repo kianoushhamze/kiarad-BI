@@ -1,0 +1,42 @@
+{
+  "review_base_commit": "112153c08cd2587ec014530bf762c9c4f2eaff3f",
+  "prepared_for": "2026-11-13",
+  "company_data_used": false,
+  "company_acceptance_complete": false,
+  "offline": {
+    "run": 725,
+    "passed": 540,
+    "skipped": 185,
+    "failures": 0,
+    "errors": 0
+  },
+  "postgresql": {
+    "version": 16,
+    "groups": 23,
+    "test_executions": 257,
+    "all_passed": true,
+    "overlaps_offline_tests": true
+  },
+  "anonymous_route_checks": 305,
+  "html_routing_checks": 41,
+  "frontend": {
+    "typecheck": "passed",
+    "build": "passed",
+    "lint_errors": 0,
+    "existing_image_warnings": 2,
+    "unit_files_passed": 7
+  },
+  "storefront_node_files_passed": 5,
+  "responsive_browser_widths_passed": [
+    360,
+    390,
+    640,
+    1280
+  ],
+  "backup_restore_checks_passed": 6,
+  "kit_guard_checks_passed": 7,
+  "powershell_parse_files": 44,
+  "powershell_execution_environment": "7.7 on Linux; Windows 5.1 acceptance pending",
+  "company_backup_in_download": false,
+  "runtime_images": "See release.json: offline artifact includes CI-built images; light artifact does not"
+}

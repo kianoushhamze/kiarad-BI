@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { PortalShell, Surface, fieldClass, primaryButton } from "../../components/portal-shell";
-import { secureApi } from "../../lib/secure-api";
+import { secureApi, getSavedUser } from "../../lib/secure-api";
 
 type ProductRow = {
   code: string;
@@ -39,6 +39,7 @@ const toman = (value: number | null) =>
   value === null || value === undefined ? "—" : value.toLocaleString("fa-IR");
 
 export default function SiteCmsPage() {
+  const canManage = getSavedUser()?.role === "ceo";
   const [data, setData] = useState<ProductsResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
@@ -93,10 +94,11 @@ export default function SiteCmsPage() {
   }, []);
 
   useEffect(() => {
+    if (!canManage) return;
     void load("", "");
     void loadBanners();
     void loadOrders();
-  }, [load, loadBanners, loadOrders]);
+  }, [canManage, load, loadBanners, loadOrders]);
 
   const onBannerFile = (file: File) => {
     if (file.size > 600 * 1024) {
@@ -236,6 +238,12 @@ export default function SiteCmsPage() {
       setBusy(false);
     }
   };
+
+  if (!canManage) {
+    return <PortalShell title="مدیریت سایت" eyebrow="داشبورد مدیریت سایت عمومی">
+      <Surface><p role="alert">مدیریت سایت فقط با حساب مدیرعامل امکان‌پذیر است.</p></Surface>
+    </PortalShell>;
+  }
 
   return <PortalShell title="مدیریت سایت" eyebrow="داشبورد مدیریت سایت عمومی">
     <div className="mb-4 flex flex-wrap items-end gap-3">

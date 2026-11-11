@@ -231,8 +231,13 @@
   .toast.show { opacity: 1; transform: none; }
 
   @media (max-width: 640px) {
-    .nav .search { display: none; }
-    .login input { width: 110px; }
+    .nav-in { height: auto; min-height: 58px; flex-wrap: wrap; gap: 10px; padding-block: 10px; }
+    .nav .brand { flex: 1; min-width: 0; }
+    .nav .search, .nav .spacer { display: none; }
+    .nav .cartbtn { flex: none; }
+    .login { order: 3; flex: 1 0 100%; min-width: 0; }
+    .login #authFields { flex: 1; min-width: 0; }
+    .login input { width: 110px; min-width: 0; max-width: 100%; flex: 1 1 110px; }
     .hero { padding: 52px 0 40px; }
   }
   @media (prefers-reduced-motion: reduce) {

@@ -1,0 +1,117 @@
+[
+  {
+    "file": "test_attendance_workflow.py",
+    "status": 0,
+    "tests": 7
+  },
+  {
+    "file": "test_base_proposals.py",
+    "status": 0,
+    "tests": 8
+  },
+  {
+    "file": "test_base_readiness.py",
+    "status": 0,
+    "tests": 7
+  },
+  {
+    "file": "test_base_registry.py",
+    "status": 0,
+    "tests": 8
+  },
+  {
+    "file": "test_base_route_workflow.py",
+    "status": 0,
+    "tests": 3
+  },
+  {
+    "file": "test_data_entry.py",
+    "status": 0,
+    "tests": 15
+  },
+  {
+    "file": "test_field_day_workflow.py",
+    "status": 0,
+    "tests": 2
+  },
+  {
+    "file": "test_field_intelligence.py",
+    "status": 0,
+    "tests": 18
+  },
+  {
+    "file": "test_holoo_operational_sync.py",
+    "status": 0,
+    "tests": 16
+  },
+  {
+    "file": "test_integration_schema_upgrade.py",
+    "status": 0,
+    "tests": 2
+  },
+  {
+    "file": "test_payroll_service.py",
+    "status": 0,
+    "tests": 39
+  },
+  {
+    "file": "test_personnel_access_e2e.py",
+    "status": 0,
+    "tests": 13
+  },
+  {
+    "file": "test_personnel_session_safety.py",
+    "status": 0,
+    "tests": 12
+  },
+  {
+    "file": "test_proforma_ownership.py",
+    "status": 0,
+    "tests": 6
+  },
+  {
+    "file": "test_target_schema.py",
+    "status": 0,
+    "tests": 2
+  },
+  {
+    "file": "test_task_workflow.py",
+    "status": 0,
+    "tests": 6
+  },
+  {
+    "file": "test_treasury_excel.py",
+    "status": 0,
+    "tests": 20
+  },
+  {
+    "file": "test_treasury_strategy.py",
+    "status": 0,
+    "tests": 27
+  },
+  {
+    "file": "test_visit_checkin_workflow.py",
+    "status": 0,
+    "tests": 11
+  },
+  {
+    "file": "test_visit_coverage.py",
+    "status": 0,
+    "tests": 6
+  },
+  {
+    "file": "test_voice_report_workflow.py",
+    "status": 0,
+    "tests": 7
+  },
+  {
+    "file": "test_storefront_orders.py",
+    "status": 0,
+    "tests": 17
+  },
+  {
+    "file": "test_site_cms_regressions.py",
+    "status": 0,
+    "tests": 5
+  }
+]

@@ -1,0 +1,19 @@
+[
+  {
+    "name": "customer registration in browser",
+    "passed": true
+  },
+  {
+    "name": "mobile checkout with real synthetic SQL reservation",
+    "passed": true,
+    "order_id": 1
+  },
+  {
+    "name": "same receipt visible to manager",
+    "passed": true
+  },
+  {
+    "name": "customer token cannot access staff CMS",
+    "passed": true
+  }
+]

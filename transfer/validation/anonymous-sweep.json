@@ -1,0 +1,5 @@
+{
+  "scope": "anonymous protected-route gate; synthetic database only",
+  "checks": 305,
+  "failed": []
+}

@@ -55,18 +55,6 @@ export default function MorningBriefPage() {
   const [busy, setBusy] = useState(false);
   const [notes, setNotes] = useState("");
 
-  const load = useCallback(async function () {
-    try {
-      const res = await secureApi<BriefEnvelope>("/morning-brief");
-      setData(res);
-      setNotes(res.brief?.notes || "");
-      setError("");
-      secureApi("/morning-brief/viewed", { method: "POST" }).catch(() => undefined);
-    } catch (reason) {
-      setError(reason instanceof Error ? reason.message : "دریافت گزارش صبحگاهی ناموفق بود.");
-    }
-  }, []);
-
   const loadHistory = useCallback(async function () {
     try {
       const res = await secureApi<{ days: HistoryRow[] }>("/morning-brief/history?days=14");
@@ -76,9 +64,25 @@ export default function MorningBriefPage() {
 
   useEffect(function () {
     if (!allowed) return;
-    load();
-    loadHistory();
-  }, [allowed, load, loadHistory]);
+    const controller = new AbortController();
+    secureApi<BriefEnvelope>("/morning-brief", { signal: controller.signal }).then(function (res) {
+      if (controller.signal.aborted) return;
+      setData(res);
+      setNotes(res.brief?.notes || "");
+      setError("");
+      secureApi("/morning-brief/viewed", { method: "POST", signal: controller.signal }).catch(() => undefined);
+    }).catch(function (reason) {
+      if (!controller.signal.aborted) {
+        setError(reason instanceof Error ? reason.message : "دریافت گزارش صبحگاهی ناموفق بود.");
+      }
+    });
+    secureApi<{ days: HistoryRow[] }>("/morning-brief/history?days=14", { signal: controller.signal }).then(function (res) {
+      if (!controller.signal.aborted) setHistory(res.days || []);
+    }).catch(function () {
+      if (!controller.signal.aborted) setHistory([]);
+    });
+    return function () { controller.abort(); };
+  }, [allowed]);
 
   async function refresh() {
     setBusy(true); setNotice("");
