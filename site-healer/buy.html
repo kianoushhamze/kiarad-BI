@@ -470,6 +470,7 @@
     return fetch(API_BASE + "/public/catalog", { headers: { Accept: "application/json" } })
       .then(function (r) { if (!r.ok) throw new Error("api " + r.status); return r.json(); })
       .then(function (d) {
+        if (!d || !Array.isArray(d.products)) throw new Error("invalid live catalog");
         liveMode = true;
         return {
           store: d.store,
@@ -491,7 +492,13 @@
       .catch(function () {
         liveMode = false;
         if (healerMode) throw new Error("کاتالوگ در دسترس نیست.");
-        return fetch("data.json").then(function (r) { return r.json(); });
+        return fetch("data.json").then(function (r) {
+          if (!r.ok) throw new Error("catalog " + r.status);
+          return r.json();
+        }).then(function (d) {
+          if (!d || !Array.isArray(d.products)) throw new Error("invalid saved catalog");
+          return d;
+        });
       });
   }
 
@@ -515,14 +522,14 @@
       });
       var dot = document.getElementById("liveDot"), txt = document.getElementById("liveTxt");
       if (liveMode) { dot.className = "dot on"; txt.textContent = "قیمت و موجودی زنده از سامانهٔ کیاراد"; }
-      else { dot.className = "dot wait"; txt.textContent = "حالت آفلاین — نمایش کاتالوگ ذخیره‌شده"; document.getElementById("demobar").classList.add("show"); }
-      var items = cart.items.map(function (it) {
-        var p = products.find(function (x) { return x.code === it.code; });
-        return p ? Object.assign({}, it, { p: p }) : null;
-      }).filter(Boolean);
-      cart.items.forEach(function (it) {
-        if (!products.some(function (x) { return x.code === it.code; })) removeFromCart(it.code, true);
-      });
+      else { dot.className = "dot wait"; txt.textContent = "حالت آفلاین — نمایش کاتالوگ ذخیره‌شده"; }
+      document.getElementById("demobar").classList.toggle("show", !liveMode);
+      document.getElementById("empty").textContent = "محصولی مطابق جستجو پیدا نشد.";
+      if (liveMode) {
+        cart.items.slice().forEach(function (it) {
+          if (!products.some(function (x) { return x.code === it.code; })) removeFromCart(it.code, true);
+        });
+      }
       renderCats();
       render();
       paintCart();
@@ -968,3 +975,4 @@
 </script>
 </body>
 </html>
+

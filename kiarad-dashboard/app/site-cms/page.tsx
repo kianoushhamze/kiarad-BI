@@ -212,7 +212,7 @@ export default function SiteCmsPage() {
           method: "POST",
           body: JSON.stringify({ price_irr: Math.round(priceToman * 10) }),
         });
-        setMessage(`کد ${code}: تغییرات ذخیره و قیمت هلو به‌روزرسانی شد. برای اعمال در سایت، کاتالوگ را بازسازی کنید.`);
+        setMessage(`کد ${code}: قیمت کاتالوگ محلی ذخیره شد؛ قیمت در نرم‌افزار هلو تغییر نکرده است و همگام‌سازی بعدی هلو ممکن است آن را بازنویسی کند.`);
       } else {
         setMessage(`کد ${code} ذخیره شد.`);
       }
@@ -414,3 +414,4 @@ export default function SiteCmsPage() {
     </Surface>
   </PortalShell>;
 }
+

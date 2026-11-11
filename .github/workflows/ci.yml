@@ -15,6 +15,20 @@ jobs:
     name: Backend offline test subset
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: kiarad_test
+          POSTGRES_PASSWORD: disposable-ci-only
+          POSTGRES_DB: kiarad_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U kiarad_test -d kiarad_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -25,6 +39,31 @@ jobs:
         run: pip install -r requirements.txt
       - name: Run offline test subset
         run: python scripts/run_offline_review_tests.py
+      - name: CMS, task workflow and storefront PostgreSQL regressions
+        env:
+          DB_HOST: 127.0.0.1
+          DB_PORT: "5432"
+          DB_USER: kiarad_test
+          DB_NAME: kiarad_test
+          POSTGRES_PASSWORD: disposable-ci-only
+          KIARAD_TEST_CMS_DB: "1"
+          KIARAD_TEST_TASK_WORKFLOW_DB: "1"
+          KIARAD_TEST_STOREFRONT_DB: "1"
+        run: |
+          python -m unittest discover -s tests -p test_site_cms_regressions.py
+          python -m unittest discover -s tests -p test_task_workflow.py
+          python -m unittest discover -s tests -p test_storefront_orders.py
+
+  storefront-node-tests:
+    name: Storefront catalog and checkout regressions
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: node --test tests/node/*.test.mjs
 
   frontend-build:
     name: Frontend type check and build
@@ -51,3 +90,4 @@ jobs:
           KIARAD_API_URL: http://127.0.0.1:8000
           NEXT_PUBLIC_API_URL: http://127.0.0.1:8000
         run: npm run build
+
