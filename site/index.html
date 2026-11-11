@@ -456,6 +456,14 @@
   // to the bundled static JSON so the site also works fully offline.
   var API_BASE = window.SITE_API_BASE || "/api";
   var liveMode = false;
+  var healerMode = location.pathname === "/buy/";
+  if (healerMode) {
+    document.title = "فروشگاه کیاراد شفا اندیش";
+    document.getElementById("storeName").textContent = "کیاراد شفا اندیش";
+    document.getElementById("storeTag").textContent = "خرید محصولات از کاتالوگ کیاراد";
+    document.querySelector(".foot-in > span").innerHTML = '<a href="/">بازگشت به ویترین کیاراد</a>';
+  }
+
 
   function loadCatalog() {
     return fetch(API_BASE + "/public/catalog", { headers: { Accept: "application/json" } })
@@ -481,13 +489,14 @@
       })
       .catch(function () {
         liveMode = false;
+        if (healerMode) throw new Error("کاتالوگ در دسترس نیست.");
         return fetch("data.json").then(function (r) { return r.json(); });
       });
   }
 
   function refreshData() {
     loadCatalog().then(function (d) {
-      if (d.store) {
+      if (d.store && !healerMode) {
         document.getElementById("storeName").textContent = d.store.name || document.getElementById("storeName").textContent;
         document.getElementById("storeTag").textContent = d.store.tagline || document.getElementById("storeTag").textContent;
       }
@@ -770,6 +779,10 @@
   }
 
   function submitOrder() {
+    if (healerMode && !liveMode) {
+      setCoErr("اتصال به کاتالوگ برقرار نیست. پس از اتصال دوباره تلاش کنید.");
+      return;
+    }
     var btn = document.getElementById("submitOrder");
     var token = null;
     try { token = localStorage.getItem(TOKEN_KEY); } catch (_) {}
@@ -802,6 +815,15 @@
         return d;
       });
     }).then(function (d) {
+      if (healerMode && (!d.ok || !Number.isInteger(d.order_id) || d.order_id <= 0)) {
+        throw new Error("تأیید ثبت سفارش دریافت نشد. دوباره تلاش کنید.");
+      }
+      if (healerMode) {
+        cart.items = [];
+        saveCart();
+        paintCart();
+        try { localStorage.removeItem("site_checkout_pending_v1"); } catch (_) {}
+      }
       lastOrder = d;
       step = 1;
       renderDrawer();

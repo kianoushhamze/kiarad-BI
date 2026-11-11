@@ -1,39 +1,99 @@
-// KiaradHealer static server (zero-dependency, Node >= 16)
-// Serves the site folder on 0.0.0.0:8090 for the Cloudflare tunnel.
-import http from 'http';
-import fs from 'fs';
-import path from 'path';
-import url from 'url';
+import { createServer } from 'node:http';
+import { readFile } from 'node:fs/promises';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
-const __dirname = path.dirname(url.fileURLToPath(import.meta.url));
-const ROOT = process.env.KIARAD_SITE_DIR || path.join(__dirname, 'KiaradHealer');
-const PORT = Number(process.env.KIARAD_SITE_PORT || 8090);
+const repo = dirname(dirname(fileURLToPath(import.meta.url)));
+const root = process.env.KIARAD_SITE_DIR || join(repo, 'site-healer');
+const port = Number(process.env.KIARAD_SITE_PORT || 8090);
+const api = new URL(process.env.KIARAD_API_URL || 'http://127.0.0.1:8000');
+if (!['http:', 'https:'].includes(api.protocol) || api.username || api.password) {
+  throw new Error('KIARAD_API_URL must be an HTTP(S) backend origin.');
+}
+const routes = new Map([
+  ['/api/public/catalog', 'GET'],
+  ['/api/site-banners', 'GET'],
+  ['/api/site-auth/me', 'GET'],
+  ['/api/site-auth/login', 'POST'],
+  ['/api/site-auth/register', 'POST'],
+  ['/api/site-orders', 'POST'],
+  ['/api/site-orders/mine', 'GET'],
+]);
+const files = new Map([
+  ['/', [root, 'index.html', 'text/html; charset=utf-8']],
+  ['/index.html', [root, 'index.html', 'text/html; charset=utf-8']],
+  ['/buy/', [join(repo, 'site'), 'index.html', 'text/html; charset=utf-8']],
+]);
+for (const font of ['Vazirmatn-Bold.ttf', 'Vazirmatn-Regular.ttf', 'lalezar.woff2']) {
+  const asset = [root, 'fonts/' + font, font.endsWith('.ttf') ? 'font/ttf' : 'font/woff2'];
+  files.set('/fonts/' + font, asset);
+  files.set('/buy/fonts/' + font, asset);
+}
 
-const MIME = {
-  '.html': 'text/html; charset=utf-8',
-  '.css': 'text/css; charset=utf-8',
-  '.js': 'text/javascript; charset=utf-8',
-  '.json': 'application/json; charset=utf-8',
-  '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg',
-  '.svg': 'image/svg+xml', '.ico': 'image/x-icon',
-  '.ttf': 'font/ttf', '.woff': 'font/woff', '.woff2': 'font/woff2'
-};
+function reply(res, status, detail) {
+  res.writeHead(status, {'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store'});
+  res.end(JSON.stringify({detail}));
+}
 
-http.createServer((req, res) => {
-  let p;
-  try { p = decodeURIComponent(new URL(req.url, 'http://x').pathname); }
-  catch { res.writeHead(400); return res.end('bad request'); }
-  if (p === '/') p = '/index.html';
-  const file = path.normalize(path.join(ROOT, p));
-  if (!file.startsWith(ROOT)) { res.writeHead(403); return res.end('forbidden'); }
-  fs.readFile(file, (err, data) => {
-    if (err) {
-      res.writeHead(404, { 'Content-Type': 'text/plain; charset=utf-8' });
-      return res.end('404 — یافت نشد');
+async function proxy(req, res, pathname) {
+  const method = routes.get(pathname);
+  if (!method) return reply(res, 404, 'Unknown storefront endpoint');
+  if (req.method !== method) {
+    res.setHeader('Allow', method);
+    return reply(res, 405, 'Method not allowed');
+  }
+  const headers = {Accept: 'application/json'};
+  if (req.headers.authorization) headers.Authorization = req.headers.authorization;
+  let body;
+  if (method === 'POST') {
+    if (!/^application\/json(?:;|$)/i.test(req.headers['content-type'] || '')) {
+      return reply(res, 415, 'Expected JSON');
     }
-    res.writeHead(200, { 'Content-Type': MIME[path.extname(file).toLowerCase()] || 'application/octet-stream' });
-    res.end(data);
+    headers['Content-Type'] = 'application/json';
+    const chunks = [];
+    let length = 0;
+    for await (const chunk of req.iterator({destroyOnReturn: false})) {
+      length += chunk.length;
+      if (length > 128 * 1024) {
+        res.setHeader('Connection', 'close');
+        return reply(res, 413, 'Request too large');
+      }
+      chunks.push(chunk);
+    }
+    body = Buffer.concat(chunks);
+  }
+  const upstream = await fetch(new URL(pathname.slice(4), api.origin), {
+    method, headers, body, redirect: 'error', signal: AbortSignal.timeout(15000),
   });
-}).listen(PORT, '0.0.0.0', () => {
-  console.log('KiaradHealer site -> http://0.0.0.0:' + PORT + '  (root: ' + ROOT + ')');
+  const payload = await upstream.json();
+  res.writeHead(upstream.status, {'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store'});
+  res.end(JSON.stringify(payload));
+}
+
+createServer(async (req, res) => {
+  let pathname;
+  try {
+    pathname = decodeURIComponent(new URL(req.url, 'http://localhost').pathname);
+  } catch {
+    return reply(res, 400, 'Invalid path');
+  }
+  try {
+    if (pathname.startsWith('/api/')) return await proxy(req, res, pathname);
+    if (!['GET', 'HEAD'].includes(req.method)) return reply(res, 405, 'Method not allowed');
+    if (pathname === '/buy') {
+      res.writeHead(308, {Location: '/buy/'});
+      return res.end();
+    }
+    const asset = files.get(pathname);
+    if (!asset) return reply(res, 404, 'Not found');
+    const [base, filename, type] = asset;
+    const data = await readFile(join(base, filename));
+    res.writeHead(200, {'Content-Type': type, 'Cache-Control': 'no-store', 'X-Content-Type-Options': 'nosniff'});
+    res.end(req.method === 'HEAD' ? undefined : data);
+  } catch (error) {
+    if (res.headersSent) return res.destroy();
+    return reply(res, error.code === 'ENOENT' ? 404 : 502, 'Storefront service unavailable');
+  }
+}).listen(port, '127.0.0.1', function () {
+  console.log('KiaradHealer ready on port ' + this.address().port);
 });
