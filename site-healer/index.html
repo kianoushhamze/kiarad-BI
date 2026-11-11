@@ -291,7 +291,7 @@ header::after {
 
         <button id="authTriggerBtn" class="auth-btn" onclick="toggleAuthModal(true)">
           <span>🔐</span>
-          <span id="authBtnText">پرتال همکاران (داروخانه / پزشکان)</span>
+          <span id="authBtnText">پیش‌نمایش پرتال همکاران</span>
         </button>
       </div>
     </div>
@@ -339,6 +339,11 @@ header::after {
   </header>
 
   <main class="container">
+    <section class="corp-card" style="margin-top:24px" aria-label="خرید از کیاراد">
+      <h2>خرید از کاتالوگ کیاراد</h2>
+      <p>برای مشاهدهٔ موجودی و قیمت به‌روز و ثبت سفارش، وارد فروشگاه شوید. قیمت‌ها و نقش‌های این ویترین برای نمایش طرح هستند.</p>
+      <a class="btn-primary" href="/buy/" style="display:inline-block;margin-top:12px">مشاهدهٔ کاتالوگ و خرید</a>
+    </section>
     <section id="stage-sec" class="hero">
       <div class="hero-glow"></div>
       <span class="hero-badge">CLINICAL & DERMATOLOGY SKINCARE COLLECTION</span>
@@ -491,49 +496,13 @@ header::after {
         <button onclick="toggleAuthModal(false)" style="background:var(--switch-bg); color:var(--text); padding:6px 12px; border-radius:10px; font-weight:bold;">✕</button>
       </div>
 
+      <p>پیش‌نمایش تعرفه و شرایط همکاری</p>
       <div class="auth-tabs">
-        <button id="tabLoginBtn" class="auth-tab active" onclick="switchAuthTab('login')">ورود همکاران دارای اشتراک</button>
-        <button id="tabRegBtn" class="auth-tab" onclick="switchAuthTab('register')">درخواست پنل همکاری جدید</button>
+        <button class="auth-tab" onclick="handlePartnerLogin(false)">نمای داروخانه</button>
+        <button class="auth-tab" onclick="handlePartnerLogin(true)">نمای کلینیک</button>
       </div>
+      <a href="/buy/">ورود به حساب مشتری و خرید</a>
 
-      <div id="loginFormArea">
-        <div class="form-group">
-          <label>نوع مرکز درمانی / تجاری:</label>
-          <select id="partnerTypeSelect" class="form-input">
-            <option value="pharmacy">داروخانه یا گالری آرایشی و بهداشتی</option>
-            <option value="clinic">پزشک متخصص پوست / کلینیک زیبایی (دسترسی کلینیکال)</option>
-          </select>
-        </div>
-        <div class="form-group">
-          <label>شماره موبایل یا کد اشتراک همکاری:</label>
-          <input id="phoneInput" type="text" class="form-input" placeholder="مثلاً 09130000000" />
-        </div>
-        <div class="form-group">
-          <label>رمز عبور یا کد تایید پیامکی:</label>
-          <input id="passInput" type="password" class="form-input" placeholder="••••••••" />
-        </div>
-        <button class="btn-primary" style="width:100%; padding:14px; margin-top:6px;" onclick="handlePartnerLogin()">
-          ورود به پنل عمده‌فروشی همکاران
-        </button>
-      </div>
-
-      <div id="registerFormArea" style="display:none;">
-        <div class="form-group">
-          <label>نام داروخانه / کلینیک / گالری:</label>
-          <input type="text" class="form-input" placeholder="نام مرکز تجاری یا درمانی..." />
-        </div>
-        <div class="form-group">
-          <label>شماره نظام پزشکی / پروانه تاسیس یا جواز کسب:</label>
-          <input type="text" class="form-input" placeholder="شماره مجوز جهت احراز هویت همکار..." />
-        </div>
-        <div class="form-group">
-          <label>شماره موبایل مسئول خرید و نام شهر:</label>
-          <input type="text" class="form-input" placeholder="مثلاً: 09130000000 - کرمان" />
-        </div>
-        <button class="btn-primary" style="width:100%; padding:14px; margin-top:6px;" onclick="alert('درخواست پنل همکاری شما ثبت شد. پس از بررسی واحد فروش کیاراد شفا اندیش، رمز ورود به پنل عمده برایتان پیامک خواهد شد.'); toggleAuthModal(false);">
-          ارسال مدارک و درخواست فعال‌سازی پنل عمده
-        </button>
-      </div>
     </div>
   </div>
 
@@ -560,7 +529,7 @@ header::after {
 
         <div id="checkoutButtonsArea" style="display:flex; flex-direction:column; gap:10px;">
           <button class="btn-primary" style="width:100%; padding:14px;" onclick="submitOrder('cash')">
-            💳 پرداخت آنلاین نقدی و ثبت سفارش
+            ادامه در فروشگاه
           </button>
         </div>
       </div>
@@ -591,34 +560,13 @@ header::after {
       moq: 1
     };
 
-    function switchAuthTab(tab) {
-      const isLogin = tab === 'login';
-      document.getElementById('tabLoginBtn').className = isLogin ? 'auth-tab active' : 'auth-tab';
-      document.getElementById('tabRegBtn').className = !isLogin ? 'auth-tab active' : 'auth-tab';
-      document.getElementById('loginFormArea').style.display = isLogin ? 'block' : 'none';
-      document.getElementById('registerFormArea').style.display = !isLogin ? 'block' : 'none';
-    }
-
-    function handlePartnerLogin() {
-      const type = document.getElementById('partnerTypeSelect').value;
-      const phone = (document.getElementById('phoneInput').value || '').trim();
-      if (!phone) {
-        alert('لطفاً شماره موبایل یا کد اشتراک همکاری خود را وارد نمایید.');
-        return;
-      }
-      const pass = (document.getElementById('passInput').value || '').trim();
-      if (!pass) {
-        alert('رمز عبور یا کد تایید پیامکی را وارد کنید.');
-        return;
-      }
-
-      const isClinic = type === 'clinic' || phone === '2';
+    function handlePartnerLogin(isClinic) {
       activeUser = {
         isB2B: true,
         canBuyClinical: isClinic,
         title: isClinic ? 'پنل کلینیک و پزشک متخصص (VIP)' : 'پنل همکاری داروخانه و گالری (B2B)',
         moq: isClinic ? 3 : 6,
-        partnerCode: 'کد اشتراک: KH-' + phone.slice(-4).padStart(4, '0'),
+        partnerCode: 'حساب نمایشی',
         creditLimit: isClinic ? 120000000 : 50000000,
         hasDebtLock: false
       };
@@ -636,9 +584,9 @@ header::after {
         banner.appendChild(d);
       }
       const cb = document.getElementById('partnerCreditBadge');
-      if (cb) cb.textContent = 'سقف خرید اعتباری فعال (آزمایشی): ' + fa(activeUser.creditLimit) + ' تومان';
+      if (cb) cb.textContent = 'نمونهٔ سقف خرید اعتباری: ' + fa(activeUser.creditLimit) + ' تومان';
       document.getElementById('storeSubTitle').textContent =
-        'پرتال عمده‌فروشی فعال است • تعرفه‌های همکاری، حاشیه سود و آفرهای حجمی بر اساس سطح دسترسی شما نمایش داده می‌شوند.';
+        'پیش‌نمایش پرتال عمده‌فروشی • تعرفه‌های همکاری، حاشیه سود و آفرهای حجمی بر اساس سطح دسترسی شما نمایش داده می‌شوند.';
 
       const found = PRODUCTS.find(x => x.id === currentProdId) || PRODUCTS[0];
       updateStage(found);
@@ -654,7 +602,7 @@ header::after {
         moq: 1
       };
       document.getElementById('authTriggerBtn').className = 'auth-btn';
-      document.getElementById('authBtnText').textContent = 'پرتال همکاران (داروخانه / پزشکان)';
+      document.getElementById('authBtnText').textContent = 'پیش‌نمایش پرتال همکاران';
       document.getElementById('partnerBanner').className = 'partner-banner';
       const cb = document.getElementById('partnerCreditBadge');
       if (cb) cb.textContent = '';
@@ -984,17 +932,17 @@ header::after {
 
         btnArea.innerHTML = `
           <button class="btn-primary" style="width:100%; padding:14px;" onclick="submitOrder('credit')">
-            📄 ثبت پیش‌فاکتور اعتباری همکاران
+            ادامه در فروشگاه
           </button>
           <button class="theme-toggle" style="width:100%; justify-content:center; padding:12px;" onclick="submitOrder('cash')">
-            💳 پرداخت نقدی آنلاین (با ۴٪ تخفیف تسویه نقدی)
+            ادامه در فروشگاه
           </button>
         `;
       } else {
         summaryBox.style.display = 'none';
         btnArea.innerHTML = `
           <button class="btn-primary" style="width:100%; padding:14px;" onclick="submitOrder('cash')">
-            💳 پرداخت آنلاین و ثبت سفارش
+            ادامه در فروشگاه
           </button>
         `;
       }
@@ -1004,53 +952,8 @@ header::after {
       document.getElementById('cartDrawer').className = open ? 'drawer open' : 'drawer';
     }
 
-    function submitOrder(payType) {
-      if (!cart.length) { alert('سبد خرید خالی است — ابتدا محصول اضافه کنید.'); return; }
-      const stamp = new Date();
-      const pad = x => String(x).padStart(2, '0');
-      const orderNo = 'KH-' + stamp.getFullYear() + pad(stamp.getMonth() + 1) + pad(stamp.getDate()) + '-' + pad(stamp.getHours()) + pad(stamp.getMinutes()) + pad(stamp.getSeconds());
-      const items = cart.map(item => {
-        const p0 = PRODUCTS.find(x => x.id === item.id) || {};
-        const unit = activeUser.isB2B ? (p0.b2bPrice || p0.price) : (p0.price || 0);
-        return { id: item.id, name: p0.name || item.id, brand: p0.brand || '', qty: item.qty, unit: unit, sum: unit * item.qty };
-      });
-      const total = items.reduce((s, i) => s + i.sum, 0);
-      const order = {
-        orderNo: orderNo, at: stamp.toISOString(), payType: payType,
-        role: activeUser.isB2B ? (activeUser.canBuyClinical ? 'clinic' : 'partner') : 'b2c',
-        customer: activeUser.title, items: items, total: total
-      };
-      try {
-        const list = JSON.parse(localStorage.getItem('kiarad_healer_orders') || '[]');
-        list.push(order);
-        localStorage.setItem('kiarad_healer_orders', JSON.stringify(list));
-      } catch (e) {}
-      try {
-        var api = (window.KIARAD_API_URL || '').replace(/\/$/, '');
-        if (api) {
-          fetch(api + '/site-orders', {
-            method: 'POST', headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ customer_name: order.customer, pay_type: payType, items: items.map(i => ({ code: i.id, qty: i.qty })) })
-          }).catch(function () {});
-        }
-      } catch (e) {}
-      const rows = items.map(i => '<tr><td>' + i.name + '</td><td>' + fa(i.qty) + '</td><td>' + fa(i.unit) + '</td><td>' + fa(i.sum) + '</td></tr>').join('');
-      const w = window.open('', '_blank');
-      if (w) {
-        w.document.write('<html dir="rtl" lang="fa"><head><meta charset="utf-8"><title>' + orderNo + '</title><style>body{font-family:Tahoma,Vazirmatn,sans-serif;padding:24px;} h2{margin:0 0 4px;} table{width:100%;border-collapse:collapse;margin-top:14px;} td,th{border:1px solid #ddd;padding:8px;font-size:13px;text-align:right;} th{background:#f6f2ec;} .tot{font-size:16px;font-weight:bold;margin-top:12px;} .muted{color:#777;font-size:12px;}</style></head><body>');
-        w.document.write('<h2>پیش‌فاکتور ' + (payType === 'credit' ? 'اعتباری (۶۰ روزه)' : 'نقدی') + ' — ' + orderNo + '</h2>');
-        w.document.write('<div class="muted">خریدار: ' + order.customer + ' • تاریخ ثبت: ' + stamp.toLocaleString('fa-IR') + '</div>');
-        w.document.write('<table><tr><th>محصول</th><th>تعداد</th><th>قیمت واحد (تومان)</th><th>جمع (تومان)</th></tr>' + rows + '</table>');
-        w.document.write('<div class="tot">مبلغ کل: ' + fa(total) + ' تومان</div>');
-        w.document.write('<div class="muted">شرکت پخش کیاراد شفا اندیش — KiaradHealer • این پیش‌فاکتور پس از تأیید واحد فروش نهایی می‌شود.</div>');
-        w.document.write('</body></html>');
-        w.document.close();
-        setTimeout(function () { try { w.print(); } catch (e) {} }, 400);
-      }
-      cart = [];
-      renderCart();
-      toggleCart(false);
-      alert('✓ سفارش ' + orderNo + ' ثبت شد.' + (w ? ' پیش‌فاکتور برای چاپ باز شد.' : ''));
+    function submitOrder() {
+      window.location.assign('/buy/');
     }
 
     renderBrandBar();

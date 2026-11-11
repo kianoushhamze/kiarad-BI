@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import vm from 'node:vm';
 import assert from 'node:assert/strict';
-const html = readFileSync(new URL('../../site/index.html', import.meta.url),'utf8');
+const html = readFileSync(new URL('../../site-healer/buy.html', import.meta.url),'utf8');
 const start = html.indexOf('  function checkoutRequestId(');
 const end = html.indexOf('\n  function submitOrder()',start);
 assert.ok(start > 0 && end > start);
