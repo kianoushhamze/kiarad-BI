@@ -608,11 +608,7 @@ def _p24_search(text_query: str, city_slug: str, page: int = 1) -> list:
     import requests
     headers = {"User-Agent": "KiaradBI/1.0 (+lead-discovery)"}
     url = P24_SEARCH_URL.format(city=city_slug.strip() or "kerman")
-    try:
-        resp = requests.get(url, params={"text": text_query, "page": page}, headers=headers, timeout=20)
-    except requests.exceptions.SSLError:
-        # برخی پروکسی‌ها TLS را می‌شکنند؛ این endpoint عمومی و بدون دادهٔ حساس است.
-        resp = requests.get(url, params={"text": text_query, "page": page}, headers=headers, timeout=20, verify=False)
+    resp = requests.get(url, params={"text": text_query, "page": page}, headers=headers, timeout=20)
     resp.raise_for_status()
     return (resp.json().get("search") or {}).get("result") or []
 
@@ -652,10 +648,7 @@ def _mojavez_search(name_query: str, license_id: int, province_id: int | None, p
     import requests
     headers = {"User-Agent": "KiaradBI/1.0", "Content-Type": "application/json"}
     payload = {"license_id": license_id, "province_id": province_id, "name": name_query or "", "page": page}
-    try:
-        resp = requests.post(MOJAVEZ_SEARCH_URL, json=payload, headers=headers, timeout=20)
-    except requests.exceptions.SSLError:
-        resp = requests.post(MOJAVEZ_SEARCH_URL, json=payload, headers=headers, timeout=20, verify=False)
+    resp = requests.post(MOJAVEZ_SEARCH_URL, json=payload, headers=headers, timeout=20)
     resp.raise_for_status()
     return resp.json()
 

@@ -31,5 +31,5 @@ PLAYBOOKS = {
 }
 
 # Boundaries cannot be relaxed by a model, a learned note, or uploaded text.
-AUTO_OPERATIONS = {'create_task','create_content_draft','crm_create_followup','monthly_plan_create','monthly_plan_submit'}
+AUTO_OPERATIONS = {'create_task','create_content_draft','crm_create_followup','monthly_plan_create','monthly_plan_submit','training_generate','prospect_discover','outbound_preview'}
 PROTECTED_PREFIXES = ('treasury_', 'payroll_', 'catalog_', 'enter_', 'proforma_', 'save_contract', 'campaign_', 'target_')
