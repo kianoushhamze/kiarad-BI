@@ -28,7 +28,9 @@ try {
     $createdContainer = $true
     $ready = $false
     for ($i = 0; $i -lt 30; $i++) {
-        & docker exec $restoreContainer pg_isready -U restoreuser -d restoretest 2>$null | Out-Null
+        # The entrypoint bootstrap server accepts Unix sockets before it restarts.
+        # TCP is enabled only by the final server, so readiness cannot race that restart.
+        & docker exec $restoreContainer pg_isready -h 127.0.0.1 -U restoreuser -d restoretest 2>$null | Out-Null
         if ($LASTEXITCODE -eq 0) { $ready = $true; break }
         Start-Sleep -Seconds 1
     }
