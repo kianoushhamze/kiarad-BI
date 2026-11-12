@@ -1,7 +1,7 @@
 import * as SecureStore from 'expo-secure-store';
 import * as SQLite from 'expo-sqlite';
 export const STORE_OPTIONS={keychainAccessible:SecureStore.AFTER_FIRST_UNLOCK_THIS_DEVICE_ONLY};
-export type Session={origin:string;token:string;user:{id:number;full_name:string;role:string;salesperson_id:number|null}};
+export type Session={origin:string;token:string;user:{id:number;username:string;full_name:string;role:string;salesperson_id:number|null}};
 export type Shift={session_id:string;device_id:string;started_at:string;expires_at:string;collecting:boolean};
 export async function session():Promise<Session|null>{const x=await SecureStore.getItemAsync('session');return x?JSON.parse(x):null;}
 export async function shift():Promise<Shift|null>{const x=await SecureStore.getItemAsync('shift');return x?JSON.parse(x):null;}

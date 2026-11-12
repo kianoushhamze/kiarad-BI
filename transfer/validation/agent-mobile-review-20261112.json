@@ -71,5 +71,17 @@
   ],
   "company_server_access": false,
   "real_phone_background_acceptance": false,
-  "ios_device_signing": false
+  "ios_device_signing": false,
+  "real_route_workflow": {
+    "create": "applied",
+    "submit": "applied",
+    "review": "applied",
+    "routes_published": true,
+    "synthetic_data_only": true
+  },
+  "powershell_parse": {
+    "files": 44,
+    "issues": 0
+  },
+  "storefront_node_suites": 5
 }

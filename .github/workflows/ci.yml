@@ -159,6 +159,8 @@ jobs:
           distribution: temurin
           java-version: '17'
       - uses: android-actions/setup-android@v3
+        with:
+          packages: platform-tools
       - run: npm ci
       - run: npm run typecheck && npm test
       - name: Generate native Android project
@@ -208,7 +210,7 @@ jobs:
 
   training-manual:
     name: Persian PDF handbook
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
