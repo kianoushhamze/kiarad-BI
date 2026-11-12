@@ -61,6 +61,12 @@ class TaskWorkflowTests(unittest.TestCase):
         self.assertEqual(response.status_code, 201, response.text)
         return response.json()["id"]
 
+    def test_creation_without_database_default_still_sets_review_state(self):
+        self.conn.execute(text("ALTER TABLE tasks ALTER COLUMN review_status DROP DEFAULT"))
+        task_id = self.create()
+        row = self.conn.execute(text("SELECT review_status FROM tasks WHERE id=:id"), {"id": task_id}).mappings().one()
+        self.assertEqual(row["review_status"], "not_submitted")
+
     def test_full_report_return_resubmit_approve_and_history(self):
         task_id = self.create()
         operations._ensure_task_workflow(self.conn)

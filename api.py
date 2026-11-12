@@ -41,6 +41,10 @@ from data_entry import router as data_entry_router
 # App setup
 # ----------------------------------------------------------------------------
 app = FastAPI(title="Kiarad BI API")
+from agent_center import router as agent_center_router
+from live_tracking import router as live_tracking_router
+app.include_router(agent_center_router)
+app.include_router(live_tracking_router)
 
 from crud_api import router as crud_router
 app.include_router(voice_reports_router)
@@ -191,6 +195,8 @@ def _required_module(path: str) -> Optional[str]:
         ("/integrations", "online-sales"),
         ("/kerman", "kerman-bases"),
         ("/telegram", "team-chat"),
+        ("/agent-center", "assistant"),
+        ("/tracking", "map"),
         ("/assistant", "assistant"),
         ("/chat", "team-chat"),
         ("/crm", "crm"),

@@ -100,3 +100,11 @@ coverage/
 !migrations/*.sql
 !scripts/*.sql
 !kiarad-dashboard/package-lock.json
+
+# Native mobile generated files
+mobile/node_modules/
+mobile/.expo/
+mobile/android/
+mobile/ios/
+mobile/dist/
+mobile/*.keystore

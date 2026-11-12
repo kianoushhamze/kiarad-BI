@@ -43,9 +43,9 @@ Expand-Archive -LiteralPath (Join-Path $PSScriptRoot 'source.zip') -DestinationP
 $dest = (Resolve-Path -LiteralPath $Destination).Path
 Copy-Item -LiteralPath (Join-Path $PSScriptRoot 'compose.transfer.yml') -Destination (Join-Path $dest 'compose.transfer.yml')
 $envText = [IO.File]::ReadAllText((Join-Path $payload 'runtime.env'))
-$envText = [regex]::Replace($envText, '(?m)^\s*(?:HOLO_URL|HOLO_API_URL|HOLO_AUTO_REFRESH_ENABLED|KIARAD_AUTOMATIONS_DISABLED|KIARAD_RELEASE_TAG)\s*=.*\r?$', '')
+$envText = [regex]::Replace($envText, '(?m)^\s*(?:HOLO_URL|HOLO_API_URL|HOLO_AUTO_REFRESH_ENABLED|KIARAD_AUTOMATIONS_DISABLED|KIARAD_AGENT_DISABLED|KIARAD_RELEASE_TAG)\s*=.*\r?$', '')
 if ($HolooUrl -notmatch '^https?://[^\r\n]+$') { throw 'Invalid Holoo URL.' }
-$envText += "`r`nHOLO_URL=$HolooUrl`r`nHOLO_API_URL=$HolooUrl`r`nHOLO_AUTO_REFRESH_ENABLED=0`r`nKIARAD_AUTOMATIONS_DISABLED=1`r`nKIARAD_RELEASE_TAG=$($release.image_tag)`r`n"
+$envText += "`r`nHOLO_URL=$HolooUrl`r`nHOLO_API_URL=$HolooUrl`r`nHOLO_AUTO_REFRESH_ENABLED=0`r`nKIARAD_AUTOMATIONS_DISABLED=1`r`nKIARAD_AGENT_DISABLED=1`r`nKIARAD_RELEASE_TAG=$($release.image_tag)`r`n"
 [IO.File]::WriteAllText((Join-Path $dest '.env'), $envText, [Text.UTF8Encoding]::new($false))
 if (Test-Path -LiteralPath (Join-Path $payload 'secrets')) { Copy-Item -LiteralPath (Join-Path $payload 'secrets') -Destination $dest -Recurse }
 if (Test-Path -LiteralPath (Join-Path $payload 'speech-models')) {

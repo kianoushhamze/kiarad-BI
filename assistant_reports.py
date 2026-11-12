@@ -102,6 +102,14 @@ for tool in REPORT_TOOLS:
         tool['function']['description']='آماده‌کردن عملیات واقعی برای صفحهٔ تأیید: وظیفه، گزارش کار، قرارداد، محتوا و عملیات تمام ماژول‌ها. برای نام و ساختار عملیات جدید ابتدا panel_operations را بخوان. عملیات جدید payload شامل body، path_params و در صورت نیاز query_params دارد. تا تأیید کاربر فقط پیشنهاد ذخیره می‌شود؛ عملیات تجاری اجرا نشده است.'
 
 
+# Multi-step mission tools use the same actor and never approve their own plans.
+REPORT_TOOLS.extend([
+    {'type':'function','function':{'name':'prepare_agent_mission','description':'ساخت برنامه چندمرحله‌ای تخصصی با حدود اختیار، بازبینی یک‌جای برنامه و رسید اجرا. برای هدف‌های ترکیبی فروش، مالی، منابع انسانی، آموزش، قرارداد و برنامه‌ریزی بلندمدت استفاده کن؛ این ابزار فقط پیش‌نویس می‌سازد.',
+        'parameters':{'type':'object','properties':{'objective':{'type':'string','minLength':5,'maxLength':6000},'domains':{'type':'array','items':{'type':'string','enum':['sales','marketing','finance','hr','logistics','inventory','customer_care','legal','coordination']},'minItems':1,'maxItems':9}},'required':['objective','domains'],'additionalProperties':False}}},
+    {'type':'function','function':{'name':'read_agent_missions','description':'خواندن وضعیت و نتایج مأموریت‌های متعلق به مدیر؛ انجام کار فقط با رسید واقعی گزارش می‌شود.',
+        'parameters':{'type':'object','properties':{},'additionalProperties':False}}},
+])
+
 def rows(conn, sql, params=None):
     return [dict(r) for r in conn.execute(text(sql), params or {}).mappings()]
 
@@ -342,6 +350,12 @@ def execute_report_tool(name, args, user):
     if not isinstance(args,dict) or not user.get('id') or not user.get('role'):
         return {'status':'access_denied'}
     try:
+        if name == 'prepare_agent_mission':
+            from agent_center import Objective,plan_objective
+            return plan_objective(Objective.model_validate(args),user)
+        if name == 'read_agent_missions':
+            from agent_center import list_missions
+            return list_missions(user)
         if name == 'panel_operations':
             from assistant_commands import catalog
             if set(args)-{'module','operation'}:return {'status':'invalid_arguments'}
