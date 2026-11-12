@@ -32,7 +32,7 @@ if (@(Invoke-Docker ps -aq --filter ('label=com.docker.compose.project=' + $Proj
 if (@(Invoke-Docker volume ls -q --filter ('label=com.docker.compose.project=' + $ProjectName)).Count -gt 0) { throw 'Stage project volumes already exist.' }
 if (@(Invoke-Docker volume ls --format '{{.Name}}') -contains ($ProjectName + '_postgres_data')) { throw 'Stage database volume name already exists.' }
 Invoke-Docker load -i (Join-Path $payload 'images.tar')
-$expected = @("kiarad-transfer-backend:$($release.image_tag)","kiarad-transfer-frontend:$($release.image_tag)",'postgres:16','node:22-slim')
+$expected = @("kiarad-transfer-backend:$($release.image_tag)","kiarad-transfer-frontend:$($release.image_tag)",'postgres:16','node:22-slim','traccar/traccar:6.17.0-alpine')
 foreach ($name in $expected) {
     $record = @($images.images | Where-Object name -eq $name)
     if ($record.Count -ne 1) { throw ('Image missing in export manifest: ' + $name) }
@@ -43,9 +43,9 @@ Expand-Archive -LiteralPath (Join-Path $PSScriptRoot 'source.zip') -DestinationP
 $dest = (Resolve-Path -LiteralPath $Destination).Path
 Copy-Item -LiteralPath (Join-Path $PSScriptRoot 'compose.transfer.yml') -Destination (Join-Path $dest 'compose.transfer.yml')
 $envText = [IO.File]::ReadAllText((Join-Path $payload 'runtime.env'))
-$envText = [regex]::Replace($envText, '(?m)^\s*(?:HOLO_URL|HOLO_API_URL|HOLO_AUTO_REFRESH_ENABLED|KIARAD_AUTOMATIONS_DISABLED|KIARAD_AGENT_DISABLED|KIARAD_ROUTINES_DISABLED|KIARAD_OUTBOUND_ENABLED|KIARAD_RELEASE_TAG)\s*=.*\r?$', '')
+$envText = [regex]::Replace($envText, '(?m)^\s*(?:HOLO_URL|HOLO_API_URL|HOLO_AUTO_REFRESH_ENABLED|KIARAD_AUTOMATIONS_DISABLED|KIARAD_AGENT_DISABLED|KIARAD_ROUTINES_DISABLED|KIARAD_OUTBOUND_ENABLED|KIARAD_TRACCAR_ENABLED|KIARAD_RELEASE_TAG)\s*=.*\r?$', '')
 if ($HolooUrl -notmatch '^https?://[^\r\n]+$') { throw 'Invalid Holoo URL.' }
-$envText += "`r`nHOLO_URL=$HolooUrl`r`nHOLO_API_URL=$HolooUrl`r`nHOLO_AUTO_REFRESH_ENABLED=0`r`nKIARAD_AUTOMATIONS_DISABLED=1`r`nKIARAD_AGENT_DISABLED=1`r`nKIARAD_ROUTINES_DISABLED=1`r`nKIARAD_OUTBOUND_ENABLED=0`r`nKIARAD_RELEASE_TAG=$($release.image_tag)`r`n"
+$envText += "`r`nHOLO_URL=$HolooUrl`r`nHOLO_API_URL=$HolooUrl`r`nHOLO_AUTO_REFRESH_ENABLED=0`r`nKIARAD_AUTOMATIONS_DISABLED=1`r`nKIARAD_AGENT_DISABLED=1`r`nKIARAD_ROUTINES_DISABLED=1`r`nKIARAD_OUTBOUND_ENABLED=0`r`nKIARAD_TRACCAR_ENABLED=0`r`nKIARAD_RELEASE_TAG=$($release.image_tag)`r`n"
 [IO.File]::WriteAllText((Join-Path $dest '.env'), $envText, [Text.UTF8Encoding]::new($false))
 if (Test-Path -LiteralPath (Join-Path $payload 'secrets')) { Copy-Item -LiteralPath (Join-Path $payload 'secrets') -Destination $dest -Recurse }
 if (Test-Path -LiteralPath (Join-Path $payload 'speech-models')) {

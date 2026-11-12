@@ -91,5 +91,19 @@ services:
     ports:
       - "127.0.0.1:5050:80"
 
+  traccar:
+    image: traccar/traccar:6.17.0-alpine
+    profiles: [traccar]
+    restart: unless-stopped
+    environment:
+      JAVA_TOOL_OPTIONS: '-Xmx512m'
+    ports: ['127.0.0.1:5055:5055']
+    volumes:
+      - ./secrets/traccar-forward.xml:/opt/traccar/conf/traccar.xml:ro
+    depends_on:
+      backend:
+        condition: service_healthy
+    security_opt: ['no-new-privileges:true']
+
 volumes:
   postgres_data:

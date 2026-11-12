@@ -12,3 +12,13 @@ These are isolated development checks, not company-server or physical-device acc
 - All44 PowerShell files parsed, including staged migration and selective enable switches. CI repeats backup/restore, kit guards, Android Release APK and iOS Release Simulator compilation. Final downloadable artifact SHA, CI conclusion and source commit are recorded by the actual workflow, not inferred from these local checks.
 
 The first unrestricted default-discovery attempt also picked up live-API tests without their configured endpoint/JWT environment; it is not the offline runner. Those environmental errors are not counted as passing checks. The separately scoped API, offline and SQL results above are the evidence used for release readiness.
+
+## Traccar extension validation
+
+- Local offline subset:872 discovered,271 skipped, zero failures/errors. All30 disposable PostgreSQL groups passed341 tests; a later26-test focused rerun adds retryable burst-throttling and mock-location coverage. The bridge has dedicated JSON/header authentication tests through the actual application middleware.
+- Actual JWT API and Chromium: manager device binding, own consented start/stop, trusted sample/live/history, duplicate suppression, outside-shift and revoked-device rejection; worker/manager visibility and390/1280 layouts passed. These samples are synthetic, not phone GPS.
+- Web lint/types/production build passed (two existing CMS image warnings); updated Persian handbook rendered37 A4 pages. PowerShell parses45 files.
+- CI now also runs the complete Linux-image build for PRs, before merge. Its smoke script sends real OsmAnd protocol requests through the official pinned Traccar container, verifies forwarding to the existing live dashboard, pre/post-shift exclusion, duplicate handling and forwarding-auth denial. Exact success is recorded in `validation/traccar-smoke.json` of the corresponding final offline artifact.
+- Company HTTPS/reverse proxy, App Store availability, phone Always/Precise/background settings and actual locked-screen/offline/battery behavior still require company/device acceptance.
+
+Additional authorization hardening: the bridge reads current map-write grants in the same database transaction, ends affected shifts when map permission is revoked, and binds each shift to the account security version. Role/profile/password revocation cannot silently reuse an old shift. The follow-up31 focused tests and all30 isolated SQL groups(348 tests) passed; offline subset877 discovered/276 skipped, no failures/errors. The first local rerun encountered a full disposable PostgreSQL disk; only owned build cache was removed, the synthetic fixture was restarted and the successful checks above were rerun.

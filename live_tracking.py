@@ -22,7 +22,7 @@ def ensure(conn):
         id UUID PRIMARY KEY,user_id INTEGER NOT NULL REFERENCES users(id),device_id TEXT NOT NULL,
         platform TEXT NOT NULL,started_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
         expires_at TIMESTAMPTZ NOT NULL,ended_at TIMESTAMPTZ,consent_version TEXT NOT NULL,
-        last_upload_at TIMESTAMPTZ,last_device_status TEXT NOT NULL DEFAULT 'starting')'''))
+        last_upload_at TIMESTAMPTZ,last_device_status TEXT NOT NULL DEFAULT 'starting',source TEXT NOT NULL DEFAULT 'kiarad')'''))
     conn.execute(text('CREATE INDEX IF NOT EXISTS tracking_sessions_owner_time ON tracking_sessions(user_id,started_at DESC)'))
     conn.execute(text('''CREATE TABLE IF NOT EXISTS tracking_points(
         id BIGSERIAL PRIMARY KEY,session_id UUID NOT NULL REFERENCES tracking_sessions(id),
@@ -106,18 +106,23 @@ def start_session(data: Start, user=Depends(current_user)):
     now = datetime.now(timezone.utc)
     with engine.begin() as conn:
         ensure(conn)
-        conn.execute(text('SELECT pg_advisory_xact_lock(819731,:uid)'), {'uid': user['id']})
-        existing = conn.execute(text('''SELECT * FROM tracking_sessions WHERE user_id=:uid
-            AND ended_at IS NULL AND expires_at>NOW() ORDER BY started_at DESC FOR UPDATE'''), {'uid': user['id']}).mappings().first()
-        if existing:
-            if existing['device_id'] != data.device_id:
-                raise HTTPException(409, 'ردیابی روی دستگاه دیگری فعال است؛ ابتدا همان نشست را پایان دهید.')
-            return {'session_id': str(existing['id']), 'expires_at': existing['expires_at'], 'reused': True, 'sample_interval_seconds': 30}
-        ident = str(uuid4())
-        expires = now + timedelta(hours=data.max_hours)
-        conn.execute(text('''INSERT INTO tracking_sessions(id,user_id,device_id,platform,expires_at,consent_version)
-            VALUES (:id,:uid,:device,:platform,:expires,:consent)'''),
-            dict(id=ident, uid=user['id'], device=data.device_id, platform=data.platform, expires=expires, consent=data.consent_version))
+        return start_session_in_connection(conn,data,user,now=now)
+
+
+def start_session_in_connection(conn,data,user,*,now=None):
+    staff(user);now=now or datetime.now(timezone.utc)
+    conn.execute(text('SELECT pg_advisory_xact_lock(819731,:uid)'), {'uid': user['id']})
+    existing = conn.execute(text('''SELECT * FROM tracking_sessions WHERE user_id=:uid
+        AND ended_at IS NULL AND expires_at>NOW() ORDER BY started_at DESC FOR UPDATE'''), {'uid': user['id']}).mappings().first()
+    if existing:
+        if existing['device_id'] != data.device_id:
+            raise HTTPException(409, 'ردیابی روی دستگاه دیگری فعال است؛ ابتدا همان نشست را پایان دهید.')
+        return {'session_id': str(existing['id']), 'expires_at': existing['expires_at'], 'reused': True, 'sample_interval_seconds': 30}
+    ident = str(uuid4())
+    expires = now + timedelta(hours=data.max_hours)
+    conn.execute(text('''INSERT INTO tracking_sessions(id,user_id,device_id,platform,expires_at,consent_version)
+        VALUES (:id,:uid,:device,:platform,:expires,:consent)'''),
+        dict(id=ident, uid=user['id'], device=data.device_id, platform=data.platform, expires=expires, consent=data.consent_version))
     return {'session_id': ident, 'expires_at': expires, 'reused': False, 'sample_interval_seconds': 30,
             'continuous_delivery_guaranteed': False, 'purpose': 'work_shift_location_only'}
 
@@ -182,7 +187,7 @@ def live(user=Depends(current_user)):
     manager = user.get('role') in MANAGER_ROLES
     with engine.connect() as conn:
         rows = conn.execute(text('''SELECT u.id AS user_id,u.full_name,u.salesperson_id,
-            s.id AS session_id,s.started_at,s.expires_at,s.last_upload_at,s.last_device_status,
+            s.id AS session_id,s.started_at,s.expires_at,s.last_upload_at,s.last_device_status,s.source,
             p.recorded_at,p.received_at,p.latitude,p.longitude,p.accuracy_m,p.mocked,p.battery_level
             FROM users u
             LEFT JOIN LATERAL (SELECT * FROM tracking_sessions WHERE user_id=u.id AND ended_at IS NULL
