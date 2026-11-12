@@ -54,10 +54,14 @@ const menuGroups: { label: string; icon: string; href?: string; children?: strin
   ]},
   { label: "هوش مصنوعی", icon: "🤖", children: [
     ["مرکز فرمان تخصصی", "/agent-center", "✨"],
+    ["برنامه‌های دوره‌ای و لید", "/automation-hub", "🔁"],
+    ["پیام مشتری و رسید", "/outbound", "✉️"],
+    ["تحلیل تخصصی و قرارداد", "/specialists", "📐"],
     ["دستیار هوشمند", "/assistant", "🤖"],
     ["اتوماسیون‌های دستیار", "/assistant-automations", "⏱️"]
   ]},
   { label: "همکاری تیمی", icon: "💬", children: [
+    ["آموزش و آزمون", "/training", "🎓"],
     ["تسک‌ها", "/tasks", "☑"],
     ["چت تیم", "/team-chat", "💬"]
   ]},
@@ -179,7 +183,8 @@ export function PortalShell({ title, eyebrow, actions, children }: { title: stri
   };
 
   const isAllowed = (href: string) => {
-    if (href === "/account") return Boolean(user);
+    if (href === "/account" || href === "/training") return Boolean(user);
+    if (["/automation-hub","/outbound","/specialists"].includes(href)) return user?.role === "ceo";
     if (href === "/agent-center") return user?.role === "ceo";
     if (href === "/assistant-automations") return user?.role === "ceo";
     if (href === "/route-builder") return user?.role === "ceo";

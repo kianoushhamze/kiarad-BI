@@ -2,7 +2,7 @@
   "expo": {
     "name": "KiaradField",
     "slug": "kiarad-field",
-    "version": "1.0.0",
+    "version": "1.1.0",
     "orientation": "portrait",
     "userInterfaceStyle": "dark",
     "scheme": "kiarad",
@@ -15,8 +15,12 @@
         ],
         "NSLocationWhenInUseUsageDescription": "نمایش و ثبت مسیر کاری با شروع شیفت توسط شما.",
         "NSLocationAlwaysAndWhenInUseUsageDescription": "ثبت مسیر شیفت کاری در پس‌زمینه؛ با پایان شیفت متوقف می‌شود.",
-        "CFBundleDisplayName": "کیاراد همراه"
-      }
+        "CFBundleDisplayName": "کیاراد همراه",
+        "NSCameraUsageDescription": "برای اسکن چک و ثبت تصویر در فرم انتخابی شما.",
+        "NSMicrophoneUsageDescription": "برای ضبط و ارسال گزارش صوتی با درخواست شما.",
+        "NSPhotoLibraryUsageDescription": "برای انتخاب تصویر یا مدرک در فرم انتخابی شما."
+      },
+      "buildNumber": "2"
     },
     "android": {
       "package": "ir.kiarad.field",
@@ -25,8 +29,11 @@
         "ACCESS_FINE_LOCATION",
         "ACCESS_BACKGROUND_LOCATION",
         "FOREGROUND_SERVICE",
-        "FOREGROUND_SERVICE_LOCATION"
-      ]
+        "FOREGROUND_SERVICE_LOCATION",
+        "CAMERA",
+        "RECORD_AUDIO"
+      ],
+      "versionCode": 2
     },
     "plugins": [
       [
@@ -39,7 +46,8 @@
         }
       ],
       "expo-secure-store",
-      "expo-sqlite"
+      "expo-sqlite",
+      "expo-sharing"
     ],
     "extra": {
       "trackingPurpose": "consented_work_shift_only"

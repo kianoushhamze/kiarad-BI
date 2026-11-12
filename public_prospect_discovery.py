@@ -33,6 +33,8 @@ def normalize_elements(elements):
             'name':tags.get('name:fa') or tags.get('name') or tags.get('name:en') or None,
             'category':category,'city':tags.get('addr:city'),'street':tags.get('addr:street'),
             'latitude':center.get('lat'),'longitude':center.get('lon'),
+            'address':tags.get('addr:full') or ' '.join(str(tags.get(k) or '') for k in ('addr:city','addr:street','addr:housenumber')).strip() or None,
+            'phone':tags.get('contact:phone') or tags.get('phone'),
             'review_status':'unverified','customer_id':None})
     return records
 

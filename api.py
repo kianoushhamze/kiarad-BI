@@ -45,6 +45,18 @@ from agent_center import router as agent_center_router
 from live_tracking import router as live_tracking_router
 app.include_router(agent_center_router)
 app.include_router(live_tracking_router)
+from tracking_analytics import router as tracking_analytics_router
+app.include_router(tracking_analytics_router)
+from outbound_messages import router as outbound_router
+app.include_router(outbound_router)
+from prospect_pipeline import router as prospect_router
+app.include_router(prospect_router)
+from agent_routines import router as agent_routines_router
+app.include_router(agent_routines_router)
+from specialist_workflows import router as specialist_router
+app.include_router(specialist_router)
+from training_workflows import router as training_router
+app.include_router(training_router)
 
 from crud_api import router as crud_router
 app.include_router(voice_reports_router)
@@ -197,6 +209,11 @@ def _required_module(path: str) -> Optional[str]:
         ("/telegram", "team-chat"),
         ("/agent-center", "assistant"),
         ("/tracking", "map"),
+        ("/outbound", "assistant"),
+        ("/prospects", "assistant"),
+        ("/agent-routines", "assistant"),
+        ("/specialists", "assistant"),
+        ("/training", "tasks"),
         ("/assistant", "assistant"),
         ("/chat", "team-chat"),
         ("/crm", "crm"),
@@ -305,7 +322,10 @@ async def auth_gate(request, call_next):
                 if payload.get("pwd_ver", 0) != user_row["password_version"]:
                     return JSONResponse(status_code=401, content={"detail": "Session expired after password change"})
 
-                if path not in _AUTH_METADATA_PATHS:
+                # Training access is an explicit per-enrollment account grant; the router
+                # checks ownership for every lesson/assessment and CEO role for publishing.
+                training_account_path = path == "/training" or path.startswith("/training/")
+                if path not in _AUTH_METADATA_PATHS and not training_account_path:
                     module = _required_module(path)
                     if path in {"/dashboard/full", "/api/dashboard/full"} and str(user_row["role"]) in MANAGER_ROLES:
                         module = "management"

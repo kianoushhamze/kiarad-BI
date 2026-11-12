@@ -110,6 +110,11 @@ REPORT_TOOLS.extend([
         'parameters':{'type':'object','properties':{},'additionalProperties':False}}},
 ])
 
+REPORT_TOOLS.extend([
+ {'type':'function','function':{'name':'specialist_tools','description':'فهرست ابزار تخصصی واقعی و ساختار ورودی: سناریوی تارگت سالانه، تحلیل GPS، قرارداد مستند و آموزش. پیش‌نویس‌های نوشتنی از مسیر مأموریت بازبینی می‌شوند.','parameters':{'type':'object','properties':{},'additionalProperties':False}}},
+ {'type':'function','function':{'name':'read_specialist_analysis','description':'اجرای تحلیل تخصصی خواندنی؛ هیچ پیام، تارگت، قرارداد یا وظیفه‌ای را ثبت یا ارسال نمی‌کند.','parameters':{'type':'object','properties':{'operation':{'type':'string','enum':['team_signals','target_scenarios','tracking_analytics','contract_review','training_progress','training_my_courses']},'payload':{'type':'object'}},'required':['operation','payload'],'additionalProperties':False}}}
+])
+
 def rows(conn, sql, params=None):
     return [dict(r) for r in conn.execute(text(sql), params or {}).mappings()]
 
@@ -350,6 +355,13 @@ def execute_report_tool(name, args, user):
     if not isinstance(args,dict) or not user.get('id') or not user.get('role'):
         return {'status':'access_denied'}
     try:
+        if name == 'specialist_tools':
+            from agent_extensions import catalog
+            return {'operations':catalog(user)}
+        if name == 'read_specialist_analysis':
+            from agent_extensions import SPECS,execute
+            if set(args)-{'operation','payload'} or args.get('operation') not in SPECS or SPECS[args['operation']]['kind']!='read':return {'status':'invalid_arguments'}
+            return execute(args['operation'],args.get('payload',{}),user)
         if name == 'prepare_agent_mission':
             from agent_center import Objective,plan_objective
             return plan_objective(Objective.model_validate(args),user)

@@ -739,34 +739,39 @@ def visitors_overview(user: dict = Depends(current_user)):
 
 @router.post("/tasks", status_code=status.HTTP_201_CREATED)
 def create_task(data: TaskCreate, manager: dict = Depends(require_manager)):
+    with engine.begin() as conn:
+        return create_task_in_connection(conn, data, manager)
+
+
+def create_task_in_connection(conn, data: TaskCreate, manager: dict):
+    if manager.get("role") not in MANAGER_ROLES:raise HTTPException(403,"تخصیص کار فقط برای مدیر مجاز است.")
     if not data.title.strip():
         raise HTTPException(status_code=422, detail="عنوان کار را وارد کنید")
     if data.priority not in {"low", "normal", "high", "urgent"}:
         raise HTTPException(status_code=422, detail="Invalid priority")
-    with engine.begin() as conn:
-        _ensure_task_workflow(conn)
-        assignee = conn.execute(
-            text("SELECT id FROM users WHERE id=:id AND is_active::text IN ('1','true','t')"),
-            {"id": data.assigned_to},
-        ).first()
-        if not assignee:
-            raise HTTPException(status_code=404, detail="Assignee not found")
-        row = conn.execute(
-            text("""
-                INSERT INTO tasks
-                    (title, description, priority, status, progress, assigned_to,
-                     created_by, customer_id, due_date, created_at, updated_at, review_status)
-                VALUES
-                    (:title, :description, :priority, 'new', 0, :assigned_to,
-                     :created_by, :customer_id, :due_date, NOW(), NOW(), 'not_submitted')
-                RETURNING *
-            """),
-            {**data.model_dump(), "title": data.title.strip(), "created_by": manager["id"]},
-        ).mappings().first()
-        conn.execute(text("""INSERT INTO task_updates
-            (task_id,user_id,progress,status,note,created_at)
-            VALUES (:task_id,:user_id,0,'new',:note,NOW())"""),
-            {"task_id": row["id"], "user_id": manager["id"], "note": "ایجاد و تخصیص کار"})
+    _ensure_task_workflow(conn)
+    assignee = conn.execute(
+        text("SELECT id FROM users WHERE id=:id AND is_active::text IN ('1','true','t')"),
+        {"id": data.assigned_to},
+    ).first()
+    if not assignee:
+        raise HTTPException(status_code=404, detail="Assignee not found")
+    row = conn.execute(
+        text("""
+            INSERT INTO tasks
+                (title, description, priority, status, progress, assigned_to,
+                 created_by, customer_id, due_date, created_at, updated_at, review_status)
+            VALUES
+                (:title, :description, :priority, 'new', 0, :assigned_to,
+                 :created_by, :customer_id, :due_date, NOW(), NOW(), 'not_submitted')
+            RETURNING *
+        """),
+        {**data.model_dump(), "title": data.title.strip(), "created_by": manager["id"]},
+    ).mappings().first()
+    conn.execute(text("""INSERT INTO task_updates
+        (task_id,user_id,progress,status,note,created_at)
+        VALUES (:task_id,:user_id,0,'new',:note,NOW())"""),
+        {"task_id": row["id"], "user_id": manager["id"], "note": "ایجاد و تخصیص کار"})
     return dict(row)
 
 
@@ -972,7 +977,6 @@ def assign_campaign(data: CampaignAssignment, manager: dict = Depends(require_ma
             ON CONFLICT (campaign_id,user_id) DO NOTHING"""), {**data.model_dump(), "assigned_by": manager["id"]})
     return {"status": "assigned"}
 
-
 @router.get("/tasks/assignees")
 def task_assignees(manager: dict = Depends(require_manager)):
     with engine.connect() as conn:
@@ -1002,6 +1006,11 @@ def list_tasks(user: dict = Depends(current_user)):
 
 @router.patch("/tasks/{task_id}/progress")
 def update_task_progress(task_id: int, data: TaskProgress, user: dict = Depends(current_user)):
+    with engine.begin() as conn:
+        return update_task_progress_in_connection(conn, task_id, data, user)
+
+
+def update_task_progress_in_connection(conn, task_id: int, data: TaskProgress, user: dict):
     allowed_statuses = {"new", "in_progress", "completed", "blocked"}
     if data.status not in allowed_statuses:
         raise HTTPException(status_code=422, detail="Invalid status")
@@ -1012,34 +1021,32 @@ def update_task_progress(task_id: int, data: TaskProgress, user: dict = Depends(
     note = (data.note or "").strip()
     if data.status in {"completed", "blocked"} and not note:
         raise HTTPException(status_code=422, detail="نتیجهٔ کار یا علت توقف را بنویسید")
-    with engine.begin() as conn:
-        task = conn.execute(
-            text("SELECT * FROM tasks WHERE id=:id FOR UPDATE"), {"id": task_id}
-        ).mappings().first()
-        if not task:
-            raise HTTPException(status_code=404, detail="Task not found")
-        if task["assigned_to"] != user["id"]:
-            raise HTTPException(status_code=403, detail="Task access denied")
-        if task.get("review_status") in {"pending", "approved"}:
-            raise HTTPException(status_code=409, detail="این کار در انتظار بررسی یا تأییدشده است")
-        row = conn.execute(
-            text("""
-                UPDATE tasks SET progress=:progress, status=:status, updated_at=NOW(),
-                    review_status=:review_status, reviewed_by=NULL, reviewed_at=NULL, review_note=NULL
-                WHERE id=:id RETURNING *
-            """),
-            {"id": task_id, "progress": data.progress, "status": data.status,
-             "review_status": "pending" if data.status == "completed" else task.get("review_status", "not_submitted")},
-        ).mappings().first()
-        conn.execute(
-            text("""
-                INSERT INTO task_updates (task_id, user_id, progress, status, note, created_at)
-                VALUES (:task_id, :user_id, :progress, :status, :note, NOW())
-            """),
-            {"task_id": task_id, "user_id": user["id"], **data.model_dump(), "note": note or None},
-        )
+    task = conn.execute(
+        text("SELECT * FROM tasks WHERE id=:id FOR UPDATE"), {"id": task_id}
+    ).mappings().first()
+    if not task:
+        raise HTTPException(status_code=404, detail="Task not found")
+    if task["assigned_to"] != user["id"]:
+        raise HTTPException(status_code=403, detail="Task access denied")
+    if task.get("review_status") in {"pending", "approved"}:
+        raise HTTPException(status_code=409, detail="این کار در انتظار بررسی یا تأییدشده است")
+    row = conn.execute(
+        text("""
+            UPDATE tasks SET progress=:progress, status=:status, updated_at=NOW(),
+                review_status=:review_status, reviewed_by=NULL, reviewed_at=NULL, review_note=NULL
+            WHERE id=:id RETURNING *
+        """),
+        {"id": task_id, "progress": data.progress, "status": data.status,
+         "review_status": "pending" if data.status == "completed" else task.get("review_status", "not_submitted")},
+    ).mappings().first()
+    conn.execute(
+        text("""
+            INSERT INTO task_updates (task_id, user_id, progress, status, note, created_at)
+            VALUES (:task_id, :user_id, :progress, :status, :note, NOW())
+        """),
+        {"task_id": task_id, "user_id": user["id"], **data.model_dump(), "note": note or None},
+    )
     return dict(row)
-
 
 @router.get("/tasks/{task_id}/updates")
 def task_history(task_id: int, user: dict = Depends(current_user)):
