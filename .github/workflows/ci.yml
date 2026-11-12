@@ -102,6 +102,8 @@ jobs:
       - name: PostgreSQL isolated-schema regressions
         run: |
           python scripts/run_database_review_tests.py
+      - name: Real Traccar protocol to consented dashboard
+        run: python scripts/ci_traccar_service.py
       - name: PowerShell syntax
         shell: pwsh
         run: |
@@ -253,7 +255,7 @@ jobs:
         shell: pwsh
         run: ./tests/test_transfer_kit.ps1 -KitRoot (Join-Path $env:RUNNER_TEMP 'Kiarad-Transfer-20261113') -DockerGuards
       - name: Upload private repository transfer artifact
-        if: github.ref == 'refs/heads/main'
+        if: github.ref == 'refs/heads/main' || github.event_name == 'pull_request'
         uses: actions/upload-artifact@v4
         with:
           name: Kiarad-Transfer-20261113
@@ -263,7 +265,7 @@ jobs:
 
   offline-images:
     name: Build Linux images and verify offline stack
-    if: github.ref == 'refs/heads/main'
+    if: github.ref == 'refs/heads/main' || github.event_name == 'pull_request'
     needs: [transfer-kit]
     runs-on: ubuntu-latest
     timeout-minutes: 40

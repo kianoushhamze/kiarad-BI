@@ -16,7 +16,8 @@ try {
     Invoke-Docker build --label ('org.opencontainers.image.revision=' + $release.source_commit) --build-arg KIARAD_API_URL=http://backend:8000 --build-arg NEXT_PUBLIC_API_URL=http://backend:8000 -f kiarad-dashboard/Dockerfile -t $frontend .
     Invoke-Docker pull postgres:16
     Invoke-Docker pull node:22-slim
-    $images = @($backend,$frontend,'postgres:16','node:22-slim')
+    Invoke-Docker pull --platform linux/amd64 traccar/traccar:6.17.0-alpine
+    $images = @($backend,$frontend,'postgres:16','node:22-slim','traccar/traccar:6.17.0-alpine')
     $records = @()
     foreach ($name in $images) {
         $info = Invoke-Docker image inspect $name | ConvertFrom-Json

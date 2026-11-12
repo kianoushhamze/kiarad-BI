@@ -103,3 +103,7 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\06-Enable-Sync.ps1 -De
 
 ## دستیار، اپ و آموزش نسخهٔ جدید
 مرجع قابلیت و پذیرش `Agent_Mobile_Handoff_20261113.md` است. پوشهٔ `deliverables` شامل APK پایلوت، خروجی شبیه‌ساز آیفون و PDF فارسی است؛ Simulator روی آیفون واقعی نصب نمی‌شود. نصب آیفون به امضای حساب سازمان نیاز دارد. پردازشگرهای قدیم باید پیش از فعال‌سازی نسخهٔ جدید خاموش باشند.
+
+
+## GPS با اپ آمادهٔ Traccar
+مرجع جدید `Traccar_Bridge_Handoff_20261113.md` است. بستهٔ کامل تصویرپنجم واسط Traccar6.17.0را دارد؛ در stageخاموش است. پس از نصب، `07-Configure-Traccar.ps1 -Destination <installed-root> -ClientUrl https://gps.company.ir` را اجرا و reverseproxyHTTPSرا تنظیم کنید. فقط خود پرسنل شیفت را شروع می‌کنند. اپ آمادهٔ AppStoreنیاز به امضای اختصاصی شرکت ندارد؛ این موضوع با امضای اپ اختصاصی کیاراد متفاوت است.

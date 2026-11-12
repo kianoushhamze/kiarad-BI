@@ -45,6 +45,8 @@ from agent_center import router as agent_center_router
 from live_tracking import router as live_tracking_router
 app.include_router(agent_center_router)
 app.include_router(live_tracking_router)
+from traccar_bridge import router as traccar_router
+app.include_router(traccar_router)
 from tracking_analytics import router as tracking_analytics_router
 app.include_router(tracking_analytics_router)
 from outbound_messages import router as outbound_router
@@ -280,6 +282,13 @@ async def auth_gate(request, call_next):
     if request.method == "OPTIONS":
         return await call_next(request)
     path = request.url.path
+    if request.method == "POST" and path == "/tracking/traccar/positions":
+        # This single server-to-server route authenticates its dedicated forwarding
+        # credential before reading a bounded body; a device identifier is not a JWT.
+        from traccar_bridge import authorize_forward
+        try: authorize_forward(request)
+        except HTTPException as exc: return JSONResponse(status_code=exc.status_code,content={"detail":exc.detail})
+        return await call_next(request)
     if path in _OPEN_PATHS:
         return await call_next(request)
     if request.method in {"GET", "HEAD"} and (path == "/site-banners" or path.startswith("/site-banners/")):
