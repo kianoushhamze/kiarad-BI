@@ -2,7 +2,7 @@
 import argparse,hashlib,json,shutil
 from pathlib import Path
 p=argparse.ArgumentParser();p.add_argument('--kit',type=Path,required=True);p.add_argument('--extras',type=Path,required=True);a=p.parse_args()
-expected={'Kiarad-Training-Manual/Kiarad-Comprehensive-Manual-FA.pdf','Kiarad-Android-Pilot/app-debug.apk','Kiarad-iOS-Simulator/Kiarad-iOS-Simulator.zip'}
+expected={'Kiarad-Training-Manual/Kiarad-Comprehensive-Manual-FA.pdf','Kiarad-Android-Pilot/app-release.apk','Kiarad-iOS-Simulator/Kiarad-iOS-Simulator.zip'}
 for path in expected:
  if not (a.extras/path).is_file():raise RuntimeError('Missing release deliverable: '+path)
 shutil.copytree(a.extras,a.kit/'deliverables')

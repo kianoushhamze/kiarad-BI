@@ -166,12 +166,14 @@ jobs:
       - name: Generate native Android project
         run: npx expo prebuild --platform android --no-install
       - name: Compile organizational pilot APK
-        run: ./gradlew --no-daemon assembleDebug -PreactNativeArchitectures=arm64-v8a,x86_64
+        run: ./gradlew --no-daemon assembleRelease -PreactNativeArchitectures=arm64-v8a
         working-directory: mobile/android
+      - name: Verify APK embeds application bundle
+        run: python -c "import zipfile; z=zipfile.ZipFile('android/app/build/outputs/apk/release/app-release.apk'); assert 'assets/index.android.bundle' in z.namelist(); assert any(p.startswith('lib/arm64-v8a/') for p in z.namelist()); assert z.testzip() is None"
       - uses: actions/upload-artifact@v4
         with:
           name: Kiarad-Android-Pilot
-          path: mobile/android/app/build/outputs/apk/debug/app-debug.apk
+          path: mobile/android/app/build/outputs/apk/release/app-release.apk
           if-no-files-found: error
           retention-days: 30
 
@@ -197,10 +199,10 @@ jobs:
       - name: Generate native iOS project and Pods
         run: npx expo prebuild --platform ios
       - name: Compile unsigned simulator app
-        run: xcodebuild -workspace ios/KiaradField.xcworkspace -scheme KiaradField -configuration Debug -sdk iphonesimulator -destination 'generic/platform=iOS Simulator' -derivedDataPath "$RUNNER_TEMP/kiarad-ios" CODE_SIGNING_ALLOWED=NO build
+        run: xcodebuild -workspace ios/KiaradField.xcworkspace -scheme KiaradField -configuration Release -sdk iphonesimulator -destination 'generic/platform=iOS Simulator' -derivedDataPath "$RUNNER_TEMP/kiarad-ios" CODE_SIGNING_ALLOWED=NO build
       - name: Package simulator app and signing instructions
         run: |
-          ditto -c -k --sequesterRsrc --keepParent "$RUNNER_TEMP/kiarad-ios/Build/Products/Debug-iphonesimulator/KiaradField.app" "$RUNNER_TEMP/Kiarad-iOS-Simulator.zip"
+          ditto -c -k --sequesterRsrc --keepParent "$RUNNER_TEMP/kiarad-ios/Build/Products/Release-iphonesimulator/KiaradField.app" "$RUNNER_TEMP/Kiarad-iOS-Simulator.zip"
       - uses: actions/upload-artifact@v4
         with:
           name: Kiarad-iOS-Simulator

@@ -27,7 +27,7 @@
 
 ## ساخت و توزیع موبایل
 
-CI علاوه بر وب/بک‌اند، Android debug APK پایلوت و iOS Simulator app را کامپایل می‌کند. نام artifactها:
+CI علاوه بر وب/بک‌اند، Android release APK پایلوت با امضای آزمایشی و iOS Simulator app را کامپایل می‌کند. نام artifactها:
 
 - `Kiarad-Android-Pilot`: APK آزمایشی، مناسب پایلوت کنترل‌شده؛ امضای تولید و کلید پایدار سازمان جداست.
 - `Kiarad-iOS-Simulator`: خروجی شبیه‌ساز مک؛ روی آیفون واقعی نصب نمی‌شود.
