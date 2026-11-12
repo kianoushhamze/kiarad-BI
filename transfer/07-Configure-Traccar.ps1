@@ -18,5 +18,5 @@ if([Environment]::OSVersion.Platform -eq [PlatformID]::Unix){
 Invoke-Docker @runArgs --mount ("type=bind,source="+$dest+",target=/setup") ("kiarad-transfer-backend:"+$release.image_tag) python /app/scripts/configure_traccar.py --root /setup --client-url $ClientUrl
 Invoke-Docker @compose config --quiet
 Invoke-Docker @compose up -d --no-build --pull never --wait backend
-Invoke-Docker @compose up -d --no-build --pull never traccar
+Invoke-Docker @compose up -d --no-build --pull never --force-recreate traccar
 Write-Host 'GPS gateway started on loopback port5055. Configure HTTPS reverse proxy before phones connect; staff must start their own consented shift.'

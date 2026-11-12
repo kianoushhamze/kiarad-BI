@@ -13,7 +13,7 @@ import live_tracking as tracking
 @unittest.skipUnless(os.getenv('KIARAD_TEST_TRACCAR_DB')=='1','Opt-in disposable PostgreSQL')
 class TraccarTests(unittest.TestCase):
  def setUp(self):
-  self.c=engine.connect();self.tx=self.c.begin();self.addCleanup(self.c.close);self.addCleanup(self.tx.rollback);schema='traccar_'+uuid4().hex;self.c.execute(text('CREATE SCHEMA '+schema));self.c.execute(text('SET LOCAL search_path TO '+schema));self.c.execute(text('CREATE TABLE users(id INTEGER PRIMARY KEY,username TEXT,full_name TEXT,role TEXT,salesperson_id INTEGER,is_active INTEGER,password_version INTEGER)'));self.c.execute(text("INSERT INTO users VALUES(1,'chief','Chief','ceo',NULL,1,0),(2,'worker','Worker','visitor',2,1,0),(3,'other','Other','visitor',3,1,0)"));m.ensure(self.c)
+  self.c=engine.connect();self.tx=self.c.begin();self.addCleanup(self.c.close);self.addCleanup(self.tx.rollback);schema='traccar_'+uuid4().hex;self.c.execute(text('CREATE SCHEMA '+schema));self.c.execute(text('SET LOCAL search_path TO '+schema));self.c.execute(text('CREATE TABLE users(id INTEGER PRIMARY KEY,username TEXT,full_name TEXT,role TEXT,salesperson_id INTEGER,is_active INTEGER,password_version INTEGER)'));self.c.execute(text("INSERT INTO users VALUES(1,'chief','Chief','ceo',NULL,1,0),(2,'worker','Worker','visitor',2,1,0),(3,'other','Other','visitor',3,1,0)"));self.c.execute(text('CREATE TABLE role_permissions(role TEXT,module TEXT,can_read BOOLEAN,can_write BOOLEAN,can_delete BOOLEAN)'));m.ensure(self.c)
   for module in [m,tracking]:
    e=self.enterContext(patch.object(module,'engine'));e.begin.side_effect=self.atomic;e.connect.side_effect=lambda:nullcontext(self.c)
   self.enterContext(patch.dict(os.environ,{'KIARAD_TRACCAR_ENABLED':'1','KIARAD_TRACCAR_FORWARD_TOKEN':'synthetic-forward-token-0123456789012345','KIARAD_TRACCAR_CLIENT_URL':'https://gps.ci.invalid'}));self.user={'id':1,'role':'ceo'};app=FastAPI();app.include_router(m.router);app.include_router(tracking.router);app.dependency_overrides[current_user]=lambda:self.user;self.client=TestClient(app);self.addCleanup(self.client.close)
@@ -71,3 +71,19 @@ class TraccarTests(unittest.TestCase):
   b=self.bind();s=self.start(b);self.c.execute(text("INSERT INTO tracking_points(session_id,event_id,user_id,recorded_at,latitude,longitude,accuracy_m) SELECT :session,md5('rate:'||g)::uuid,2,NOW(),30,57,5 FROM generate_series(1,1200) g"),{'session':s['session_id']});r=self.send(self.point(b));self.assertEqual(r.status_code,429);self.assertEqual(r.headers['retry-after'],'60');self.assertEqual(self.count(),1200)
  def test_mock_flag_from_forwarder_is_never_shown_as_live(self):
   b=self.bind();self.start(b);p=self.point(b);p['position']['attributes']['mock']='true';self.send(p);live=self.client.get('/tracking/live').json()['items'][0];self.assertFalse(live['is_live']);self.assertEqual(live['state'],'possible_mock')
+
+ def test_revoked_map_permission_ends_shift_and_does_not_auto_resume(self):
+  b=self.bind();s=self.start(b);self.c.execute(text("INSERT INTO role_permissions VALUES('visitor','__configured__',false,false,false)"));r=self.send(self.point(b));self.assertEqual(r.json()['ignored'],'tracking_permission_revoked');self.assertEqual(self.count(),0);self.assertIsNotNone(self.c.execute(text('SELECT ended_at FROM tracking_sessions WHERE id=:id'),{'id':s['session_id']}).scalar());self.c.execute(text('DELETE FROM role_permissions'));self.assertEqual(self.send(self.point(b)).json()['ignored'],'outside_consented_shift')
+ def test_role_change_without_map_grant_blocks_receipt(self):
+  b=self.bind();self.start(b);self.c.execute(text("UPDATE users SET role='finance' WHERE id=2"));self.assertEqual(self.send(self.point(b)).json()['ignored'],'tracking_permission_revoked');self.assertEqual(self.count(),0)
+ def test_account_reassignment_or_password_revocation_ends_old_shift(self):
+  b=self.bind();s=self.start(b);self.c.execute(text('UPDATE users SET password_version=1 WHERE id=2'));self.assertEqual(self.send(self.point(b)).json()['ignored'],'account_session_changed');self.assertEqual(self.count(),0);self.assertIsNotNone(self.c.execute(text('SELECT ended_at FROM tracking_sessions WHERE id=:id'),{'id':s['session_id']}).scalar())
+ def test_role_editor_closes_shift_immediately_without_waiting_for_a_point(self):
+  import operations
+  b=self.bind();s=self.start(b);fake=self.enterContext(patch.object(operations,'engine'));fake.begin.side_effect=self.atomic
+  operations.set_role_permissions('visitor',{'permissions':[]},{'id':1,'role':'ceo'})
+  self.assertIsNotNone(self.c.execute(text('SELECT ended_at FROM tracking_sessions WHERE id=:id'),{'id':s['session_id']}).scalar())
+  operations.set_role_permissions('visitor',{'modules':['map']},{'id':1,'role':'ceo'})
+  self.assertEqual(self.send(self.point(b)).json()['ignored'],'outside_consented_shift')
+ def test_fresh_consent_after_account_change_creates_new_bound_shift(self):
+  b=self.bind();old=self.start(b);self.c.execute(text('UPDATE users SET password_version=1 WHERE id=2'));self.user['password_version']=1;r=self.client.post('/tracking/traccar/shift/start',json={'device_id':b['id'],'consent_version':'work-shift-location-v1'});self.assertEqual(r.status_code,201,r.text);self.assertNotEqual(r.json()['session_id'],old['session_id']);self.assertTrue(self.send(self.point(b)).json()['accepted'])

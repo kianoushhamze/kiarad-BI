@@ -8,7 +8,7 @@ from fastapi import APIRouter,Depends,HTTPException,Request
 from pydantic import BaseModel,ConfigDict,Field,ValidationError,field_validator
 from sqlalchemy import text
 from db import engine
-from operations import current_user,require_manager,MANAGER_ROLES
+from operations import current_user,require_manager,MANAGER_ROLES,role_has_module_permission
 from live_tracking import ensure as ensure_tracking,Start,start_session_in_connection,staff
 
 router=APIRouter(prefix='/tracking/traccar',tags=['traccar_bridge'])
@@ -25,7 +25,8 @@ def ensure(c):
         created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),revoked_at TIMESTAMPTZ,last_received_at TIMESTAMPTZ,last_recorded_at TIMESTAMPTZ)''',
         '''CREATE UNIQUE INDEX IF NOT EXISTS traccar_active_owner ON traccar_devices(user_id) WHERE revoked_at IS NULL''',
         '''CREATE TABLE IF NOT EXISTS traccar_shifts(session_id UUID PRIMARY KEY REFERENCES tracking_sessions(id),
-        device_id UUID NOT NULL REFERENCES traccar_devices(id))''',
+        device_id UUID NOT NULL REFERENCES traccar_devices(id),auth_version INTEGER NOT NULL DEFAULT 0)''',
+        '''ALTER TABLE traccar_shifts ADD COLUMN IF NOT EXISTS auth_version INTEGER NOT NULL DEFAULT 0''',
         '''CREATE INDEX IF NOT EXISTS traccar_shifts_device ON traccar_shifts(device_id)''',
         '''CREATE TABLE IF NOT EXISTS traccar_device_events(id BIGSERIAL PRIMARY KEY,device_id UUID NOT NULL REFERENCES traccar_devices(id),
         actor_id INTEGER NOT NULL REFERENCES users(id),kind TEXT NOT NULL,created_at TIMESTAMPTZ DEFAULT NOW())''',
@@ -105,8 +106,10 @@ def start(data:Shift,user=Depends(current_user)):
     with engine.begin() as c:
         row=c.execute(text('SELECT * FROM traccar_devices WHERE id=:id AND user_id=:uid AND revoked_at IS NULL FOR UPDATE'),{'id':str(data.device_id),'uid':user['id']}).mappings().first()
         if not row:raise HTTPException(404,'دستگاه فعال متعلق به شما پیدا نشد.')
+        version=int(user.get('password_version',0))
+        c.execute(text("UPDATE tracking_sessions s SET ended_at=NOW(),last_device_status='permission_revoked' FROM traccar_shifts x WHERE x.session_id=s.id AND x.device_id=:device AND x.auth_version<>:version AND s.ended_at IS NULL"),{'device':str(row['id']),'version':version})
         session=start_session_in_connection(c,Start(device_id='traccar:'+str(row['id']),platform=row['platform'],consent_version=data.consent_version,max_hours=data.max_hours),user)
-        c.execute(text('INSERT INTO traccar_shifts(session_id,device_id) VALUES(:session,:device) ON CONFLICT DO NOTHING'),{'session':session['session_id'],'device':str(row['id'])})
+        c.execute(text('INSERT INTO traccar_shifts(session_id,device_id,auth_version) VALUES(:session,:device,:version) ON CONFLICT DO NOTHING'),{'session':session['session_id'],'device':str(row['id']),'version':version})
         c.execute(text("UPDATE tracking_sessions SET source='traccar' WHERE id=:id"),{'id':session['session_id']})
     return session|{'device_id':'traccar:'+str(row['id']),'source':'traccar','phone_app_must_be_enabled':True}
 
@@ -140,14 +143,22 @@ def ingest(c,data,*,now=None):
     if data.device.id!=p.deviceId:return ignored('device_mismatch')
     if not p.valid:return ignored('invalid_fix')
     if at>now+timedelta(seconds=90) or at<now-timedelta(days=7):return ignored('timestamp_out_of_bounds')
-    device=c.execute(text('''SELECT d.*,u.is_active,u.salesperson_id FROM traccar_devices d JOIN users u ON u.id=d.user_id
+    device=c.execute(text('''SELECT d.*,u.is_active,u.salesperson_id,u.role,u.password_version FROM traccar_devices d JOIN users u ON u.id=d.user_id
         WHERE d.identifier=:identifier AND d.revoked_at IS NULL FOR UPDATE OF d'''),{'identifier':data.device.uniqueId}).mappings().first()
-    if not device or str(device['is_active']).lower() not in {'1','true','t'} or not device['salesperson_id']:return ignored('unmapped_or_inactive_device')
+    if not device:return ignored('unmapped_or_inactive_device')
+    active=str(device['is_active']).lower() in {'1','true','t'} and bool(device['salesperson_id'])
+    allowed=active and role_has_module_permission(device['role'],'map','can_write',connection=c)
+    if not allowed:
+        c.execute(text("UPDATE tracking_sessions s SET ended_at=NOW(),last_device_status='permission_revoked' FROM traccar_shifts x WHERE x.session_id=s.id AND x.device_id=:device AND s.ended_at IS NULL"),{'device':str(device['id'])})
+        return ignored('tracking_permission_revoked' if active else 'unmapped_or_inactive_device')
     # A buffered point can only enter the original, explicitly consented session.
-    session=c.execute(text('''SELECT s.* FROM tracking_sessions s JOIN traccar_shifts x ON x.session_id=s.id
+    session=c.execute(text('''SELECT s.*,x.auth_version FROM tracking_sessions s JOIN traccar_shifts x ON x.session_id=s.id
         WHERE x.device_id=:device AND s.user_id=:uid AND s.started_at<=:at
         AND :at<=LEAST(s.expires_at,COALESCE(s.ended_at,s.expires_at)) ORDER BY s.started_at DESC LIMIT 1 FOR UPDATE OF s'''),{'device':str(device['id']),'uid':device['user_id'],'at':at}).mappings().first()
     if not session:return ignored('outside_consented_shift')
+    if session['auth_version']!=device['password_version']:
+        c.execute(text("UPDATE tracking_sessions SET ended_at=COALESCE(ended_at,NOW()),last_device_status='permission_revoked' WHERE id=:id"),{'id':str(session['id'])})
+        return ignored('account_session_changed')
     accuracy=p.accuracy if p.accuracy and p.accuracy>0 else 50000.0
     stable=json.dumps([str(device['id']),at.isoformat(),p.latitude,p.longitude,accuracy],separators=(',',':'))
     event=str(uuid5(NAMESPACE_URL,'kiarad-traccar:'+stable))

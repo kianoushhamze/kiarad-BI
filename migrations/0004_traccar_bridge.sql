@@ -8,7 +8,9 @@ CREATE TABLE IF NOT EXISTS traccar_devices(id UUID PRIMARY KEY,user_id INTEGER N
 CREATE UNIQUE INDEX IF NOT EXISTS traccar_active_owner ON traccar_devices(user_id) WHERE revoked_at IS NULL;
 
 CREATE TABLE IF NOT EXISTS traccar_shifts(session_id UUID PRIMARY KEY REFERENCES tracking_sessions(id),
-        device_id UUID NOT NULL REFERENCES traccar_devices(id));
+        device_id UUID NOT NULL REFERENCES traccar_devices(id),auth_version INTEGER NOT NULL DEFAULT 0);
+
+ALTER TABLE traccar_shifts ADD COLUMN IF NOT EXISTS auth_version INTEGER NOT NULL DEFAULT 0;
 
 CREATE INDEX IF NOT EXISTS traccar_shifts_device ON traccar_shifts(device_id);
 

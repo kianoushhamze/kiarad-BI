@@ -34,12 +34,14 @@ DEFAULT_ROLE_MODULES = {
 }
 
 
-def get_role_module_permissions(role: str) -> dict[str, dict[str, bool]]:
+def get_role_module_permissions(role: str, *, connection=None) -> dict[str, dict[str, bool]]:
     """Return configured module grants, falling back only for roles never configured."""
-    with engine.connect() as conn:
-        rows = conn.execute(text(
-            "SELECT module, can_read, can_write, can_delete FROM role_permissions WHERE role = :r"
-        ), {"r": role}).mappings().all()
+    query=text("SELECT module, can_read, can_write, can_delete FROM role_permissions WHERE role = :r")
+    if connection is None:
+        with engine.connect() as conn:
+            rows = conn.execute(query, {"r": role}).mappings().all()
+    else:
+        rows = connection.execute(query, {"r": role}).mappings().all()
 
     if rows:
         return {
@@ -58,10 +60,10 @@ def get_role_module_permissions(role: str) -> dict[str, dict[str, bool]]:
     }
 
 
-def role_has_module_permission(role: str, module: str, action: str = "can_read") -> bool:
+def role_has_module_permission(role: str, module: str, action: str = "can_read", *, connection=None) -> bool:
     if role == "ceo":
         return True
-    permissions = get_role_module_permissions(role)
+    permissions = get_role_module_permissions(role) if connection is None else get_role_module_permissions(role,connection=connection)
     candidate_names = ROLE_MODULE_ALIASES.get(module, (module,))
     for candidate in (*candidate_names, "*"):
         grant = permissions.get(candidate)
@@ -338,6 +340,9 @@ def set_role_permissions(role: str, data: dict, manager: dict = Depends(require_
                 VALUES (:r, :m, :read, :write, :delete)
             """), {"r": role, "m": m, "read": grant["can_read"],
                     "write": grant["can_write"], "delete": grant["can_delete"]})
+        if conn.execute(text("SELECT to_regclass('traccar_shifts') IS NOT NULL")).scalar() and not role_has_module_permission(role,'map','can_write',connection=conn):
+            conn.execute(text("""UPDATE tracking_sessions s SET ended_at=NOW(),last_device_status='permission_revoked'
+                FROM traccar_shifts x,users u WHERE x.session_id=s.id AND u.id=s.user_id AND u.role=:role AND s.ended_at IS NULL"""),{'role':role})
     return {"ok": True, "role": role, "modules_count": len(normalized)}
 
 

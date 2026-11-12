@@ -14,7 +14,7 @@ kit="$RUNNER_TEMP/Kiarad-Transfer-20261113-Offline"
 created_env=false
 cleanup() {
   if [ "$created_env" = true ]; then
-    docker compose --env-file .env -p "$project" -f .transfer-smoke.yml down -v --remove-orphans >/dev/null 2>&1 || true
+    docker compose --env-file .env -p "$project" -f .transfer-smoke.yml --profile traccar down -v --remove-orphans >/dev/null 2>&1 || true
     rm -f .env .transfer-smoke.yml secrets/traccar-forward.xml
   fi
 }
