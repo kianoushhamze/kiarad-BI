@@ -27,6 +27,7 @@ const menuGroups: { label: string; icon: string; href?: string; children?: strin
     ["مسیرسازی ویزیت", "/route-builder", "🧭"],
     ["برنامهٔ ماهانهٔ ویزیت", "/monthly-plans", "🗓️"],
     ["نقشه و ویزیت‌ها", "/map", "🗺️"],
+    ["موقعیت زندهٔ تیم", "/live-tracking", "📡"],
     ["گزارش شبانه", "/daily-reports", "🌙"]
   ]},
   { label: "پایگاه‌ها و پوشش", icon: "📍", children: [
@@ -52,6 +53,7 @@ const menuGroups: { label: string; icon: string; href?: string; children?: strin
     ["مدیریت سایت", "/site-cms", "🖥️"]
   ]},
   { label: "هوش مصنوعی", icon: "🤖", children: [
+    ["مرکز فرمان تخصصی", "/agent-center", "✨"],
     ["دستیار هوشمند", "/assistant", "🤖"],
     ["اتوماسیون‌های دستیار", "/assistant-automations", "⏱️"]
   ]},
@@ -178,6 +180,7 @@ export function PortalShell({ title, eyebrow, actions, children }: { title: stri
 
   const isAllowed = (href: string) => {
     if (href === "/account") return Boolean(user);
+    if (href === "/agent-center") return user?.role === "ceo";
     if (href === "/assistant-automations") return user?.role === "ceo";
     if (href === "/route-builder") return user?.role === "ceo";
     if (href === "/digikala-mapping") return user?.role === "ceo";
@@ -190,7 +193,7 @@ export function PortalShell({ title, eyebrow, actions, children }: { title: stri
     if (href === "/personnel" && (user?.role === "salesperson" || user?.role === "visitor")) return false;
     if (allowedModules.includes("*")) return true;
     const rawModule = href.replace(/^\//, "");
-    const mod = rawModule === "data-entry" ? "catalog" : rawModule === "monthly-plans" ? "map" : rawModule === "my-plan" ? "tasks" : rawModule === "person-targets" ? "personnel" : rawModule === "capability-center" ? "management" : rawModule;
+    const mod = rawModule === "live-tracking" ? "map" : rawModule === "data-entry" ? "catalog" : rawModule === "monthly-plans" ? "map" : rawModule === "my-plan" ? "tasks" : rawModule === "person-targets" ? "personnel" : rawModule === "capability-center" ? "management" : rawModule;
     return allowedModules.includes(mod);
   };
   const visibleGroups = menuGroups.map((g) => {

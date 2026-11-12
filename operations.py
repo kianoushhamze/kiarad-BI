@@ -744,6 +744,7 @@ def create_task(data: TaskCreate, manager: dict = Depends(require_manager)):
     if data.priority not in {"low", "normal", "high", "urgent"}:
         raise HTTPException(status_code=422, detail="Invalid priority")
     with engine.begin() as conn:
+        _ensure_task_workflow(conn)
         assignee = conn.execute(
             text("SELECT id FROM users WHERE id=:id AND is_active::text IN ('1','true','t')"),
             {"id": data.assigned_to},
@@ -754,10 +755,10 @@ def create_task(data: TaskCreate, manager: dict = Depends(require_manager)):
             text("""
                 INSERT INTO tasks
                     (title, description, priority, status, progress, assigned_to,
-                     created_by, customer_id, due_date, created_at, updated_at)
+                     created_by, customer_id, due_date, created_at, updated_at, review_status)
                 VALUES
                     (:title, :description, :priority, 'new', 0, :assigned_to,
-                     :created_by, :customer_id, :due_date, NOW(), NOW())
+                     :created_by, :customer_id, :due_date, NOW(), NOW(), 'not_submitted')
                 RETURNING *
             """),
             {**data.model_dump(), "title": data.title.strip(), "created_by": manager["id"]},
@@ -909,6 +910,8 @@ def _notification_items(conn, user: dict) -> list[dict]:
         items.extend(automation_items(conn, user))
     except Exception:
         pass
+    from agent_center import alert_items
+    items.extend(alert_items(conn, user))
     return items
 
 

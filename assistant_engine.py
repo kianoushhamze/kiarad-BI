@@ -350,6 +350,9 @@ def call_gpt(msg, ctx, history, role, full_name):
     if not api_key:
         return None
     sys_prompt = (
+        "به پرسش‌های عمومی، آموزشی و خارج از پنل هم پاسخ مفید بده؛ برای واقعیت جاری بازار و اخبار به منبع زنده و تاریخ نیاز است و بدون آن قطعیت نساز. نقش تخصصی با مدرک حرفه‌ای یا اختیار نامحدود یکی نیست. "
+        "برای هدف‌های چندمرحله‌ای و تخصصی از prepare_agent_mission استفاده کن: هدف را به همان زبان کاربر همراه حوزه‌ها منتقل کن تا برنامه، حدود اختیار و رسیدهای اجرا در مرکز فرمان ساخته شوند. این ابزار تصویب یا اجرای برنامه نیست؛ لینک بازبینی را بده. برای برنامهٔ مسیر ماهانه با ظرفیت و مختصات، کاربر را به مرکز فرمان /agent-center هدایت کن تا افراد، ماه، تقویم و مبدا مشخص شوند. وضعیت اجرای مأموریت را از read_agent_missions بخوان و هیچ عمل بدون رسید را انجام‌شده ننام. "
+
         "برای پیدا کردن پرسنل و پایگاهِ برنامهٔ ماهانه، read_panel_module با resource=monthly_visit_plan_options و query شامل بخشی از نام واقعی را بخوان. فهرست برنامه‌ها monthly_visit_plans نیز query نام پرسنل و month شمسی می‌پذیرد. برای اصلاح حین ماه فقط روزهای آیندهٔ بدون شواهد را در پیش‌نویس جدید بنویس؛ تأیید مدیرعامل، روزهای گذشته و کارکرد قبلی را خودکار بدون تغییر حفظ می‌کند. ادعای ناتوانی در اصلاح حین ماه نکن. روز گذشته یا امروز و روزهای دارای شواهد را تغییر نده و نسخهٔ قدیمی را حذف نکن. "
         "برنامهٔ ماهانهٔ ویزیت: با read_panel_module و monthly_visit_plans برای month شمسی فهرست را بخوان، سپس monthly_visit_plan_detail با plan_id واقعی برای توقف‌ها، تداخل و شواهد اجرا. پیش‌نویس را با monthly_plan_create بساز؛ submit فقط ارسال برای بازبینی است. فقط مدیرعامل می‌تواند monthly_plan_review را تأیید کند. کارکرد حقوق جدا از برنامه است؛ برای monthly_plan_workday باید روز پایان‌یافته، ویزیت معتبر و گزارش کار و مقدار صریح کارکرد و دلیل مدیرعامل وجود داشته باشد. از برنامه یا موقعیت، کارکرد واقعی حدس نزن. "
         "خطای invalid_arguments یعنی ساختار ورودی نادرست است، نه فقدان قابلیت؛ آن را با ساختار ابزار اصلاح و دوباره امتحان کن. خطای عدم دسترسی فقط access_denied است. برای enter_targets اطلاعات را دقیقاً به شکل payload={body:{unit:'TOMAN',rows:[{title:عنوان,salesperson_id:شناسهٔ واقعی,target_amount:مبلغ,start_date:تاریخ,end_date:تاریخ,bonus_reward:پاداش}]},path_params:{}} بفرست. برای هر شخص ابتدا read_contract_people را بخوان؛ شناسه را حدس نزن. اگر کاربر فقط مشخصات عملیات را داده، تأیید نهایی از صفحهٔ پیشنهاد گرفته می‌شود؛ برای ساخت پیش‌نمایش دوباره اجازه نگیر. "
@@ -443,6 +446,8 @@ def call_gpt(msg, ctx, history, role, full_name):
                         value = currency_error or execute_report_tool(fn.get("name"), args, ctx.get("_actor", {}))
                     except (ValueError, TypeError):
                         value = {"status": "invalid_arguments"}
+                if fn.get('name') == 'prepare_agent_mission' and value.get('state') == 'draft':
+                    return {'answer':'برنامهٔ چندمرحله‌ای آمادهٔ بازبینی است. هنوز عملیاتی اجرا نشده؛ گام‌ها، اطلاعات ناقص و حدود اختیار را در مرکز فرمان بررسی و تصویب کن.', 'action':{'label':'بازبینی مأموریت و حدود اختیار','href':value['review_href']},'mode':'operation_preview'}
                 if fn.get('name') == 'prepare_panel_operation' and value.get('status') == 'operation_preview':
                     return {'answer':value['message'],'action':{'label':'بررسی جزئیات و تأیید عملیات','href':value['review_href']},'mode':'operation_preview'}
                 if fn.get('name') == 'prepare_contract_review' and value.get('status') == 'review_only':

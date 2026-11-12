@@ -1,0 +1,48 @@
+{
+  "expo": {
+    "name": "KiaradField",
+    "slug": "kiarad-field",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "dark",
+    "scheme": "kiarad",
+    "ios": {
+      "bundleIdentifier": "ir.kiarad.field",
+      "supportsTablet": true,
+      "infoPlist": {
+        "UIBackgroundModes": [
+          "location"
+        ],
+        "NSLocationWhenInUseUsageDescription": "نمایش و ثبت مسیر کاری با شروع شیفت توسط شما.",
+        "NSLocationAlwaysAndWhenInUseUsageDescription": "ثبت مسیر شیفت کاری در پس‌زمینه؛ با پایان شیفت متوقف می‌شود.",
+        "CFBundleDisplayName": "کیاراد همراه"
+      }
+    },
+    "android": {
+      "package": "ir.kiarad.field",
+      "permissions": [
+        "ACCESS_COARSE_LOCATION",
+        "ACCESS_FINE_LOCATION",
+        "ACCESS_BACKGROUND_LOCATION",
+        "FOREGROUND_SERVICE",
+        "FOREGROUND_SERVICE_LOCATION"
+      ]
+    },
+    "plugins": [
+      [
+        "expo-location",
+        {
+          "locationAlwaysAndWhenInUsePermission": "برای ثبت مسیر شیفت، دسترسی همیشگی مکان را فعال کنید؛ ثبت فقط در شیفت انتخابی انجام می‌شود.",
+          "isIosBackgroundLocationEnabled": true,
+          "isAndroidBackgroundLocationEnabled": true,
+          "isAndroidForegroundServiceEnabled": true
+        }
+      ],
+      "expo-secure-store",
+      "expo-sqlite"
+    ],
+    "extra": {
+      "trackingPurpose": "consented_work_shift_only"
+    }
+  }
+}

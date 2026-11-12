@@ -1,0 +1,75 @@
+{
+  "scope": "isolated local synthetic data; not company acceptance",
+  "offline_initial": {
+    "run": 750,
+    "skipped": 197,
+    "failures": 0,
+    "errors": 0
+  },
+  "agent_core_tests": 13,
+  "agent_tracking_postgres_tests": 14,
+  "postgres_groups": 24,
+  "postgres_executions_before_added_task_regression": 271,
+  "task_regressions_after_fix": 7,
+  "frontend_lint": {
+    "errors": 0,
+    "preexisting_img_warnings": 2
+  },
+  "frontend_typecheck": "passed",
+  "frontend_production_build": "passed",
+  "mobile_typecheck": "passed",
+  "mobile_policy_tests": 3,
+  "mobile_native_project_generation": [
+    "android",
+    "ios"
+  ],
+  "mobile_hermes_export": [
+    "android",
+    "ios"
+  ],
+  "native_binary_builds": "See same-commit CI jobs; not established by JS export",
+  "pdf_pages": 25,
+  "browser": [
+    {
+      "mission_real_task_receipt": true
+    },
+    {
+      "live_map_width": 360,
+      "passed": true
+    },
+    {
+      "live_map_width": 390,
+      "passed": true
+    },
+    {
+      "live_map_width": 640,
+      "passed": true
+    },
+    {
+      "live_map_width": 1280,
+      "passed": true
+    },
+    {
+      "shop_width": 360,
+      "passed": true
+    },
+    {
+      "shop_width": 390,
+      "passed": true
+    },
+    {
+      "shop_width": 640,
+      "passed": true
+    },
+    {
+      "shop_width": 1280,
+      "passed": true
+    },
+    {
+      "actual_task_id": 3
+    }
+  ],
+  "company_server_access": false,
+  "real_phone_background_acceptance": false,
+  "ios_device_signing": false
+}

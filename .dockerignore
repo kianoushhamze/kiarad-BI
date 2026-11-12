@@ -26,3 +26,9 @@ kiarad-dashboard/.next-qa-build/
 kiarad-dashboard/public/uploads/
 kiarad-dashboard-backup-before-ui-refactor/
 all_code.txt
+
+mobile/node_modules/
+mobile/.expo/
+mobile/ios/
+mobile/android/
+mobile/dist/

@@ -250,7 +250,7 @@ class Task(Base):
     due_date = Column(DateTime, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
     updated_at = Column(DateTime, default=datetime.utcnow, nullable=False)
-    review_status = Column(String(30), default="not_submitted", nullable=False)
+    review_status = Column(String(30), default="not_submitted", server_default="not_submitted", nullable=False)
     reviewed_by = Column(Integer, ForeignKey("users.id"), nullable=True)
     reviewed_at = Column(DateTime, nullable=True)
     review_note = Column(Text)
