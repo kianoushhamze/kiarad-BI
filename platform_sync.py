@@ -445,21 +445,26 @@ def list_platform_orders(user: dict = Depends(current_user)):
     return {"items": [dict(r) for r in rows]}
 
 
-@router.post("/orders/{order_ref}/holoo-registered")
-def mark_holoo_registered(order_ref: str, user: dict = Depends(current_user)):
-    """Tick after the owner invoices this order manually in Holoo. Local bookkeeping
-    only — no Holoo API is called from here."""
+@router.post("/orders/{platform}/{order_ref}/holoo-registered")
+def mark_holoo_registered(platform: str, order_ref: str, user: dict = Depends(current_user)):
+    """Tick one platform's order after manual Holoo invoicing.
+
+    Order references are only unique within a platform; always scope this
+    update by both platform and order_ref. This is local bookkeeping only.
+    """
     _require_manager(user)
+    if platform not in PLATFORMS:
+        raise HTTPException(400, "سکوی فروش نامعتبر است.")
     with engine.begin() as conn:
         ensure(conn)
         _ensure_platform_proforma_storage(conn)
         updated = conn.execute(text("""
             UPDATE platform_order_proformas SET holoo_registered=TRUE, status='registered'
-            WHERE order_ref=:r
-        """), {"r": order_ref}).rowcount
+            WHERE platform=:p AND order_ref=:r
+        """), {"p": platform, "r": order_ref}).rowcount
         if not updated:
-            raise HTTPException(404, "سفارش سکو پیدا نشد یا پیش‌نویس پیش‌فاکتور ندارد.")
-    return {"order_ref": order_ref, "holoo_registered": True}
+            raise HTTPException(404, "سفارش این سکو پیدا نشد یا پیش‌نویس پیش‌فاکتور ندارد.")
+    return {"platform": platform, "order_ref": order_ref, "holoo_registered": True}
 
 
 # ------------------------------------------------- product creation proposals
