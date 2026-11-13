@@ -101,6 +101,23 @@ class StorefrontOrderUnitTests(unittest.TestCase):
         updates = [call for call in conn.execute.call_args_list if 'UPDATE proforma_invoices' in str(call.args[0])]
         self.assertEqual(updates[0].args[1]['amount'], 2400)
 
+    def test_holoo_registration_is_scoped_to_platform_and_order_ref(self):
+        conn = MagicMock()
+        conn.execute.return_value.rowcount = 1
+        with patch.object(platforms.engine, 'begin', return_value=nullcontext(conn)), \
+             patch.object(platforms, 'ensure'), patch.object(platforms, '_ensure_platform_proforma_storage'):
+            result = platforms.mark_holoo_registered('digikala', 'shared-ref', {'role':'ceo'})
+        self.assertEqual(result['platform'], 'digikala')
+        statement, params = conn.execute.call_args.args
+        self.assertIn('platform=:p AND order_ref=:r', str(statement))
+        self.assertEqual(params, {'p':'digikala', 'r':'shared-ref'})
+
+    def test_holoo_registration_rejects_unknown_platform(self):
+        with patch.object(platforms.engine, 'begin') as begin, self.assertRaises(HTTPException) as error:
+            platforms.mark_holoo_registered('unknown', 'shared-ref', {'role':'ceo'})
+        self.assertEqual(error.exception.status_code, 400)
+        begin.assert_not_called()
+
     def test_stock_publication_failure_does_not_undo_committed_order(self):
         with patch.object(orders, 'push_stock_many', side_effect=RuntimeError('offline')), \
              self.assertLogs(orders.logger, level='ERROR'):
