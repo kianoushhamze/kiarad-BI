@@ -7,6 +7,7 @@ from fastapi import FastAPI
 from fastapi.testclient import TestClient
 from sqlalchemy import text
 from db import engine
+import operations as ops
 from operations import current_user
 import traccar_bridge as m
 import live_tracking as tracking
@@ -14,7 +15,7 @@ import live_tracking as tracking
 class TraccarTests(unittest.TestCase):
  def setUp(self):
   self.c=engine.connect();self.tx=self.c.begin();self.addCleanup(self.c.close);self.addCleanup(self.tx.rollback);schema='traccar_'+uuid4().hex;self.c.execute(text('CREATE SCHEMA '+schema));self.c.execute(text('SET LOCAL search_path TO '+schema));self.c.execute(text('CREATE TABLE users(id INTEGER PRIMARY KEY,username TEXT,full_name TEXT,role TEXT,salesperson_id INTEGER,is_active INTEGER,password_version INTEGER)'));self.c.execute(text("INSERT INTO users VALUES(1,'chief','Chief','ceo',NULL,1,0),(2,'worker','Worker','visitor',2,1,0),(3,'other','Other','visitor',3,1,0)"));self.c.execute(text('CREATE TABLE role_permissions(role TEXT,module TEXT,can_read BOOLEAN,can_write BOOLEAN,can_delete BOOLEAN)'));m.ensure(self.c)
-  for module in [m,tracking]:
+  for module in [m,tracking,ops]:
    e=self.enterContext(patch.object(module,'engine'));e.begin.side_effect=self.atomic;e.connect.side_effect=lambda:nullcontext(self.c)
   self.enterContext(patch.dict(os.environ,{'KIARAD_TRACCAR_ENABLED':'1','KIARAD_TRACCAR_FORWARD_TOKEN':'synthetic-forward-token-0123456789012345','KIARAD_TRACCAR_CLIENT_URL':'https://gps.ci.invalid'}));self.user={'id':1,'role':'ceo'};app=FastAPI();app.include_router(m.router);app.include_router(tracking.router);app.dependency_overrides[current_user]=lambda:self.user;self.client=TestClient(app);self.addCleanup(self.client.close)
  @contextmanager
