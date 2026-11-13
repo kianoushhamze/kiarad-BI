@@ -232,9 +232,46 @@ jobs:
           if-no-files-found: error
           retention-days: 30
 
+  powershell-51-compat:
+    name: Windows PowerShell 5.1 transfer-kit compatibility
+    runs-on: windows-2022
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Parse every tracked PowerShell script with Windows PowerShell 5.1
+        shell: powershell
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $files = @(git ls-files -- '*.ps1')
+          if ($LASTEXITCODE -ne 0 -or $files.Count -eq 0) { throw 'Unable to enumerate tracked PowerShell scripts.' }
+          $issues = @()
+          foreach ($path in $files) {
+            $fullPath = (Resolve-Path -LiteralPath $path).Path
+            $tokens = $null; $parseErrors = $null
+            [void][System.Management.Automation.Language.Parser]::ParseFile($fullPath, [ref]$tokens, [ref]$parseErrors)
+            foreach ($issue in $parseErrors) { $issues += ($path + ': ' + $issue.Message) }
+          }
+          if ($issues.Count -gt 0) {
+            $issues | ForEach-Object { Write-Error $_ }
+            throw 'Windows PowerShell 5.1 parser rejected tracked scripts.'
+          }
+          Write-Output ("Parsed {0} tracked PowerShell files with Windows PowerShell {1}." -f $files.Count, $PSVersionTable.PSVersion)
+      - name: Build a disposable transfer-kit fixture
+        shell: powershell
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $kit = Join-Path $env:RUNNER_TEMP 'Kiarad-Transfer-PS51'
+          python scripts/build_transfer_kit.py --output $kit
+          if ($LASTEXITCODE -ne 0) { throw 'Transfer-kit fixture build failed.' }
+          & .\tests\test_transfer_kit.ps1 -KitRoot $kit
+          if ($LASTEXITCODE -ne 0) { throw 'Windows PowerShell 5.1 transfer-kit guards failed.' }
+
   transfer-kit:
     name: Build and verify transfer kit
-    needs: [backend-offline-tests, frontend-build, cms-and-storefront-regressions, storefront-browser, mobile-android, mobile-ios, training-manual]
+    needs: [backend-offline-tests, frontend-build, cms-and-storefront-regressions, storefront-browser, mobile-android, mobile-ios, training-manual, powershell-51-compat]
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
