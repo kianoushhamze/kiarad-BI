@@ -187,6 +187,19 @@ class StorefrontOrderDatabaseTests(unittest.TestCase):
         self.checkout('request_second_1234567890')
         self.assertEqual(self.scalar('SELECT COUNT(*) FROM site_orders'), 2)
 
+    def test_shipped_order_cannot_be_cancelled_or_reopened(self):
+        result = self.checkout()
+        orders.set_status(result['order_id'], orders.StatusIn(status='ارسال شد'), BackgroundTasks(), {'role':'ceo','id':1})
+        with self.assertRaises(HTTPException) as error:
+            orders.set_status(result['order_id'], orders.StatusIn(status='لغو شد'), BackgroundTasks(), {'role':'ceo','id':1})
+        self.assertEqual(error.exception.status_code, 409)
+        self.assertEqual(self.scalar("SELECT COUNT(*) FROM platform_reservations WHERE status='active'"), 1)
+        self.assertEqual(self.scalar("SELECT status FROM site_orders"), 'ارسال شد')
+        with self.assertRaises(HTTPException) as error:
+            orders.set_status(result['order_id'], orders.StatusIn(status='جدید'), BackgroundTasks(), {'role':'ceo','id':1})
+        self.assertEqual(error.exception.status_code, 409)
+        self.assertEqual(self.scalar("SELECT COUNT(*) FROM platform_reservations WHERE status='active'"), 1)
+
     def test_external_platform_reservation_blocks_checkout(self):
         platforms.apply_order('digikala', 'test_external', [{'code':'A','qty':1}])
         with self.assertRaises(HTTPException) as error: self.checkout()
