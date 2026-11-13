@@ -51,7 +51,7 @@ def build(root, snapshot, output, evidence, provisional=False):
             # line-ending filters can rewrite files after checkout. Release
             # source must remain byte-for-byte identical to the selected Git tree.
             data = subprocess.check_output(['git', 'cat-file', 'blob', entry['sha']], cwd=root)
-            blob = hashlib.sha1(b'blob ' + str(len(data)).encode() + b'\\0' + data).hexdigest()
+            blob = hashlib.sha1(b'blob ' + str(len(data)).encode() + b'\0' + data).hexdigest()
             if blob != entry['sha']:
                 raise ValueError('Git blob verification failed: ' + name)
             info = zipfile.ZipInfo(name, date_time=(2026, 11, 12, 0, 0, 0))
