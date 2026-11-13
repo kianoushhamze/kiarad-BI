@@ -9,6 +9,10 @@ BASE_URL = "https://seller.digikala.com/open-api/v1"
 TOKENS_PATH = Path(__file__).resolve().parent / "secrets" / "digikala_tokens.json"
 
 
+class DigikalaProductCreationUnavailable(RuntimeError):
+    """The current Seller Open API v1 does not expose product creation."""
+
+
 class DigikalaClient:
     def __init__(self, tokens_path=TOKENS_PATH):
         self.tokens_path = Path(tokens_path)
@@ -80,16 +84,12 @@ class DigikalaClient:
         return self.request("GET", "/categories/tree")
 
     def create_product(self, payload: dict):
-        """STUB / UNCONFIRMED ENDPOINT — do not rely on this yet.
+        """Fail closed: Seller Open API v1 has no confirmed product-create route.
 
-        Probed 2026-11-07 against the seller open-api v1: there is NO
-        product-creation route. POST /products, POST /variants,
-        POST /products/create all return 404 ("No route found"); /variants
-        only allows GET/OPTIONS. Product creation currently exists only in
-        the Seller Center web UI, not the open API. This method keeps the
-        intended call shape (POST /products with the proposal payload) so
-        the confirm flow is wired end-to-end; until Digikala publishes a
-        creation route the call will fail with 404 and the proposal is
-        stored with status 'failed' and the raw response as its receipt.
+        Product creation must be completed manually in Seller Center. Once a
+        documented endpoint is published and verified, replace this guard.
         """
-        return self.request("POST", "/products", json_data=payload)
+        raise DigikalaProductCreationUnavailable(
+            "Digikala Seller Open API v1 does not currently support product creation; "
+            "create the listing in Seller Center and map its variant afterwards."
+        )
