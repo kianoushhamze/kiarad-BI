@@ -19,6 +19,8 @@ class AgentTrackingDBTests(unittest.TestCase):
   self.conn.execute(text('SET LOCAL search_path TO agent_test_'+schema))
   self.conn.execute(text('CREATE TABLE users(id INTEGER PRIMARY KEY,username TEXT,full_name TEXT,role TEXT,salesperson_id INTEGER,is_active INTEGER,password_version INTEGER DEFAULT 0)'))
   self.conn.execute(text("INSERT INTO users(id,username,full_name,role,salesperson_id,is_active) VALUES(1,'chief','CEO','ceo',NULL,1),(2,'worker','Visitor','visitor',2,1),(3,'other','Other','visitor',3,1),(4,'chief2','Other CEO','ceo',NULL,1)"))
+  self.conn.execute(text('CREATE TABLE role_permissions(role TEXT,module TEXT,can_read BOOLEAN,can_write BOOLEAN,can_delete BOOLEAN)'))
+  self.conn.execute(text("INSERT INTO role_permissions VALUES ('visitor','map',TRUE,TRUE,FALSE),('salesperson','map',TRUE,TRUE,FALSE),('finance','map',FALSE,FALSE,FALSE)"))
   agent.ensure(self.conn);tracking.ensure(self.conn)
   for module in [agent,tracking]:
    fake=self.enterContext(patch.object(module,'engine'));fake.begin.side_effect=self.atomic;fake.connect.side_effect=lambda:nullcontext(self.conn)
@@ -54,6 +56,20 @@ class AgentTrackingDBTests(unittest.TestCase):
   self.user={'id':2,'role':'visitor','salesperson_id':2};r=self.client.post('/tracking/sessions',json={'device_id':'test-device-0001','platform':'android','consent_version':'work-shift-location-v1'});self.assertEqual(r.status_code,201,r.text);return r.json()['session_id']
  def sample(self,at=None):return {'event_id':str(uuid4()),'recorded_at':(at or datetime.now(timezone.utc)).isoformat(),'latitude':30.29,'longitude':57.06,'accuracy_m':5}
  def upload(self,sid,samples):return self.client.post('/tracking/locations',json={'session_id':sid,'device_id':'test-device-0001','samples':samples})
+ def test_native_tracking_requires_explicit_map_write_grant(self):
+  sid=self.start();self.conn.execute(text("UPDATE role_permissions SET can_write=FALSE WHERE role='visitor' AND module='map'"))
+  self.assertEqual(self.upload(sid,[self.sample()]).status_code,403)
+  self.assertEqual(self.conn.execute(text('SELECT COUNT(*) FROM tracking_points')).scalar(),0)
+  self.assertEqual(self.client.post('/tracking/heartbeat',json={'session_id':sid,'device_id':'test-device-0001','status':'tracking'}).status_code,403)
+  self.assertEqual(self.client.post('/tracking/sessions/stop',json={'session_id':sid,'device_id':'test-device-0001'}).status_code,200)
+ def test_native_tracking_live_and_history_require_map_read_grant(self):
+  sid=self.start();self.user={'id':1,'role':'ceo'}
+  self.assertEqual(self.client.get('/tracking/live').status_code,200)
+  self.conn.execute(text("INSERT INTO tracking_points(session_id,event_id,user_id,recorded_at,latitude,longitude,accuracy_m) VALUES(:s,:e,2,NOW(),30,57,5)"),{'s':sid,'e':str(uuid4())})
+  self.conn.execute(text("UPDATE role_permissions SET can_read=FALSE WHERE role='visitor' AND module='map'"))
+  self.user={'id':2,'role':'visitor','salesperson_id':2}
+  self.assertEqual(self.client.get('/tracking/live').status_code,403)
+  self.assertEqual(self.client.get('/tracking/history?user_id=2').status_code,403)
  def test_duplicate_upload_has_one_stored_point(self):
   sid=self.start();sample=self.sample();self.assertEqual(self.upload(sid,[sample]).status_code,200);self.assertEqual(self.upload(sid,[sample]).status_code,200);self.assertEqual(self.conn.execute(text('SELECT COUNT(*) FROM tracking_points')).scalar(),1)
  def test_wrong_account_cannot_upload_or_read_history(self):
