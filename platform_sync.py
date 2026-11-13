@@ -544,9 +544,7 @@ def create_proposal(data: CreateProposalInput, user: dict = Depends(current_user
 
 @router.post("/create-product-proposals/{proposal_id}/confirm")
 def confirm_create_proposal(proposal_id: int, user: dict = Depends(current_user)):
-    """Owner confirmed: send the create request to Digikala and store the receipt.
-    The DK open-api currently has NO creation route (404), so expect the call to
-    fail until Digikala publishes one — the receipt keeps the exact response."""
+    """Fail closed until Digikala publishes a verified product-creation API."""
     _require_manager(user)
     with engine.begin() as conn:
         ensure(conn)
@@ -555,33 +553,12 @@ def confirm_create_proposal(proposal_id: int, user: dict = Depends(current_user)
         if not prop:
             raise HTTPException(404, "پیشنهاد پیدا نشد.")
         if prop["status"] != "pending":
-            raise HTTPException(409, "این پیشنهاد قبلاً تایید یا رد شده است.")
-        payload = _build_dk_create_payload(prop)
-        conn.execute(text("UPDATE platform_create_proposals SET payload=CAST(:p AS JSONB) WHERE id=:i"),
-                     {"p": json.dumps(payload, ensure_ascii=False), "i": proposal_id})
-    errors, receipt, status = [], None, "confirmed"
-    try:
-        resp = _dk_client().create_product(payload)
-        try:
-            receipt = resp.json()
-        except ValueError:
-            receipt = {"raw": resp.text[:2000]}
-        if resp.status_code not in (200, 201):
-            status = "failed"
-            errors.append(f"digikala responded {resp.status_code}")
-        else:
-            status = "submitted"
-    except Exception as exc:
-        status = "failed"
-        errors.append(f"{type(exc).__name__}: {exc}")
-    with engine.begin() as conn:
-        ensure(conn)
-        conn.execute(text("""UPDATE platform_create_proposals
-            SET status=:s, receipt=CAST(:r AS JSONB), confirmed_at=NOW() WHERE id=:i"""),
-            {"s": status, "r": json.dumps({"receipt": receipt, "errors": errors}, ensure_ascii=False, default=str),
-             "i": proposal_id})
-    return {"id": proposal_id, "status": status, "errors": errors, "receipt": receipt}
-
+            raise HTTPException(409, "این پیشنهاد دیگر در انتظار اقدام نیست.")
+    raise HTTPException(
+        409,
+        "ثبت خودکار کالای جدید از API رسمی دیجی‌کالا پشتیبانی نمی‌شود. "
+        "کالا را در پنل فروشنده ثبت کنید و سپس متغیر آن را در صفحه نگاشت دیجی‌کالا به کالای هلو متصل کنید."
+    )
 
 @router.post("/create-product-proposals/{proposal_id}/reject")
 def reject_create_proposal(proposal_id: int, user: dict = Depends(current_user)):
