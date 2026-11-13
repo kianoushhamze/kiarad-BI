@@ -11,7 +11,7 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator
 from sqlalchemy import text
 from db import engine
 from iran_time import IRAN_TIMEZONE, iran_today
-from operations import current_user, MANAGER_ROLES
+from operations import current_user, MANAGER_ROLES, role_has_module_permission
 
 router = APIRouter(prefix='/tracking', tags=['live_tracking'])
 STALE_SECONDS = 120
@@ -87,9 +87,17 @@ class Stop(Strict):
     device_id: str = Field(min_length=8, max_length=120)
 
 
+def require_map_permission(user, action):
+    if not role_has_module_permission(str(user.get('role', '')), 'map', action):
+        raise HTTPException(403, 'برای این عملیات دسترسی ماژول نقشه فعال نیست.')
+
+
 def staff(user):
     if not user.get('id') or not user.get('salesperson_id'):
         raise HTTPException(403, 'ردیابی شیفت به حساب پرسنلی متصل نیاز دارد.')
+    # Enforce the same map-module grant for native GPS as for Traccar.
+    # A revoked grant must stop new sessions, heartbeats and point uploads.
+    require_map_permission(user, 'can_write')
 
 
 def own_session(conn, session_id, device_id, user, lock=False):
@@ -184,6 +192,7 @@ def freshness(point, now=None):
 
 @router.get('/live')
 def live(user=Depends(current_user)):
+    require_map_permission(user, 'can_read')
     manager = user.get('role') in MANAGER_ROLES
     with engine.connect() as conn:
         rows = conn.execute(text('''SELECT u.id AS user_id,u.full_name,u.salesperson_id,
@@ -203,6 +212,7 @@ def live(user=Depends(current_user)):
 
 @router.get('/history')
 def history(user_id: int, day: date | None = None, user=Depends(current_user)):
+    require_map_permission(user, 'can_read')
     if user.get('role') not in MANAGER_ROLES and user_id != user['id']:
         raise HTTPException(403, 'فقط مسیر کاری خودتان را می‌توانید بخوانید.')
     day = day or iran_today()
