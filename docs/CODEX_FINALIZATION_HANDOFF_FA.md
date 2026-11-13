@@ -100,7 +100,7 @@ PRهای #3 و #4 پس از مقایسهٔ دقیق با main در ۱۳ نوام
 - Storefront: مسیر site-healer، catalog fallback، حفظ cart، recovery، checkout retry، order receipt و اتصال رسید فروشگاه به پنل.
 - Tracking: رضایت و مالکیت دستگاه، shift boundaries، revoke، deduplication، backfill و محدودیت داده؛ موقعیت قدیمی را live نشان نده.
 - Backup/restore و migration: restore فقط روی مقصد disposable؛ حفظ رسانه، secrets خارج از Git، checksum و سازگاری PostgreSQL.
-- Windows deployment: اسکریپت‌ها برای PowerShell 5.1 هستند؛ parse/behavior تست PowerShell 7 جایگزین اجرای PS 5.1 نیست.
+- Windows deployment: اسکریپت‌ها برای PowerShell 5.1 هستند. در commit `ada93cc411b45cb7ec73423f1c64deec68d4ccb3` یک job مستقل `Windows PowerShell 5.1 transfer-kit compatibility` به workflow افزوده شد: تمام فایل‌های PowerShell ثبت‌شده در Git را با parser خود Windows PowerShell 5.1 بررسی می‌کند، بستهٔ آزمایشی را از snapshot همان checkout می‌سازد و guardهای کیت را روی Windows اجرا می‌کند. تا سبزشدن همین job، این شکاف بسته محسوب نمی‌شود؛ تست PowerShell 7 در Linux به‌تنهایی کافی نیست.
 - امنیت: secret، رمز ثابت، token، private export، دادهٔ مشتری و مختصات GPS در commit/log/artifact منتشر نشود. تاریخچهٔ Git را بدون مجوز جداگانه rewrite نکن.
 
 ## 7. تست دستگاه اندروید صریحاً به آخر کار موکول است
