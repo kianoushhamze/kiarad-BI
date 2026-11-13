@@ -156,3 +156,13 @@ PRهای #3 و #4 پس از مقایسهٔ دقیق با main در ۱۳ نوام
 - دستورهای PowerShell 5.1 لازم برای مرحلهٔ بعد، هر کدام در بلوک مستقل با $ErrorActionPreference = "Stop"، فقط پس از تأیید مسیر/نام واقعی و بدون secret.
 
 **معیار موفقیت:** PR کوچک و قابل بازبینی، بدون بازنویسی تکراری، CI کامل سبز روی SHA نهایی، بستهٔ انتقال قابل‌راستی‌آزمایی و فهرست شفاف پذیرش‌های باقی‌مانده. merge و بهره‌برداری به کاربر واگذار شود.
+
+## 10. ممیزی تکمیلی GPS و نتیجهٔ CI پس از تغییرات — ۱۳ نوامبر ۲۰۲۶
+
+- در بررسی مسیرهای Native GPS مشخص شد کنترل مجوز ماژول نقشه در middleware عمومی وجود دارد، اما خود router باید نیز دفاع مستقل داشته باشد. در `live_tracking.py` مجوز `can_write` برای شروع شیفت/heartbeat/upload و مجوز `can_read` برای live/history اضافه شد.
+- در `traccar_bridge.py` مجوز `can_read` برای مشاهدهٔ دستگاه‌ها/افراد و `can_write` برای bind/revoke دستگاه اضافه شد. این کنترل‌ها علاوه بر middleware هستند، نه جایگزین آن.
+- تست‌های رگرسیون جدید در `tests/test_agent_tracking_db.py` و `tests/test_traccar_bridge_db.py` اضافه شدند.
+- اجرای CI روی SHA `c04d3faa10cea21495a651e506e34f52de7cd269` شکست تست دیتابیسی را نشان داد: توابع permission در ماژول `operations` به engine سراسری وصل بودند و در تست schema ایزوله patch نشده بودند. این یک نقص fixture تست بود؛ log job `CMS PostgreSQL and storefront regressions` آن را با `relation role_permissions does not exist` نشان داد.
+- برای رفع، در هر دو تست، ماژول `operations` نیز به همان اتصال/engine ایزوله patch شد. commitهای اصلاح fixture: `b5ea4331a87f6a27bcdafabfe9a1ae3975a902fb` و `a8aa65026f21f5c377fc5ae56ba18c9c56e347fb`.
+- CI run مجدد `43460813654` روی SHA `a8aa65026f21f5c377fc5ae56ba18c9c56e347fb` ایجاد شده است. در زمان ثبت این یادداشت jobها در حال اجرا/صف بودند؛ **هیچ pass نهایی برای این SHA اعلام نشده است**. لاگ همهٔ jobها را بررسی و فقط پس از اتمام کامل نتیجه را ثبت کن.
+- هیچ تغییر روی `main`، سرور شرکت، دیتابیس واقعی، دامنه یا sync بیرونی انجام نشده است.
