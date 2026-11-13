@@ -10,6 +10,7 @@ from sqlalchemy import text
 from db import engine
 import agent_center as agent
 import live_tracking as tracking
+import operations as ops
 from operations import current_user
 @unittest.skipUnless(os.getenv('KIARAD_TEST_AGENT_DB')=='1','Opt-in disposable PostgreSQL')
 class AgentTrackingDBTests(unittest.TestCase):
@@ -22,7 +23,7 @@ class AgentTrackingDBTests(unittest.TestCase):
   self.conn.execute(text('CREATE TABLE role_permissions(role TEXT,module TEXT,can_read BOOLEAN,can_write BOOLEAN,can_delete BOOLEAN)'))
   self.conn.execute(text("INSERT INTO role_permissions VALUES ('visitor','map',TRUE,TRUE,FALSE),('salesperson','map',TRUE,TRUE,FALSE),('finance','map',FALSE,FALSE,FALSE)"))
   agent.ensure(self.conn);tracking.ensure(self.conn)
-  for module in [agent,tracking]:
+  for module in [agent,tracking,ops]:
    fake=self.enterContext(patch.object(module,'engine'));fake.begin.side_effect=self.atomic;fake.connect.side_effect=lambda:nullcontext(self.conn)
   self.user={'id':1,'role':'ceo'};app=FastAPI();app.include_router(agent.router);app.include_router(tracking.router);app.dependency_overrides[current_user]=lambda:self.user
   self.client=TestClient(app);self.addCleanup(self.client.close)
