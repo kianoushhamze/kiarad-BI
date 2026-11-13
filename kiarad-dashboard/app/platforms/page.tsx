@@ -125,7 +125,7 @@ export default function PlatformsPage(){
     try{
       await secureApi("/platforms/create-product-proposals",{method:"POST",body:JSON.stringify({
         code:p.code,suggested_title:p.name,price_irr:p.price??undefined,stock:p.stock??0})});
-      setNotice("پیشنهاد ثبت در دیجی‌کالا ایجاد شد و منتظر تایید شماست.");
+      setNotice("پیشنهاد ثبت شد. ایجاد کالای جدید باید دستی در پنل فروشنده دیجی‌کالا انجام شود؛ سپس متغیر آن را به کالای هلو نگاشت کنید.");
       load();
     }catch(r){setError(r instanceof Error?r.message:"ایجاد پیشنهاد ناموفق بود.");}
     finally{setBusy(false);}
@@ -276,7 +276,7 @@ export default function PlatformsPage(){
 
       <Surface className="space-y-3 p-5">
         <h2 className="text-base font-bold">کالاهای ثبت‌نشده در دیجی‌کالا</h2>
-        <p className="text-xs text-slate-400">این کالاها در هلو هستند اما در دیجی‌کالا لیست نشده‌اند. با دکمه زیر پیشنهاد ثبت ساخته می‌شود؛ ارسال به دیجی‌کالا فقط بعد از تایید شما انجام می‌گیرد.</p>
+        <p className="text-xs text-slate-400">این کالاها در هلو هستند اما در دیجی‌کالا لیست نشده‌اند. دکمهٔ زیر فقط پیش‌نویس پیشنهاد را ثبت می‌کند؛ ایجاد کالا باید دستی در پنل فروشنده انجام شود و سپس متغیر آن به کالای هلو نگاشت شود.</p>
         {unlisted.length===0?<p className="text-sm text-slate-400">همه کالاهای فعال در دیجی‌کالا ثبت شده‌اند.</p>
           :<div className="max-h-72 space-y-1 overflow-y-auto">
             {unlisted.map(p=><div key={p.code} className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-white/10 px-3 py-2 text-xs">
