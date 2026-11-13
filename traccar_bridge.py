@@ -9,7 +9,7 @@ from pydantic import BaseModel,ConfigDict,Field,ValidationError,field_validator
 from sqlalchemy import text
 from db import engine
 from operations import current_user,require_manager,MANAGER_ROLES,role_has_module_permission
-from live_tracking import ensure as ensure_tracking,Start,start_session_in_connection,staff
+from live_tracking import ensure as ensure_tracking,Start,start_session_in_connection,staff,require_map_permission
 
 router=APIRouter(prefix='/tracking/traccar',tags=['traccar_bridge'])
 FORWARD_PATH='/tracking/traccar/positions'
@@ -63,6 +63,7 @@ class Shift(Strict):
 
 @router.get('/devices')
 def devices(user=Depends(current_user)):
+    require_map_permission(user, 'can_read')
     manager=user.get('role') in MANAGER_ROLES
     with engine.begin() as c:
         ensure(c);rows=c.execute(text('''SELECT d.*,u.full_name,s.id AS session_id,s.device_id AS session_device_id,s.expires_at,s.started_at
@@ -74,11 +75,13 @@ def devices(user=Depends(current_user)):
 
 @router.get('/people')
 def people(user=Depends(require_manager)):
+    require_map_permission(user, 'can_read')
     with engine.connect() as c:rows=c.execute(text("SELECT id,full_name FROM users WHERE is_active::text IN ('1','true','t') AND salesperson_id IS NOT NULL ORDER BY full_name LIMIT 500")).mappings().all()
     return {'items':[dict(r) for r in rows]}
 
 @router.post('/devices',status_code=201)
 def bind(data:Binding,user=Depends(require_manager)):
+    require_map_permission(user, 'can_write')
     with engine.begin() as c:
         ensure(c);c.execute(text('SELECT pg_advisory_xact_lock(819731,:uid)'),{'uid':data.user_id})
         if not c.execute(text("SELECT id FROM users WHERE id=:uid AND is_active::text IN ('1','true','t') AND salesperson_id IS NOT NULL"),{'uid':data.user_id}).scalar():raise HTTPException(422,'حساب فعال متصل به پرسنل لازم است.')
@@ -90,6 +93,7 @@ def bind(data:Binding,user=Depends(require_manager)):
 
 @router.post('/devices/{ident}/revoke')
 def revoke(ident:UUID,user=Depends(require_manager)):
+    require_map_permission(user, 'can_write')
     with engine.begin() as c:
         row=c.execute(text('SELECT * FROM traccar_devices WHERE id=:id FOR UPDATE'),{'id':str(ident)}).mappings().first()
         if not row:raise HTTPException(404,'اتصال دستگاه پیدا نشد.')
