@@ -102,7 +102,7 @@ export default function PlatformsPage(){
   async function tickHolooRegistered(order:PlatformOrder){
     if(busy)return;setBusy(true);setError("");
     try{
-      await secureApi("/platforms/orders/"+encodeURIComponent(order.order_ref)+"/holoo-registered",{method:"POST"});
+      await secureApi("/platforms/orders/"+encodeURIComponent(order.platform)+"/"+encodeURIComponent(order.order_ref)+"/holoo-registered",{method:"POST"});
       setNotice("وضعیت «ثبت شد در هلو» به‌روزرسانی شد.");
       load();
     }catch(r){setError(r instanceof Error?r.message:"به‌روزرسانی وضعیت ناموفق بود.");}
