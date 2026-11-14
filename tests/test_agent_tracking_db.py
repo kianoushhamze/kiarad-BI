@@ -97,3 +97,22 @@ class AgentTrackingDBTests(unittest.TestCase):
   with patch('assistant_operations.prepare',return_value={'proposal_id':str(uuid4())}),patch('assistant_operations.confirm_proposal',side_effect=RuntimeError('unknown outcome')) as confirm:
    r=self.client.post('/agent-center/missions/'+m['id']+'/run');self.assertEqual(r.json()['state'],'review_required',r.text)
    self.client.post('/agent-center/missions/'+m['id']+'/run');self.assertEqual(confirm.call_count,1)
+ def full_tracking_client(self):
+  import api
+  self.enterContext(patch.dict(os.environ,{'KIARAD_JWT_SECRET':'isolated-tracking-stop-secret-0123456789','KIARAD_API_KEY':''}))
+  fake=self.enterContext(patch.object(api,'engine'));fake.connect.side_effect=lambda:nullcontext(self.conn)
+  client=TestClient(api.app);self.addCleanup(client.close);return client
+ def tracking_headers(self,uid=2,version=0):
+  import jwt
+  return {'Authorization':'Bearer '+jwt.encode({'sub':str(uid),'role':'visitor','pwd_ver':version,'exp':datetime.now(timezone.utc)+timedelta(hours=1)},os.environ['KIARAD_JWT_SECRET'],algorithm='HS256')}
+ def test_full_app_allows_own_stop_after_all_map_grants_are_revoked(self):
+  sid=self.start();self.conn.execute(text("UPDATE role_permissions SET can_read=FALSE,can_write=FALSE WHERE role='visitor'"));full=self.full_tracking_client();headers=self.tracking_headers();body={'session_id':sid,'device_id':'test-device-0001'}
+  self.assertEqual(full.post('/tracking/heartbeat',json={**body,'status':'tracking'},headers=headers).status_code,403)
+  r=full.post('/tracking/sessions/stop',json=body,headers=headers);self.assertEqual(r.status_code,200,r.text);self.assertIsNotNone(self.conn.execute(text('SELECT ended_at FROM tracking_sessions WHERE id=:id'),{'id':sid}).scalar())
+ def test_full_app_stop_still_requires_current_identity_and_owned_device(self):
+  sid=self.start();self.conn.execute(text("UPDATE role_permissions SET can_read=FALSE,can_write=FALSE WHERE role='visitor'"));full=self.full_tracking_client();body={'session_id':sid,'device_id':'test-device-0001'}
+  self.assertEqual(full.post('/tracking/sessions/stop',json=body).status_code,401)
+  self.assertEqual(full.post('/tracking/sessions/stop',json=body,headers=self.tracking_headers(version=1)).status_code,401)
+  self.assertEqual(full.post('/tracking/sessions/stop',json=body,headers=self.tracking_headers(uid=3)).status_code,404)
+  self.assertEqual(full.post('/tracking/sessions/stop',json={**body,'device_id':'wrong-device-0001'},headers=self.tracking_headers()).status_code,404)
+  self.assertIsNone(self.conn.execute(text('SELECT ended_at FROM tracking_sessions WHERE id=:id'),{'id':sid}).scalar())

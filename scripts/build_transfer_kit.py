@@ -69,6 +69,7 @@ def build(root, snapshot, output, evidence, provisional=False):
     shutil.copyfile(root / 'docs/Agent_Mobile_Handoff_20261113.md', output / 'Agent_Mobile_Handoff_20261113.md')
     shutil.copyfile(root / 'docs/Completion_Validation_20261113.md', output / 'Completion_Validation_20261113.md')
     shutil.copyfile(root / 'docs/Traccar_Bridge_Handoff_20261113.md', output / 'Traccar_Bridge_Handoff_20261113.md')
+    shutil.copyfile(root / 'docs/Software_Finalization_20261114.md', output / 'Software_Finalization_20261114.md')
     release = {'source_commit': commit, 'image_tag': 'r20261113-' + commit[:12], 'prepared_for': '2026-11-13',
                'timezone': 'Asia/Tehran', 'architecture': 'linux/amd64', 'source_files': len(records),
                'includes_images': False, 'includes_company_data': False, 'company_acceptance_complete': False,
