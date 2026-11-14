@@ -102,7 +102,7 @@ export default function PlatformsPage(){
   async function tickHolooRegistered(order:PlatformOrder){
     if(busy)return;setBusy(true);setError("");
     try{
-      await secureApi("/platforms/orders/"+encodeURIComponent(order.order_ref)+"/holoo-registered",{method:"POST"});
+      await secureApi("/platforms/orders/"+encodeURIComponent(order.platform)+"/"+encodeURIComponent(order.order_ref)+"/holoo-registered",{method:"POST"});
       setNotice("وضعیت «ثبت شد در هلو» به‌روزرسانی شد.");
       load();
     }catch(r){setError(r instanceof Error?r.message:"به‌روزرسانی وضعیت ناموفق بود.");}
@@ -125,23 +125,12 @@ export default function PlatformsPage(){
     try{
       await secureApi("/platforms/create-product-proposals",{method:"POST",body:JSON.stringify({
         code:p.code,suggested_title:p.name,price_irr:p.price??undefined,stock:p.stock??0})});
-      setNotice("پیشنهاد ثبت در دیجی‌کالا ایجاد شد و منتظر تایید شماست.");
+      setNotice("پیشنهاد ثبت شد. ایجاد کالای جدید باید دستی در پنل فروشنده دیجی‌کالا انجام شود؛ سپس متغیر آن را به کالای هلو نگاشت کنید.");
       load();
     }catch(r){setError(r instanceof Error?r.message:"ایجاد پیشنهاد ناموفق بود.");}
     finally{setBusy(false);}
   }
 
-  async function confirmProposal(pr:CreateProposal){
-    if(busy)return;setBusy(true);setError("");setNotice("");
-    try{
-      const res=await secureApi<{status:string;errors?:string[]}>("/platforms/create-product-proposals/"+pr.id+"/confirm",{method:"POST"});
-      setNotice(res.status==="submitted"
-        ?"ثبت در دیجی‌کالا انجام شد."
-        :"تایید شد، اما دیجی‌کالا ثبت نکرد: "+((res.errors||[]).join("، ")||"پاسخ نامشخص"));
-      load();
-    }catch(r){setError(r instanceof Error?r.message:"تایید پیشنهاد ناموفق بود.");}
-    finally{setBusy(false);}
-  }
 
   async function rejectProposal(pr:CreateProposal){
     if(busy)return;setBusy(true);setError("");
@@ -287,7 +276,7 @@ export default function PlatformsPage(){
 
       <Surface className="space-y-3 p-5">
         <h2 className="text-base font-bold">کالاهای ثبت‌نشده در دیجی‌کالا</h2>
-        <p className="text-xs text-slate-400">این کالاها در هلو هستند اما در دیجی‌کالا لیست نشده‌اند. با دکمه زیر پیشنهاد ثبت ساخته می‌شود؛ ارسال به دیجی‌کالا فقط بعد از تایید شما انجام می‌گیرد.</p>
+        <p className="text-xs text-slate-400">این کالاها در هلو هستند اما در دیجی‌کالا لیست نشده‌اند. دکمهٔ زیر فقط پیش‌نویس پیشنهاد را ثبت می‌کند؛ ایجاد کالا باید دستی در پنل فروشنده انجام شود و سپس متغیر آن به کالای هلو نگاشت شود.</p>
         {unlisted.length===0?<p className="text-sm text-slate-400">همه کالاهای فعال در دیجی‌کالا ثبت شده‌اند.</p>
           :<div className="max-h-72 space-y-1 overflow-y-auto">
             {unlisted.map(p=><div key={p.code} className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-white/10 px-3 py-2 text-xs">
@@ -300,7 +289,7 @@ export default function PlatformsPage(){
 
       <Surface className="space-y-3 p-5">
         <h2 className="text-base font-bold">پیشنهادهای ثبت در دیجی‌کالا</h2>
-        <p className="text-xs text-amber-200">تایید هر پیشنهاد یک درخواست ثبت به دیجی‌کالا می‌فرستد (یکی‌یکی). تا زمانی که دیجی‌کالا API ثبت کالا را ارائه نکرده باشد، درخواست با خطا ذخیره می‌شود.</p>
+        <p className="text-xs text-amber-200">API رسمی فروشندهٔ دیجی‌کالا فعلاً مسیر تأییدشده‌ای برای ساخت کالای جدید ندارد. این بخش فقط پیش‌نویس پیشنهاد را نگه می‌دارد؛ کالا را دستی در پنل فروشنده ثبت کنید و سپس از صفحهٔ «نگاشت کالاهای دیجی‌کالا» متغیر آن را به کالای هلو وصل کنید. هیچ درخواست ناموفق یا ارسال ساختگی به API انجام نمی‌شود.</p>
         {proposals.length===0?<p className="text-sm text-slate-400">پیشنهادی ثبت نشده است.</p>
           :<div className="overflow-x-auto">
             <table className="w-full min-w-[800px] text-right text-xs">
@@ -322,12 +311,12 @@ export default function PlatformsPage(){
                   <td className="p-2">{pr.stock.toLocaleString("fa-IR")}</td>
                   <td className="p-2">
                     <span className={`rounded-full px-2 py-0.5 text-[10px] ${pr.status==="pending"?"bg-amber-500/15 text-amber-300":pr.status==="submitted"?"bg-emerald-500/15 text-emerald-300":"bg-rose-500/15 text-rose-300"}`}>
-                      {pr.status==="pending"?"در انتظار تایید":pr.status==="submitted"?"ارسال شد":pr.status==="rejected"?"رد شد":"ناموفق"}</span>
+                      {pr.status==="pending"?"پیش‌نویس؛ ثبت دستی لازم":pr.status==="submitted"?"ارسال شد":pr.status==="rejected"?"رد شد":"ناموفق"}</span>
                   </td>
                   <td className="p-2 space-x-1">
                     {pr.status==="pending"&&<>
-                      <button className={primaryButton} disabled={busy} onClick={()=>void confirmProposal(pr)}>تایید و ارسال</button>
-                      <button className="rounded-full bg-white/5 px-3 py-1 text-[10px] text-slate-300 hover:bg-white/10" disabled={busy} onClick={()=>void rejectProposal(pr)}>رد</button>
+                      <span className="text-[10px] text-amber-200">ارسال خودکار پشتیبانی نمی‌شود</span>
+                      <button className="rounded-full bg-white/5 px-3 py-1 text-[10px] text-slate-300 hover:bg-white/10" disabled={busy} onClick={()=>void rejectProposal(pr)}>حذف پیشنهاد</button>
                     </>}
                     {pr.status!=="pending"&&pr.receipt?.errors?.length?<span className="text-[10px] text-rose-300">{pr.receipt.errors.join("، ")}</span>:null}
                   </td>

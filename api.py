@@ -334,7 +334,11 @@ async def auth_gate(request, call_next):
                 # Training access is an explicit per-enrollment account grant; the router
                 # checks ownership for every lesson/assessment and CEO role for publishing.
                 training_account_path = path == "/training" or path.startswith("/training/")
-                if path not in _AUTH_METADATA_PATHS and not training_account_path:
+                # Ending one's own tracking session is account self-service:
+                # revoking map access must not prevent withdrawing tracking consent.
+                # JWT activation/version checks above and router ownership checks still apply.
+                own_tracking_stop = request.method == "POST" and path == "/tracking/sessions/stop"
+                if path not in _AUTH_METADATA_PATHS and not training_account_path and not own_tracking_stop:
                     module = _required_module(path)
                     if path in {"/dashboard/full", "/api/dashboard/full"} and str(user_row["role"]) in MANAGER_ROLES:
                         module = "management"

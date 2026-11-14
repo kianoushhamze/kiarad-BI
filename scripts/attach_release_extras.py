@@ -1,12 +1,13 @@
-"""Attach same-run manuals/mobile builds and refresh every kit checksum."""
+"""Attach same-run training manual and refresh every kit checksum."""
 import argparse,hashlib,json,shutil
 from pathlib import Path
 p=argparse.ArgumentParser();p.add_argument('--kit',type=Path,required=True);p.add_argument('--extras',type=Path,required=True);a=p.parse_args()
-expected={'Kiarad-Training-Manual/Kiarad-Comprehensive-Manual-FA.pdf','Kiarad-Android-Pilot/app-release.apk','Kiarad-iOS-Simulator/Kiarad-iOS-Simulator.zip'}
+expected={'Kiarad-Training-Manual/Kiarad-Comprehensive-Manual-FA.pdf'}
+if any(p.name != 'Kiarad-Training-Manual' for p in a.extras.iterdir()):raise RuntimeError('Only the training manual belongs in the web/Traccar release.')
 for path in expected:
  if not (a.extras/path).is_file():raise RuntimeError('Missing release deliverable: '+path)
 shutil.copytree(a.extras,a.kit/'deliverables')
-release=json.loads((a.kit/'release.json').read_text());release.update({'includes_training_pdf':True,'includes_android_pilot_apk':True,'includes_ios_simulator':True,'includes_ios_device_ipa':False,'mobile_device_acceptance_complete':False})
+release=json.loads((a.kit/'release.json').read_text());release.update({'includes_training_pdf':True,'includes_android_pilot_apk':False,'includes_ios_simulator':False,'includes_ios_device_ipa':False,'mobile_device_acceptance_complete':False,'field_client':'traccar-client','panel_client':'web-app','custom_native_apps_in_release':False})
 (a.kit/'release.json').write_text(json.dumps(release,indent=2)+'\n')
 checks=[]
 for path in sorted(a.kit.rglob('*')):

@@ -1,156 +1,83 @@
-# کیاراد BI — سامانه هوش تجاری و اتوماسیون پخش کیاراد شفا اندیش
+# کیاراد BI — مدیریت و هوش تجاری پخش کیاراد شفا اندیش
 
-![CI](https://github.com/kianoushhamze/kiarad-BI/actions/workflows/ci.yml/badge.svg)
-![Python](https://img.shields.io/badge/python-3.12+-blue)
-![FastAPI](https://img.shields.io/badge/backend-FastAPI-009688)
-![Next.js](https://img.shields.io/badge/frontend-Next.js%2016-black)
-![PostgreSQL](https://img.shields.io/badge/db-PostgreSQL%2016-336791)
+سامانهٔ فارسی مدیریت فروش میدانی، مشتریان، مسیر و ویزیت، کالا و انبار، خزانه، سفارش آنلاین و دستیار تخصصی شرکت.
 
-سامانه جامع مدیریت، هوش تجاری و اتوماسیون شرکت **پخش کیاراد شفا اندیش** (کرمان) — پخش مویینه محصولات پوست، مو و مزوتراپی (Swalin Vira، Dermalist، Total Derm، MC Cosmetics).
+**وضعیت انتشار:** کد و خروجی‌های خودکار از پذیرش عملیاتی شرکت جدا هستند. نتیجهٔ آزمون و شناسهٔ دقیق هر بسته را از [CI همان نسخه](https://github.com/kianoushhamze/kiarad-BI/actions/workflows/ci.yml)، `release.json`، `ci.json` و `checksums.json` بخوانید. موفقیت CI به معنی پذیرش هلو، دادهٔ مالی، سرور شرکت یا GPS روی گوشی واقعی نیست.
 
-پنل مدیریت فارسی (RTL) با دستیار هوشمند همه‌دانه، یکپارچه‌سازی کامل با **هلو (Holoo ERP)** و **دیجی‌کالا**، مدیریت تیم فروش میدانی و ویزیت‌ها، خزانه و چک‌ها، حقوق و جبران خدمات، سایت عمومی فروش (Ordibeauty) و موجودی مجازی چندسکویی.
+مرجع جاری: [هنداف نهایی نرم‌افزار](docs/Software_Finalization_20261114.md) · [راهنمای انتقال](transfer/README-fa.md) · [راهنمای Traccar](docs/Traccar_Bridge_Handoff_20261113.md). اسناد تاریخ‌دار قبلی و بخش‌های قدیمی `HANDOFF.md` تاریخچه‌اند؛ دستور استقرار قدیمی را با stage فعلی مخلوط نکنید.
 
-> **وضعیت پروژه:** مخزن داخلی شرکت. آخرین شمار رسمی آزمون: ۷۰۱ مورد (۵۲۰ پاس، ۱۸۱ skip، صفر شکست) در زیرمجموعهٔ آفلاین. تأیید شروع بهره‌برداری کامل سرور هنوز صادر نشده است — جزئیات در [`HANDOFF.md`](HANDOFF.md) و [`docs/Delivery_20261108.md`](docs/Delivery_20261108.md).
+اپ اختصاصی کیاراد از سورس و انتشار جاری حذف شده است. مسیر پرسنل، وب‌اپ برای فرم‌ها و Traccar Client آماده برای GPS است؛ Apple Developer، TestFlight و انتشار اپ اختصاصی جزو پیش‌نیازها نیستند.
 
----
+## معماری
 
-## پشته فنی
+- **بک‌اند:** Python3.12، FastAPI، SQLAlchemy و PostgreSQL16؛ روترهای ریشه در `api.py` ثبت می‌شوند.
+- **پنل:** Next.js16، React19، TypeScript، Tailwind و رابط فارسیRTL در `kiarad-dashboard/`؛ درخواست‌ها از پراکسی هم‌مبدأ `/api` عبور می‌کنند.
+- **فروشگاه فعال:** `site-healer/`، همراه API کاتالوگ و سفارش. مسیرهای قدیمی `site/` مرجع استقرار فروشگاه فعلی نیستند.
+- **دستیار:** گفت‌وگوی داده‌محور، مأموریت چندمرحله‌ای و رسید، روش‌های تخصصی، آموزش/آزمون، تحلیل قرارداد و تارگت، برنامه‌های دوره‌ای، لید و صف پیام مصوب. اقدامات حساس و نتیجهٔ نامعلوم کنترل جدا دارند؛ تخصص نامحدود یا رشد تضمینی ادعا نمی‌شود.
+- **GPS با اپ آماده:** Traccar Client روی آیفون/اندروید به واسط Docker و سپس نشست کاریِ رضایتی کیاراد متصل می‌شود؛ نصب آن اپ آماده نیاز به امضای اختصاصی شرکت ندارد.
 
-| لایه | فناوری |
-|---|---|
-| بک‌اند | Python 3.12 · FastAPI · SQLAlchemy · PyJWT · pandas |
-| پایگاه داده | PostgreSQL 16 (پورت ۵۴۳۲، تایم‌زون تهران) |
-| فرانت‌اند | Next.js 16 (App Router) · React 19 · TypeScript · Tailwind CSS 4 · فارسی RTL |
-| هوش مصنوعی | AvalAI (GPT) برای دستیار · Faster-Whisper برای گزارش صوتی |
-| یکپارچه‌سازی | وب‌سرویس هلو (Holoo ERP) · گیت فروشندگی دیجی‌کالا · ربات تلگرام |
-| استقرار | Docker Compose (postgres + backend + frontend + pgAdmin) |
+## ماژول‌ها و حدود عملیاتی
 
-## معماری کلی
-
-```
-┌─────────────────┐   ┌──────────────────┐   ┌────────────────┐
-│  kiarad-dashboard│   │  بک‌اند FastAPI   │   │  PostgreSQL 16 │
-│  Next.js :3000  │──▶│   api.py :8000   │──▶│   db.py        │
-│  فارسی RTL      │   │  ۲۱۹ مسیر API    │   │  ۲۴ جدول       │
-└─────────────────┘   └────────┬─────────┘   └────────────────┘
-                               │
-              ┌────────────────┼────────────────┐
-              ▼                ▼                ▼
-        هلو (Holoo)      دیجی‌کالا         AvalAI (GPT)
-        وب‌سرویس ERP      گیت فروشنده        دستیار هوشمند
-```
-
-- **بک‌اند:** ساختار فلت در ریشه؛ همهٔ روترها در `api.py` رجیستر می‌شوند (`operations.py` احراز هویت و نقش‌ها، `treasury.py` خزانه و چک‌ها، `assistant_engine.py` موتور دستیار و BI).
-- **فرانت‌اند:** پنل تاریک بنفش با شِل مشترک `kiarad-dashboard/components/portal-shell.tsx`، پالت فرمان Ctrl+K، و حدود ۴۰ صفحه در `kiarad-dashboard/app/`.
-- **مستندات زمینه‌ای:** [`GEMINI.md`](GEMINI.md) خلاصهٔ معماری برای عامل‌های کدنویس است.
-
-## ماژول‌های اصلی
-
-| حوزه | ماژول‌های کلیدی | توضیح |
+| حوزه | مسیرهای اصلی | رفتار |
 |---|---|---|
-| فروش میدانی | `monthly_visit_plans.py` · `route_builder.py` · `reconciliation_engine.py` · `field_intelligence.py` | برنامهٔ ماهانهٔ ویزیت، مسیرسازی خودکار، تطبیق ۴گانهٔ پایان ماه، هوش میدانی |
-| مالی | `treasury*.py` (۵ ماژول) · `payroll_*.py` · `compensation.py` · `purchase_profit.py` | خزانه و چک‌ها، موتور حقوق، جبران خدمات، سود خرید |
-| دستیار هوشمند | `assistant_engine.py` · `assistant_automations.py` · `assistant_*.py` · `ai_knowledge/` | چت داده‌محور با ۸۷ منبع پنل، ایجنت خودکار زمان‌بندی‌شده، پرامپت‌های نقش‌محور |
-| انبار و کالا | `catalog.py` · `inventory_intelligence.py` · `product_pricing.py` | کاتالوگ، هوش موجودی، قیمت‌گذاری |
-| یکپارچه‌سازی | `holoo_*.py` (۱۰+ ماژول) · `digikala_api.py` · `platform_sync.py` | سینک هلو، گیت دیجی‌کالا، موجودی مجازی چندسکویی |
-| فروش آنلاین | `site_*.py` · `site/` · `site_cms.py` | سایت عمومی Ordibeauty، CMS، سفارش‌ها با رزرو اتمیک |
-| بازاریابی | `marketing_intel.py` · `campaign_ai.py` · `integrations.py` | سؤالات پرتکرار پوست/مو، لیدها، تقویم محتوا |
-| پشتیبانی | `voice_reports.py` · `telegram_bot.py` · `audit_panel.py` | گزارش صوتی، ربات تلگرام، ممیزی |
+| فروش و ویزیت | `monthly_visit_plans.py`، `field_intelligence.py`، `visit_coverage.py` | برنامه و ظرفیت مسیر، پرتفوی و ویزیت تأییدشده |
+| مالی و جبران خدمات | `treasury*.py`، `payroll_*.py`، `compensation.py` | منابع مالی، تطبیق و تأیید مجاز؛ GPS جایگزین حقوق/حضور نیست |
+| کالا و سکوها | `catalog.py`، `platform_sync.py`، `digikala_api.py` | نگاشت کالا، رزرو موجودی و ثبت دستی فاکتور هلو با کلید مشترک سکو/شماره سفارش |
+| فروشگاه | `site_orders.py`، `site_cms.py`، `site-healer/` | checkout اتمیک و بازیابی سبد؛ سفارش ارسال‌شده مستقیم لغو یا بازگشایی نمی‌شود |
+| دستیار و آموزش | `agent_center.py`، `agent_routines.py`، `specialist_workflows.py`، `training_workflows.py` | برنامهٔ بازبینی‌شده، درس و آزمون خصوصی، وظیفه و رسید واقعی |
+| پیام و لید | `outbound_messages.py`، `prospect_pipeline.py` | رضایت تماس، متن/گیرندهٔ مصوب، رسید و کنترل تکرار؛ لید عمومی نیازمند بازبینی است |
+| موقعیت | `live_tracking.py`، `traccar_bridge.py`، `tracking_analytics.py` | مالکیت دستگاه، مجوز نقشه، شیفت و لغو دسترسی، تفکیک نقطهٔ قدیمی از زنده |
 
-## راه‌اندازی سریع (Docker Compose)
+ساخت کالای جدید در دیجی‌کالا از API در این نسخه مسدود است؛ پیشنهاد داخلی فقط پیش‌نویس است. کالا در Seller Center ثبت و سپس متغیر آن به کد هلو نگاشت می‌شود. هیچ درخواست ساخت به endpoint حدسی ارسال نمی‌شود.
 
-### ۱) تنظیمات محیطی
+## راه‌اندازی توسعه با Docker
 
-```bash
+برای دیتابیس تازهٔ توسعه، `.env.example` را به `.env` کپی و متغیرهای لازم را محلی تنظیم کنید. رمز یا توکن را وارد Git، لاگ یا گفت‌وگو نکنید.
+
+```sh
 cp .env.example .env
-```
-
-سپس در `.env` حداقل این مقادیر را کامل کنید:
-
-```dotenv
-KIARAD_JWT_SECRET=<رشتهٔ تصادفی حداقل ۳۲ کاراکتری>
-POSTGRES_PASSWORD=<رمز یکتای دیتابیس>
-HOLO_API_URL=http://<IP رایانهٔ هلو>:8080/TncHoloo/api
-HOLO_USERNAME=web
-HOLO_PASSWORD=<رمز وب‌سرویس هلو>
-```
-
-### ۲) بالا آوردن استک
-
-```bash
 docker compose up -d --build
 ```
 
-| سرویس | نشانی |
+رمز دیتابیس یکتا و `KIARAD_JWT_SECRET` حداقل۳۲کاراکتری، تنظیمات DB و در صورت نیاز اتصال‌های شرکت باید معتبر باشند. ساخت نخستین مدیر از `create_admin.py` و اعمال مهاجرت‌های مرتب از `scripts/run_migrations.py` انجام می‌شود؛ [راهنمای مهاجرت](migrations/README.md) را بخوانید. این فرمان توسعه، جایگزین روش امن تعویض نصب موجود نیست.
+
+## انتقال نصب موجود
+
+از [راهنمای stage](transfer/README-fa.md) استفاده کنید: بازرسی، پشتیبان، restore در مقصد جدا، آزمون و سپس cutover. پورت‌های stage پنل۳۳۰۰، API۸۸۰۰ و فروشگاه۸۱۹۰ هستند؛ با پورت‌های اجرای توسعه مخلوط نشوند.
+
+بستهٔ کامل Offline پنج تصویر Linux/amd64 دارد: backend، frontend، PostgreSQL16، Node22 و Traccar6.17.0. بستهٔ سبک تصاویر را ندارد. هیچ‌کدام شامل داده، `.env` یا اسرار شرکت نیستند؛ payload خصوصی از نصب مرجع جدا تهیه می‌شود. `source_commit` بسته باید با تصاویر و رسید نصب مطابقت داشته باشد.
+
+Stage زمان‌بندها و ارسال پیام و دریافتTraccar را خاموش نگه می‌دارد. فعال‌سازی پس از مراحل پذیرش و توقف پردازشگرهای قدیم انجام می‌شود. Traccar با `07-Configure-Traccar.ps1`، دامنهٔHTTPS واقعی و شروع شیفت توسط خود پرسنل راه‌اندازی می‌شود؛ [جزئیات](docs/Traccar_Bridge_Handoff_20261113.md).
+
+## تنظیمات مهم
+
+| تنظیم | کاربرد |
 |---|---|
-| فرانت‌اند | `http://127.0.0.1:3000` |
-| بک‌اند (health) | `http://127.0.0.1:8000/health` |
-| pgAdmin (اختیاری) | `docker compose --profile tools up -d pgadmin` → پورت ۵۰۵۰ |
+| `DB_HOST`، `DB_PORT`، `DB_NAME`، `DB_USER`، `POSTGRES_PASSWORD` | PostgreSQL |
+| `KIARAD_JWT_SECRET` | امضای نشست کارکنان؛ حداقل۳۲کاراکتر |
+| `HOLO_API_URL`، `HOLO_USERNAME`، `HOLO_PASSWORD` | اتصال هلو؛ ورود موفق اثبات تطبیق مالی نیست |
+| `KIARAD_CORS_ORIGINS` | مبدأهای مجاز مرورگر؛ مطابق دامنهٔ واقعی تنظیم شود |
+| `KIARAD_AUTOMATIONS_DISABLED`، `KIARAD_AGENT_DISABLED`، `KIARAD_ROUTINES_DISABLED` | کنترل زمان‌بندها؛ در stage خاموش‌اند |
+| `KIARAD_OUTBOUND_ENABLED` | ارسال مصوب از کانال پیکربندی‌شده؛ پیش‌فرض خاموش |
+| `KIARAD_TRACCAR_ENABLED`، `KIARAD_TRACCAR_CLIENT_URL` | فعال‌سازی و نشانی عمومیHTTPS GPS؛ کلید خصوصی با ابزار تنظیم ساخته می‌شود |
 
-### ۳) دیتابیس تازه و اولین مدیر
+فهرست کامل در `.env.example` است. اسرار سکوها در `secrets/` و خارج از سورس نگهداری می‌شوند.
 
-- مهاجرت پایه: [`migrations/0001_baseline.sql`](migrations/0001_baseline.sql) با [`scripts/run_migrations.py`](scripts/run_migrations.py) — راهنمای [`migrations/README.md`](migrations/README.md).
-- در صورت نیاز به تکمیل شِما روی دیتابیس نو: `fix_missing_tables.py`.
-- ساخت اولین کاربر مدیر: `create_admin.py` را داخل کانتینر بک‌اند اجرا کنید.
+## آزمون و CI
 
-ترتیب دقیق استقرار روی سرور واقعی در [`docs/Server_Deployment_Runbook_20261101.md`](docs/Server_Deployment_Runbook_20261101.md) و [`docs/server-deployment.md`](docs/server-deployment.md) آمده است.
-
-## اجرای آزمون‌ها
-
-```bash
+```sh
 pip install -r requirements.txt
-
-# زیرمجموعهٔ آفلاین (بدون PostgreSQL/شبکه — همان اجرای CI)
 python scripts/run_offline_review_tests.py
 ```
 
-مجموعهٔ کامل و گروه‌های دیتابیس فقط در محیط واقعی اجرا می‌شوند (اسکریپت‌های `run_full_test_suite.ps1` و `run_full_system_test.py`). تست‌های opt-in دیتابیس با متغیرهای `KIARAD_TEST_*_DB` فعال می‌شوند؛ رانر آفلاین آن‌ها را عمداً نادیده می‌گیرد.
+آزمون‌های پایگاه‌داده فقط با DB/schema ایزوله و opt-in اجرا می‌شوند؛ `scripts/run_database_review_tests.py` به `KIARAD_REVIEW_DISPOSABLE_DB=1` نیاز دارد. آن را به DB شرکت متصل نکنید. تعداد pass/fail/skip را از لاگ همان SHA بخوانید؛ skip معادل pass نیست.
 
-## ساختار مخزن
+Workflow شامل هشت بررسی است: backend آفلاین؛ PostgreSQL/CMS/فروشگاه و Traccar واقعی و بازیابی پشتیبان؛ lint/typecheck/build پنل؛ مرورگر فروشگاه؛ PDF فارسی؛ سازگاری Windows PowerShell5.1؛ کیت انتقال؛ و تصاویر Linux همراه آزمون کل مجموعه. مرحلهٔ Windows، parser و guardها را بررسی می‌کند و جایگزین پذیرش Docker Desktop شرکت نیست.
 
-```
-├── api.py                  # نقطهٔ ورود FastAPI و رجیستری روترها
-├── *.py                    # ~۱۱۵ ماژول بک‌اند (۳۶ هزار خط)
-├── kiarad-dashboard/       # فرانت‌اند Next.js 16 (۷ هزار خط TSX/TS)
-│   ├── app/                # صفحات پنل (App Router)
-│   ├── components/         # portal-shell، command-palette و…
-│   └── lib/                # secure-api و ابزارهای مشترک
-├── site/                   # سایت عمومی Ordibeauty (استاتیک + API زنده)
-├── ai_knowledge/           # پرامپت‌های نقش‌محور دستیار (CFO، CEO، انبار…)
-├── migrations/             # مهاجرت پایهٔ اسکیما
-├── scripts/                # ابزارهای عملیاتی، رانرها و چک‌های انتشار
-├── tests/                  # ۷۶ فایل آزمون unittest
-├── docs/                   # ۴۵ سند تحویل، دیباگ و RUNBOOK
-├── templates/              # قالب ورود اکسل خزانه
-└── docker-compose.yml      # استک کامل production
-```
+آزمون واقعی گوشی، قفل صفحه، پس‌زمینه، آفلاین و باتری، تنظیمHTTPS شرکت، تطبیق هلو/سکوها و cutover همچنان پذیرش عملیاتی جدا می‌خواهند.
 
-## متغیرهای محیطی
+## دسترسی و محرمانگی
 
-| متغیر | نقش |
-|---|---|
-| `KIARAD_JWT_SECRET` | سکرت امضای توکن‌های JWT (حداقل ۳۲ کاراکتر) |
-| `DB_HOST` / `DB_PORT` / `DB_NAME` / `DB_USER` | اتصال PostgreSQL |
-| `POSTGRES_PASSWORD` | رمز دیتابیس |
-| `HOLO_API_URL` / `HOLO_USERNAME` / `HOLO_PASSWORD` | وب‌سرویس هلو |
-| `HOLO_AUTO_REFRESH_ENABLED` / `HOLO_AUTO_REFRESH_SECONDS` | سینک خودکار هلو (پیش‌فرض فعال، هر ۳۰۰ ثانیه) |
-| `PGADMIN_DEFAULT_EMAIL` / `PGADMIN_DEFAULT_PASSWORD` | pgAdmin (پروفایل tools) |
+نقش‌های `ceo`، `sales_manager`، `salesperson`، `visitor` و `finance` بر اساس مجوز ماژول و مالکیت داده کنترل می‌شوند. پایان شیفتِ خود کاربر پس از لغو مجوز نقشه نیز باید ممکن بماند؛ شروع/آپلود و مشاهده همچنان مجوزهای خود را می‌خواهند. GPS خام، دادهٔ بازار یا نتیجهٔ آزمون آموزشی، تأیید خودکار حقوق/عملکرد/تخصص نیست.
 
-توکن‌های دیجی‌کالا و سایر اعتبارنامه‌ها در پوشهٔ `secrets/` نگهداری می‌شوند و هرگز وارد مخزن نمی‌شوند (در `.gitignore` مستثنا شده است).
-
-## امنیت و انتشار
-
-- تفکیک نقش‌ها: `ceo` دسترسی جامع؛ `salesperson` فقط پیش‌نویس و مسیر اختصاصی خود؛ مسیرهای عمومی فقط دو endpoint کاتالوگ فقط‌خواندنی.
-- آزمون دسترسی نقش‌ها در `tests/` پوشش داده شده است (صفر نشتی در سوییپ‌های ثبت‌شده).
-- پیش از هر عمومی‌سازی این مخزن: محدودکردن CORS از `*` به دامنهٔ واقعی، رتبه‌بندی درخواست در `public_proxy.py`، و بازبینی ۱۰ فایل حاوی IP داخلی هلو انجام شود.
-
-## CI
-
-Workflow [`.github/workflows/ci.yml`](.github/workflows/ci.yml) روی هر push و pull request دو شغلی اجرا می‌کند:
-
-1. **backend-offline-tests** — نصب `requirements.txt` و اجرای زیرمجموعهٔ آفلاین (`scripts/run_offline_review_tests.py`).
-2. **frontend-build** — `npm ci`، بررسی نوع TypeScript و بیلد تولیدی Next.js.
-
-## مجوز
-
-مخزن داخلی شرکت؛ بدون لایسنس متن‌باز. تمام حقوق برای **شرکت پخش کیاراد شفا اندیش** محفوظ است.
+مخزن داخلی شرکت است. هیچ دادهٔ مشتری، مختصات واقعی، کلید انتشار یا اعتبارنامهٔ شرکت در فایل‌های عمومی قرار نگیرد.

@@ -257,6 +257,10 @@ def set_status(order_id: int, data: StatusIn, background_tasks: BackgroundTasks,
             raise HTTPException(404, "سفارشی با این شناسه پیدا نشد.")
         if old["status"] == "لغو شد" and data.status != "لغو شد":
             raise HTTPException(409, "سفارش لغوشده قابل بازگشایی نیست؛ سفارش جدید ثبت کنید.")
+        # A shipped order has already left the warehouse. Releasing its stock
+        # reservation or moving it back to a pending state could oversell stock.
+        if old["status"] == "ارسال شد" and data.status != "ارسال شد":
+            raise HTTPException(409, "سفارش ارسال‌شده قابل لغو یا بازگشت به مراحل قبلی نیست.")
         touched = []
         if data.status == "لغو شد":
             touched = [r[0] for r in conn.execute(text(

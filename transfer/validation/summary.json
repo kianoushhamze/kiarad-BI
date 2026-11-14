@@ -38,5 +38,12 @@
   "powershell_parse_files": 44,
   "powershell_execution_environment": "7.7 on Linux; Windows 5.1 acceptance pending",
   "company_backup_in_download": false,
-  "runtime_images": "See release.json: offline artifact includes CI-built images; light artifact does not"
+  "runtime_images": "See release.json: offline artifact includes CI-built images; light artifact does not",
+  "evidence_status": "historical_not_current_release_acceptance",
+  "note": "Historical local validation snapshot only. Do not attribute these counts to current main f3c7bd4a667421d5c0481b58cfcb8ec8aae38cf9. Current main CI run 43325251916 completed all nine jobs successfully; see docs/Completion_Validation_20261113.md and the exact workflow artifacts. Company/server and physical-device acceptance remain incomplete.",
+  "current_main_commit": "f3c7bd4a667421d5c0481b58cfcb8ec8aae38cf9",
+  "current_main_ci_run": 43325251916,
+  "current_main_ci_jobs": 9,
+  "current_main_ci_conclusion": "success",
+  "mobile_device_acceptance_complete": false
 }

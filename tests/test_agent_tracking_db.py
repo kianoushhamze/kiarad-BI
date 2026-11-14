@@ -10,6 +10,7 @@ from sqlalchemy import text
 from db import engine
 import agent_center as agent
 import live_tracking as tracking
+import operations as ops
 from operations import current_user
 @unittest.skipUnless(os.getenv('KIARAD_TEST_AGENT_DB')=='1','Opt-in disposable PostgreSQL')
 class AgentTrackingDBTests(unittest.TestCase):
@@ -19,8 +20,10 @@ class AgentTrackingDBTests(unittest.TestCase):
   self.conn.execute(text('SET LOCAL search_path TO agent_test_'+schema))
   self.conn.execute(text('CREATE TABLE users(id INTEGER PRIMARY KEY,username TEXT,full_name TEXT,role TEXT,salesperson_id INTEGER,is_active INTEGER,password_version INTEGER DEFAULT 0)'))
   self.conn.execute(text("INSERT INTO users(id,username,full_name,role,salesperson_id,is_active) VALUES(1,'chief','CEO','ceo',NULL,1),(2,'worker','Visitor','visitor',2,1),(3,'other','Other','visitor',3,1),(4,'chief2','Other CEO','ceo',NULL,1)"))
+  self.conn.execute(text('CREATE TABLE role_permissions(role TEXT,module TEXT,can_read BOOLEAN,can_write BOOLEAN,can_delete BOOLEAN)'))
+  self.conn.execute(text("INSERT INTO role_permissions VALUES ('visitor','map',TRUE,TRUE,FALSE),('salesperson','map',TRUE,TRUE,FALSE),('finance','map',FALSE,FALSE,FALSE)"))
   agent.ensure(self.conn);tracking.ensure(self.conn)
-  for module in [agent,tracking]:
+  for module in [agent,tracking,ops]:
    fake=self.enterContext(patch.object(module,'engine'));fake.begin.side_effect=self.atomic;fake.connect.side_effect=lambda:nullcontext(self.conn)
   self.user={'id':1,'role':'ceo'};app=FastAPI();app.include_router(agent.router);app.include_router(tracking.router);app.dependency_overrides[current_user]=lambda:self.user
   self.client=TestClient(app);self.addCleanup(self.client.close)
@@ -54,6 +57,20 @@ class AgentTrackingDBTests(unittest.TestCase):
   self.user={'id':2,'role':'visitor','salesperson_id':2};r=self.client.post('/tracking/sessions',json={'device_id':'test-device-0001','platform':'android','consent_version':'work-shift-location-v1'});self.assertEqual(r.status_code,201,r.text);return r.json()['session_id']
  def sample(self,at=None):return {'event_id':str(uuid4()),'recorded_at':(at or datetime.now(timezone.utc)).isoformat(),'latitude':30.29,'longitude':57.06,'accuracy_m':5}
  def upload(self,sid,samples):return self.client.post('/tracking/locations',json={'session_id':sid,'device_id':'test-device-0001','samples':samples})
+ def test_native_tracking_requires_explicit_map_write_grant(self):
+  sid=self.start();self.conn.execute(text("UPDATE role_permissions SET can_write=FALSE WHERE role='visitor' AND module='map'"))
+  self.assertEqual(self.upload(sid,[self.sample()]).status_code,403)
+  self.assertEqual(self.conn.execute(text('SELECT COUNT(*) FROM tracking_points')).scalar(),0)
+  self.assertEqual(self.client.post('/tracking/heartbeat',json={'session_id':sid,'device_id':'test-device-0001','status':'tracking'}).status_code,403)
+  self.assertEqual(self.client.post('/tracking/sessions/stop',json={'session_id':sid,'device_id':'test-device-0001'}).status_code,200)
+ def test_native_tracking_live_and_history_require_map_read_grant(self):
+  sid=self.start();self.user={'id':1,'role':'ceo'}
+  self.assertEqual(self.client.get('/tracking/live').status_code,200)
+  self.conn.execute(text("INSERT INTO tracking_points(session_id,event_id,user_id,recorded_at,latitude,longitude,accuracy_m) VALUES(:s,:e,2,NOW(),30,57,5)"),{'s':sid,'e':str(uuid4())})
+  self.conn.execute(text("UPDATE role_permissions SET can_read=FALSE WHERE role='visitor' AND module='map'"))
+  self.user={'id':2,'role':'visitor','salesperson_id':2}
+  self.assertEqual(self.client.get('/tracking/live').status_code,403)
+  self.assertEqual(self.client.get('/tracking/history?user_id=2').status_code,403)
  def test_duplicate_upload_has_one_stored_point(self):
   sid=self.start();sample=self.sample();self.assertEqual(self.upload(sid,[sample]).status_code,200);self.assertEqual(self.upload(sid,[sample]).status_code,200);self.assertEqual(self.conn.execute(text('SELECT COUNT(*) FROM tracking_points')).scalar(),1)
  def test_wrong_account_cannot_upload_or_read_history(self):
@@ -80,3 +97,22 @@ class AgentTrackingDBTests(unittest.TestCase):
   with patch('assistant_operations.prepare',return_value={'proposal_id':str(uuid4())}),patch('assistant_operations.confirm_proposal',side_effect=RuntimeError('unknown outcome')) as confirm:
    r=self.client.post('/agent-center/missions/'+m['id']+'/run');self.assertEqual(r.json()['state'],'review_required',r.text)
    self.client.post('/agent-center/missions/'+m['id']+'/run');self.assertEqual(confirm.call_count,1)
+ def full_tracking_client(self):
+  import api
+  self.enterContext(patch.dict(os.environ,{'KIARAD_JWT_SECRET':'isolated-tracking-stop-secret-0123456789','KIARAD_API_KEY':''}))
+  fake=self.enterContext(patch.object(api,'engine'));fake.connect.side_effect=lambda:nullcontext(self.conn)
+  client=TestClient(api.app);self.addCleanup(client.close);return client
+ def tracking_headers(self,uid=2,version=0):
+  import jwt
+  return {'Authorization':'Bearer '+jwt.encode({'sub':str(uid),'role':'visitor','pwd_ver':version,'exp':datetime.now(timezone.utc)+timedelta(hours=1)},os.environ['KIARAD_JWT_SECRET'],algorithm='HS256')}
+ def test_full_app_allows_own_stop_after_all_map_grants_are_revoked(self):
+  sid=self.start();self.conn.execute(text("UPDATE role_permissions SET can_read=FALSE,can_write=FALSE WHERE role='visitor'"));full=self.full_tracking_client();headers=self.tracking_headers();body={'session_id':sid,'device_id':'test-device-0001'}
+  self.assertEqual(full.post('/tracking/heartbeat',json={**body,'status':'tracking'},headers=headers).status_code,403)
+  r=full.post('/tracking/sessions/stop',json=body,headers=headers);self.assertEqual(r.status_code,200,r.text);self.assertIsNotNone(self.conn.execute(text('SELECT ended_at FROM tracking_sessions WHERE id=:id'),{'id':sid}).scalar())
+ def test_full_app_stop_still_requires_current_identity_and_owned_device(self):
+  sid=self.start();self.conn.execute(text("UPDATE role_permissions SET can_read=FALSE,can_write=FALSE WHERE role='visitor'"));full=self.full_tracking_client();body={'session_id':sid,'device_id':'test-device-0001'}
+  self.assertEqual(full.post('/tracking/sessions/stop',json=body).status_code,401)
+  self.assertEqual(full.post('/tracking/sessions/stop',json=body,headers=self.tracking_headers(version=1)).status_code,401)
+  self.assertEqual(full.post('/tracking/sessions/stop',json=body,headers=self.tracking_headers(uid=3)).status_code,404)
+  self.assertEqual(full.post('/tracking/sessions/stop',json={**body,'device_id':'wrong-device-0001'},headers=self.tracking_headers()).status_code,404)
+  self.assertIsNone(self.conn.execute(text('SELECT ended_at FROM tracking_sessions WHERE id=:id'),{'id':sid}).scalar())

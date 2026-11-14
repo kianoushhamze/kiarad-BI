@@ -47,10 +47,13 @@ def build(root, snapshot, output, evidence, provisional=False):
             path = root / relative
             if path.is_symlink():
                 raise ValueError('Source symlink is not supported: ' + name)
-            data = path.read_bytes()
+            # Read the indexed Git blob, not the checkout worktree: Windows
+            # line-ending filters can rewrite files after checkout. Release
+            # source must remain byte-for-byte identical to the selected Git tree.
+            data = subprocess.check_output(['git', 'cat-file', 'blob', entry['sha']], cwd=root)
             blob = hashlib.sha1(b'blob ' + str(len(data)).encode() + b'\0' + data).hexdigest()
             if blob != entry['sha']:
-                raise ValueError('Source differs from Git snapshot: ' + name)
+                raise ValueError('Git blob verification failed: ' + name)
             info = zipfile.ZipInfo(name, date_time=(2026, 11, 12, 0, 0, 0))
             info.external_attr = 0o100644 << 16
             info.compress_type = zipfile.ZIP_DEFLATED
@@ -63,9 +66,9 @@ def build(root, snapshot, output, evidence, provisional=False):
         if path.is_file():
             shutil.copyfile(path, output / path.name)
     shutil.copyfile(root / 'docs/General_Debug_20261112.md', output / 'General_Debug_20261112.md')
-    shutil.copyfile(root / 'docs/Agent_Mobile_Handoff_20261113.md', output / 'Agent_Mobile_Handoff_20261113.md')
     shutil.copyfile(root / 'docs/Completion_Validation_20261113.md', output / 'Completion_Validation_20261113.md')
     shutil.copyfile(root / 'docs/Traccar_Bridge_Handoff_20261113.md', output / 'Traccar_Bridge_Handoff_20261113.md')
+    shutil.copyfile(root / 'docs/Software_Finalization_20261114.md', output / 'Software_Finalization_20261114.md')
     release = {'source_commit': commit, 'image_tag': 'r20261113-' + commit[:12], 'prepared_for': '2026-11-13',
                'timezone': 'Asia/Tehran', 'architecture': 'linux/amd64', 'source_files': len(records),
                'includes_images': False, 'includes_company_data': False, 'company_acceptance_complete': False,
