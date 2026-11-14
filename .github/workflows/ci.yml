@@ -139,79 +139,6 @@ jobs:
       - name: Responsive registration and checkout against mock API
         run: python tests/browser/check_mobile_storefront.py
 
-  mobile-android:
-    name: Android pilot APK
-    runs-on: ubuntu-latest
-    timeout-minutes: 45
-    defaults:
-      run:
-        working-directory: mobile
-    env:
-      EXPO_NO_TELEMETRY: '1'
-      CI: '1'
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: '22'
-          cache: npm
-          cache-dependency-path: mobile/package-lock.json
-      - uses: actions/setup-java@v4
-        with:
-          distribution: temurin
-          java-version: '17'
-      - uses: android-actions/setup-android@v3
-        with:
-          packages: platform-tools
-      - run: npm ci
-      - run: npm run typecheck && npm test
-      - name: Generate native Android project
-        run: npx expo prebuild --platform android --no-install
-      - name: Compile organizational pilot APK
-        run: ./gradlew --no-daemon assembleRelease -PreactNativeArchitectures=arm64-v8a
-        working-directory: mobile/android
-      - name: Verify APK embeds application bundle
-        run: python -c "import zipfile; z=zipfile.ZipFile('android/app/build/outputs/apk/release/app-release.apk'); assert 'assets/index.android.bundle' in z.namelist(); assert any(p.startswith('lib/arm64-v8a/') for p in z.namelist()); assert z.testzip() is None"
-      - uses: actions/upload-artifact@v4
-        with:
-          name: Kiarad-Android-Pilot
-          path: mobile/android/app/build/outputs/apk/release/app-release.apk
-          if-no-files-found: error
-          retention-days: 30
-
-  mobile-ios:
-    name: iOS simulator build (device signing separate)
-    runs-on: macos-latest
-    timeout-minutes: 50
-    defaults:
-      run:
-        working-directory: mobile
-    env:
-      EXPO_NO_TELEMETRY: '1'
-      CI: '1'
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: '22'
-          cache: npm
-          cache-dependency-path: mobile/package-lock.json
-      - run: npm ci
-      - run: npm run typecheck && npm test
-      - name: Generate native iOS project and Pods
-        run: npx expo prebuild --platform ios
-      - name: Compile unsigned simulator app
-        run: xcodebuild -workspace ios/KiaradField.xcworkspace -scheme KiaradField -configuration Release -sdk iphonesimulator -destination 'generic/platform=iOS Simulator' -derivedDataPath "$RUNNER_TEMP/kiarad-ios" CODE_SIGNING_ALLOWED=NO build
-      - name: Package simulator app and signing instructions
-        run: |
-          ditto -c -k --sequesterRsrc --keepParent "$RUNNER_TEMP/kiarad-ios/Build/Products/Release-iphonesimulator/KiaradField.app" "$RUNNER_TEMP/Kiarad-iOS-Simulator.zip"
-      - uses: actions/upload-artifact@v4
-        with:
-          name: Kiarad-iOS-Simulator
-          path: ${{ runner.temp }}/Kiarad-iOS-Simulator.zip
-          if-no-files-found: error
-          retention-days: 30
-
   training-manual:
     name: Persian PDF handbook
     runs-on: ubuntu-24.04
@@ -271,7 +198,7 @@ jobs:
 
   transfer-kit:
     name: Build and verify transfer kit
-    needs: [backend-offline-tests, frontend-build, cms-and-storefront-regressions, storefront-browser, mobile-android, mobile-ios, training-manual, powershell-51-compat]
+    needs: [backend-offline-tests, frontend-build, cms-and-storefront-regressions, storefront-browser, training-manual, powershell-51-compat]
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
@@ -281,12 +208,12 @@ jobs:
           python-version: '3.12'
       - name: Build kit from exact checked-out Git tree
         run: python scripts/build_transfer_kit.py --output "$RUNNER_TEMP/Kiarad-Transfer-20261113"
-      - name: Download same-run manuals and mobile artifacts
+      - name: Download same-run training manual
         uses: actions/download-artifact@v4
         with:
-          pattern: Kiarad-{Training-Manual,Android-Pilot,iOS-Simulator}
+          pattern: Kiarad-Training-Manual
           path: ${{ runner.temp }}/release-extras
-      - name: Attach checksummed mobile and training deliverables
+      - name: Attach checksummed training deliverables
         run: python scripts/attach_release_extras.py --kit "$RUNNER_TEMP/Kiarad-Transfer-20261113" --extras "$RUNNER_TEMP/release-extras"
       - name: Verify kit and guards
         shell: pwsh
@@ -313,12 +240,12 @@ jobs:
           python-version: '3.12'
       - name: Build images, smoke test containers and export exact release
         run: bash scripts/ci_build_offline_transfer.sh
-      - name: Download same-run manuals and mobile artifacts
+      - name: Download same-run training manual
         uses: actions/download-artifact@v4
         with:
-          pattern: Kiarad-{Training-Manual,Android-Pilot,iOS-Simulator}
+          pattern: Kiarad-Training-Manual
           path: ${{ runner.temp }}/release-extras
-      - name: Attach checksummed mobile and training deliverables
+      - name: Attach checksummed training deliverables
         run: python scripts/attach_release_extras.py --kit "$RUNNER_TEMP/Kiarad-Transfer-20261113-Offline" --extras "$RUNNER_TEMP/release-extras"
       - name: Verify offline kit and guards
         shell: pwsh

@@ -6,13 +6,14 @@
 
 مرجع جاری: [هنداف نهایی نرم‌افزار](docs/Software_Finalization_20261114.md) · [راهنمای انتقال](transfer/README-fa.md) · [راهنمای Traccar](docs/Traccar_Bridge_Handoff_20261113.md). اسناد تاریخ‌دار قبلی و بخش‌های قدیمی `HANDOFF.md` تاریخچه‌اند؛ دستور استقرار قدیمی را با stage فعلی مخلوط نکنید.
 
+اپ اختصاصی کیاراد از سورس و انتشار جاری حذف شده است. مسیر پرسنل، وب‌اپ برای فرم‌ها و Traccar Client آماده برای GPS است؛ Apple Developer، TestFlight و انتشار اپ اختصاصی جزو پیش‌نیازها نیستند.
+
 ## معماری
 
 - **بک‌اند:** Python3.12، FastAPI، SQLAlchemy و PostgreSQL16؛ روترهای ریشه در `api.py` ثبت می‌شوند.
 - **پنل:** Next.js16، React19، TypeScript، Tailwind و رابط فارسیRTL در `kiarad-dashboard/`؛ درخواست‌ها از پراکسی هم‌مبدأ `/api` عبور می‌کنند.
 - **فروشگاه فعال:** `site-healer/`، همراه API کاتالوگ و سفارش. مسیرهای قدیمی `site/` مرجع استقرار فروشگاه فعلی نیستند.
 - **دستیار:** گفت‌وگوی داده‌محور، مأموریت چندمرحله‌ای و رسید، روش‌های تخصصی، آموزش/آزمون، تحلیل قرارداد و تارگت، برنامه‌های دوره‌ای، لید و صف پیام مصوب. اقدامات حساس و نتیجهٔ نامعلوم کنترل جدا دارند؛ تخصص نامحدود یا رشد تضمینی ادعا نمی‌شود.
-- **موبایل:** اپ ترکیبی KiaradField در `mobile/`؛ GPS و صف بومی، پنل کامل مجاز کاربر داخل WebView امن. APK فعلی پایلوت با کلید آزمایشی و ARM64 است؛ خروجی iOS مخصوص شبیه‌ساز است.
 - **GPS با اپ آماده:** Traccar Client روی آیفون/اندروید به واسط Docker و سپس نشست کاریِ رضایتی کیاراد متصل می‌شود؛ نصب آن اپ آماده نیاز به امضای اختصاصی شرکت ندارد.
 
 ## ماژول‌ها و حدود عملیاتی
@@ -71,7 +72,7 @@ python scripts/run_offline_review_tests.py
 
 آزمون‌های پایگاه‌داده فقط با DB/schema ایزوله و opt-in اجرا می‌شوند؛ `scripts/run_database_review_tests.py` به `KIARAD_REVIEW_DISPOSABLE_DB=1` نیاز دارد. آن را به DB شرکت متصل نکنید. تعداد pass/fail/skip را از لاگ همان SHA بخوانید؛ skip معادل pass نیست.
 
-Workflow شامل ده بررسی است: backend آفلاین؛ PostgreSQL/CMS/فروشگاه و Traccar واقعی و بازیابی پشتیبان؛ lint/typecheck/build پنل؛ مرورگر فروشگاه؛ APK پایلوت Android؛ iOS Simulator؛ PDF فارسی؛ سازگاری Windows PowerShell5.1؛ کیت انتقال؛ و تصاویر Linux همراه آزمون کل مجموعه. مرحلهٔ Windows، parser و guardها را بررسی می‌کند و جایگزین پذیرش Docker Desktop شرکت نیست.
+Workflow شامل هشت بررسی است: backend آفلاین؛ PostgreSQL/CMS/فروشگاه و Traccar واقعی و بازیابی پشتیبان؛ lint/typecheck/build پنل؛ مرورگر فروشگاه؛ PDF فارسی؛ سازگاری Windows PowerShell5.1؛ کیت انتقال؛ و تصاویر Linux همراه آزمون کل مجموعه. مرحلهٔ Windows، parser و guardها را بررسی می‌کند و جایگزین پذیرش Docker Desktop شرکت نیست.
 
 آزمون واقعی گوشی، قفل صفحه، پس‌زمینه، آفلاین و باتری، تنظیمHTTPS شرکت، تطبیق هلو/سکوها و cutover همچنان پذیرش عملیاتی جدا می‌خواهند.
 

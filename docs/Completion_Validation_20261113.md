@@ -1,3 +1,5 @@
+> سند تاریخی: اپ‌های اختصاصی کیاراد در ۱۴ نوامبر به درخواست کاربر از انتشار و سورس جاری حذف شدند. مسیر فعال، وب‌اپ و Traccar Client آماده است. مرجع جاری `docs/Software_Finalization_20261114.md` است.
+
 # Validation of the 1.1 completion work
 
 These are isolated development checks, not company-server or physical-device acceptance. No real customer messages were sent.

@@ -66,7 +66,6 @@ def build(root, snapshot, output, evidence, provisional=False):
         if path.is_file():
             shutil.copyfile(path, output / path.name)
     shutil.copyfile(root / 'docs/General_Debug_20261112.md', output / 'General_Debug_20261112.md')
-    shutil.copyfile(root / 'docs/Agent_Mobile_Handoff_20261113.md', output / 'Agent_Mobile_Handoff_20261113.md')
     shutil.copyfile(root / 'docs/Completion_Validation_20261113.md', output / 'Completion_Validation_20261113.md')
     shutil.copyfile(root / 'docs/Traccar_Bridge_Handoff_20261113.md', output / 'Traccar_Bridge_Handoff_20261113.md')
     shutil.copyfile(root / 'docs/Software_Finalization_20261114.md', output / 'Software_Finalization_20261114.md')
