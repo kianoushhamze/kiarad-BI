@@ -18,7 +18,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy import text
 from db import engine
 from iran_time import iran_today, iran_month_bounds
-from assistant_inventory import catalog_intent, resolve_selection, inventory_answer, normalize, toman, business_date, dates_for_model, question_window, limit_short_window_orders
+from assistant_inventory import aggregate_question, catalog_intent, resolve_selection, inventory_answer, normalize, toman, business_date, dates_for_model, question_window, limit_short_window_orders
 from operations import MANAGER_ROLES, current_user, role_has_module_permission
 from advisory_tools import TOOLS as ADVISORY_TOOLS, execute_tool as run_advisory_tool
 
@@ -160,6 +160,8 @@ def build_live_context(conn, user=None) -> dict:
 
     if role in MANAGER_ROLES and (is_ceo or role_has_module_permission(role, "debtors", "can_read") or role_has_module_permission(role, "treasury", "can_read")):
         latest_snapshot = "(SELECT id FROM receivable_snapshots ORDER BY snapshot_date DESC,id DESC LIMIT 1)"
+        ctx["debt_snapshot_id"] = q("SELECT id FROM receivable_snapshots ORDER BY snapshot_date DESC,id DESC LIMIT 1")
+        ctx["debt_positive_total"] = q("SELECT COALESCE(SUM(balance),0) FROM receivable_balances WHERE balance>0 AND snapshot_id=" + latest_snapshot)
         ctx["debt_total"] = q("SELECT COALESCE(SUM(balance),0) FROM receivable_balances WHERE snapshot_id=" + latest_snapshot)
         ctx["debt_rows"] = q("SELECT COUNT(*) FROM receivable_balances WHERE balance > 0 AND snapshot_id=" + latest_snapshot)
         ctx["debt_snapshot_date"] = q("SELECT MAX(snapshot_date) FROM receivable_snapshots", d=None)
@@ -178,6 +180,8 @@ def build_live_context(conn, user=None) -> dict:
         ctx["products_zero_stock_without_target"] = q("SELECT COUNT(*) FROM products WHERE is_active=1 AND stock<=0 AND COALESCE(min_stock,0)<=0")
         if role in MANAGER_ROLES:
             ctx["inventory_value"] = q("SELECT COALESCE(SUM(stock*price),0) FROM products WHERE is_active=1")
+            ctx["inventory_missing_values"] = q("SELECT COUNT(*) FROM products WHERE is_active=1 AND (price IS NULL OR stock IS NULL)")
+            ctx["catalog_updated_at"] = q("SELECT MAX(updated_at) FROM products WHERE is_active=1")
         ctx["low_stock_items"] = r("SELECT name,stock,min_stock FROM products WHERE is_active=1 AND stock<=min_stock AND min_stock>0 ORDER BY stock ASC LIMIT 10")
 
     if is_ceo or role_has_module_permission(role, "tasks", "can_read"):
@@ -275,7 +279,7 @@ def context_for_question(conn, user, question, ctx):
     selected = {"today": ctx.get("today"), "scope": ctx.get("scope")}
     groups = (
         (("فروش", "فاکتور", "تارگت", "هدف", "پورسانت"), ("sales_today", "sales_month", "sales_7d", "sales_30d", "sales_source_date", "recent_sales", "targets")),
-        (("مشتری", "حساب", "معین", "بده", "طلب", "مانده", "پرداخت"), ("my_customers_total", "my_customer_balances", "my_customer_local_balances", "local_balance_note", "my_customer_ledger_recent", "debt_total", "debt_rows", "debt_snapshot_date", "top_debtors")),
+        (("مشتری", "حساب", "معین", "بده", "طلب", "مانده", "پرداخت"), ("my_customers_total", "my_customer_balances", "my_customer_local_balances", "local_balance_note", "my_customer_ledger_recent", "debt_total", "debt_positive_total", "debt_snapshot_id", "debt_rows", "debt_snapshot_date", "top_debtors")),
         (("کالا", "محصول", "موجود", "انبار", "قیمت"), ("products_active", "products_zero_stock", "products_low_stock", "low_stock_items", "inventory_value", "price_list_note")),
         (("وظیفه", "تسک", "کارهای من", "عقب افتاده"), ("open_tasks", "overdue_tasks", "open_tasks_list")),
         (("پیش فاکتور", "پیش‌فاکتور", "پیشفاکتور"), ("my_proformas", "open_proformas")),
@@ -308,7 +312,13 @@ def context_for_question(conn, user, question, ctx):
 
     if len(selected) > 2:
         selected["amount_unit"] = "IRR"
-        selected["amount_note"] = "تمام مبالغ ریال هستند؛ نمایش تومان فقط با تقسیم بر ۱۰. ارزش موجودی حاصل موجودی × قیمت فروش فعلی است، نه بهای خرید یا سود. فروش خالص پس از برگشت و تخفیف و بدون مالیات است."
+        selected["amount_note"] = "تمام مبالغ ریال هستند؛ نمایش تومان فقط با تقسیم بر ۱۰."
+        if 'inventory_value' in selected:
+            selected['inventory_value_note'] = 'ارزش موجودی حاصل موجودی × قیمت فروش فعلی است، نه بهای خرید یا سود.'
+        if any(k.startswith('debt_') for k in selected):
+            selected['debt_note'] = 'مطالبات ماندهٔ مثبت در تاریخ آخرین تصویر بدهکاران است؛ با فروش دوره یا خالص فروش بدون مالیات یکی نیست. نبود snapshot یا خطای خواندن، نبود بدهکار را ثابت نمی‌کند.'
+        if any(k.startswith('sales_') for k in selected):
+            selected['sales_amount_note'] = 'فروش خالص پس از برگشت و تخفیف و بدون مالیات است.'
         if any(k.startswith('sales_') for k in selected) and ctx.get('sales_period'):
             selected['sales_period'] = ctx['sales_period']
 
@@ -488,6 +498,22 @@ def save_turn(user_id, user_msg, ai_msg, role="ceo"):
         logger.warning("history save failed: %s", type(e).__name__)
 
 
+
+def aggregate_answer(kind, ctx):
+    if kind == 'inventory_value':
+        if not ctx.get('products_active') or ctx.get('inventory_value') is None or ctx.get('inventory_missing_values') != 0 or not ctx.get('catalog_updated_at'):
+            return {'answer':'برای ارزش‌گذاری کامل، فهرست فعال کالاها و موجودی و قیمت معتبر همهٔ آن‌ها لازم است؛ دادهٔ ناقص را صفر فرض نمی‌کنم. دریافت هلو و کاتالوگ را بررسی کنید.', 'mode':'inventory_data_required', 'action':{'label':'بررسی کاتالوگ و موجودی','href':'/catalog'}}
+        answer = 'ارزش موجودی کالاهای فعال بر مبنای قیمت فروش جاری ' + money(ctx['inventory_value']) + '، معادل ' + toman(ctx['inventory_value']) + ' است.'
+        answer += ' این عدد بهای خرید، سود یا ارزش خالص قابل وصول نیست. تعداد کالای فعال: ' + fa_num(ctx['products_active']) + '.'
+        answer += ' آخرین به‌روزرسانی کاتالوگ: ' + business_date(ctx['catalog_updated_at']) + '.'
+        return {'answer':answer,'mode':'verified_inventory_value','action':{'label':'مشاهدهٔ کالاها و موجودی','href':'/catalog'}}
+    if not ctx.get('debt_snapshot_id') or not ctx.get('debt_snapshot_date') or ctx.get('debt_positive_total') is None or ctx.get('debt_rows') is None:
+        return {'answer':'تصویر معتبر بدهکاران برای این حساب تأیید نشد؛ این به معنی صفر بودن بدهی نیست. وضعیت دریافت هلو و گزارش بدهکاران را بررسی کنید.', 'mode':'debt_data_required','action':{'label':'گزارش بدهکاران','href':'/debtors'}}
+    answer = 'جمع ماندهٔ مثبت بدهکاران در آخرین تصویر ' + money(ctx['debt_positive_total']) + '، معادل ' + toman(ctx['debt_positive_total']) + ' است؛ ' + fa_num(ctx['debt_rows']) + ' طرف‌حساب بدهکار.'
+    answer += ' تاریخ تصویر بدهکاران: ' + business_date(ctx['debt_snapshot_date']) + '. این ماندهٔ حساب در تاریخ گزارش است، نه جمع فروش یک بازه.'
+    return {'answer':answer,'mode':'verified_debt_summary','action':{'label':'ریز صورت‌حساب بدهکاران','href':'/debtors'}}
+
+
 @router.post("/chat")
 def chat(req: ChatRequest, user: dict = Depends(require_user)):
     if is_staff_management_question(str(user.get("role", "unknown")), req.message):
@@ -515,10 +541,15 @@ def chat(req: ChatRequest, user: dict = Depends(require_user)):
             result = {'answer':'تارگت‌های خودت را می‌توانم بررسی کنم؛ تعریف یا تغییر تارگت نیازمند مدیر است.','mode':'access_limited'}
         save_turn(uid,req.message,result['answer'],role)
         return {**result,'user_role':role}
+    summary_kind = aggregate_question(question) if not execution_request else None
+    if summary_kind:
+        module = 'catalog' if summary_kind == 'inventory_value' else 'debtors'
+        if role not in MANAGER_ROLES or (role != 'ceo' and not role_has_module_permission(role, module, 'can_read')):
+            return {'answer':'جمع کل شرکت در محدودهٔ دسترسی این حساب نیست؛ گزارش‌های شخصی از مسیر مشتریان مرتبط قابل بررسی‌اند.','mode':'access_limited','user_role':role}
     with engine.connect() as conn:
         # Resolve catalog entities before loading company totals. The model cannot
         # substitute an unrelated aggregate for the requested brand or SKU.
-        if not execution_request and catalog_intent(question):
+        if not execution_request and not summary_kind and catalog_intent(question):
             if role not in {'ceo','finance','sales_manager'} and not role_has_module_permission(role,'catalog','can_read'):
                 return {'answer':'گزارش کالا در محدودهٔ دسترسی شما نیست.','mode':'access_limited','user_role':role}
             try:
@@ -550,7 +581,11 @@ def chat(req: ChatRequest, user: dict = Depends(require_user)):
                 save_turn(uid,req.message,answer,role)
                 return {'answer':answer,'mode':'catalog_clarification','user_role':role}
         ctx = build_live_context(conn, user)
-        relevant_ctx = context_for_question(conn, user, req.message, ctx)
+        relevant_ctx = context_for_question(conn, user, req.message, ctx) if not summary_kind else {}
+    if summary_kind:
+        result = aggregate_answer(summary_kind, ctx)
+        save_turn(uid, req.message, result['answer'], role)
+        return {**result, 'user_role':role}
     if question in {"سلام", "درود", "سلام دستیار"}:
         answer = "سلام! می‌توانم به سؤال‌های عمومی و آموزشی پاسخ بدهم و دربارهٔ اطلاعات کاریِ مجاز شما هم از دادهٔ ثبت‌شدهٔ سامانه کمک بگیرم."
         save_turn(uid, req.message, answer, user.get("role", "unknown"))

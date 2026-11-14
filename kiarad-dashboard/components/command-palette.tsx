@@ -7,6 +7,7 @@ type Destination = { label: string; href: string; icon: string; group: string };
 
 const DESTINATIONS: Destination[] = [
   { label: "مرکز فرماندهی", href: "/management", icon: "⚡", group: "عمومی" },
+  { label: "مدیریت سایت و فروشگاه", href: "/site-cms", icon: "🖥️", group: "فروش آنلاین" },
   { label: "برنامهٔ من", href: "/my-plan", icon: "📅", group: "عمومی" },
   { label: "برنامهٔ ماهانهٔ ویزیت", href: "/monthly-plans", icon: "🗓️", group: "عمومی" },
   { label: "ورود و منبع اطلاعات", href: "/data-entry", icon: "📥", group: "عمومی" },
@@ -37,7 +38,7 @@ const DESTINATIONS: Destination[] = [
 
 type Row = { key: string; label: string; href: string; icon: string; hint: string };
 
-export function CommandPalette() {
+export function CommandPalette({ canManageSite = false }: { canManageSite?: boolean }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
@@ -76,13 +77,14 @@ export function CommandPalette() {
     }
     const needle = q.replace(/[\u200c\s]/g, "");
     for (const item of DESTINATIONS) {
+      if (item.href === "/site-cms" && !canManageSite) continue;
       const haystack = (item.label + item.group).replace(/[\u200c\s]/g, "").toLowerCase();
       if (!needle || haystack.includes(needle.toLowerCase())) {
         result.push({ key: item.href, label: item.label, href: item.href, icon: item.icon, hint: item.group });
       }
     }
     return result.slice(0, 9);
-  }, [query]);
+  }, [query, canManageSite]);
 
 
   if (!open) return null;

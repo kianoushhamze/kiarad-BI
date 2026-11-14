@@ -10,6 +10,7 @@ import { CommandPalette } from "./command-palette";
 
 const menuGroups: { label: string; icon: string; href?: string; children?: string[][] }[] = [
   { label: "مرکز فرماندهی", icon: "⚡", href: "/management" },
+  { label: "مدیریت سایت و فروشگاه", icon: "🖥️", href: "/site-cms" },
   { label: "برنامهٔ من", icon: "📅", href: "/my-plan" },
   { label: "فروش و مشتریان", icon: "📈", children: [
     ["عملکرد ویزیتورها (تب داشبورد مدیریت)", "/management", "📊"],
@@ -49,8 +50,7 @@ const menuGroups: { label: string; icon: string; href?: string; children?: strin
   { label: "فروش آنلاین", icon: "🛒", children: [
     ["مدیریت کانال‌های آنلاین", "/online-sales", "🛒"],
     ["نگاشت دیجی‌کالا", "/digikala-mapping", "🧩"],
-    ["مدیریت سکوهای فروش", "/platforms", "🏬"],
-    ["مدیریت سایت", "/site-cms", "🖥️"]
+    ["مدیریت سکوهای فروش", "/platforms", "🏬"]
   ]},
   { label: "هوش مصنوعی", icon: "🤖", children: [
     ["مرکز فرمان تخصصی", "/agent-center", "✨"],
@@ -210,7 +210,7 @@ export function PortalShell({ title, eyebrow, actions, children }: { title: stri
 
   if (!ready) return <div dir="rtl" className="grid min-h-screen place-items-center bg-[#08070b] p-6 text-sm text-slate-400"><div role={sessionError ? "alert" : "status"}>{sessionError || "در حال بررسی دسترسی…"}{sessionError && <button onClick={()=>{setSessionError("");setSessionRetry(n=>n+1);}} className="mr-3 rounded-lg bg-violet-600 px-4 py-2 text-white">تلاش مجدد</button>}</div></div>;
   return <div dir="rtl" className={`kiarad-module-shell min-h-screen bg-[#08070b] text-slate-200${embedded ? " kiarad-module-embedded" : ""}`}>
-    <CommandPalette />
+    <CommandPalette canManageSite={user?.role === "ceo"} />
     <div className="pointer-events-none fixed inset-0 bg-[radial-gradient(640px_360px_at_84%_-8%,rgba(139,124,255,.22),transparent_62%),radial-gradient(520px_300px_at_6%_106%,rgba(94,197,255,.1),transparent_60%),radial-gradient(460px_280px_at_50%_55%,rgba(61,220,151,.04),transparent_65%)]" />
     {!embedded && <aside className="fixed inset-y-0 right-0 z-40 hidden w-[245px] flex-col border-l border-white/[0.06] bg-[#0d0b16]/85 backdrop-blur-2xl lg:flex">
       <Link href={homeHref} className="flex h-[76px] items-center gap-3 border-b border-white/[0.06] px-5">
