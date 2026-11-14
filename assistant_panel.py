@@ -17,6 +17,9 @@ RESOURCES={
  'treasury_excel':('treasury','/treasury/excel/reports'),
  'debtors':('debtors','/treasury/debtors'),
  'online_channels':('online-sales','/integrations'),
+ 'site_products':('site-cms','/site-cms/products'),
+ 'site_orders':('site-cms','/site-orders/all'),
+ 'site_banners':('site-cms','/site-cms/banners'),
  'social_calendar':('social','/integrations/content-calendar'),
  'map_locations':('map','/operations/locations/latest'),
  'map_routes':('map','/api/compensation/visit-routes'),
@@ -121,7 +124,7 @@ def read_panel(args,user):
     a=PanelReadArgs.model_validate(args)
     if a.resource=='capabilities':
         return {'resources':[{'resource':key,'module':module} for key,(module,_) in RESOURCES.items()
-            if user.get('role')=='ceo' or role_has_module_permission(user.get('role',''),module,'can_read')],
+            if user.get('role')=='ceo' or (module!='site-cms' and role_has_module_permission(user.get('role',''),module,'can_read'))],
             'note':'هر منبع با احراز هویت خود کاربر خوانده می‌شود؛ نبود دیتای اتصال، مجوز حدس آمار نیست.'}
     if a.resource not in RESOURCES:raise HTTPException(422,'منبع خواندن پشتیبانی نمی‌شود.')
     module,path=RESOURCES[a.resource]
@@ -135,7 +138,7 @@ def read_panel(args,user):
         if not value:
             raise HTTPException(422,f'شناسهٔ {name} را از گزارش واقعی انتخاب کنید؛ حدس زدن مجاز نیست.')
         path=path.replace('{'+name+'}',str(value));consumed.add(name)
-    if user.get('role')!='ceo' and not role_has_module_permission(user.get('role',''),module,'can_read'):
+    if user.get('role')!='ceo' and (module=='site-cms' or not role_has_module_permission(user.get('role',''),module,'can_read')):
         raise HTTPException(403,'این ماژول در دسترسی شما نیست.')
     session=requests.Session();session.trust_env=False
     response=session.get('http://127.0.0.1:8000'+path,

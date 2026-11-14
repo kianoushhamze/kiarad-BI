@@ -245,7 +245,8 @@ export default function SiteCmsPage() {
     </PortalShell>;
   }
 
-  return <PortalShell title="مدیریت سایت" eyebrow="داشبورد مدیریت سایت عمومی">
+  return <PortalShell title="مدیریت سایت و فروشگاه" eyebrow="کالاها، محتوا و سفارش‌های فروشگاه">
+    <Surface className="mb-4 p-4"><h2 className="text-sm font-bold text-white">مدیریت فروشگاه از همین پنل</h2><p className="mt-2 text-xs leading-6 text-slate-400">کالاها و موجودی از کاتالوگ مشترک کیاراد خوانده می‌شوند. در این صفحه قیمت نمایشی، تصویر و محتوای سایت را مدیریت و سفارش‌های ثبت‌شدهٔ فروشگاه را پیگیری کنید.</p><a href="#site-orders" className="mt-3 inline-block text-xs text-violet-300">مشاهدهٔ سفارش‌های سایت ↓</a></Surface>
     <div className="mb-4 flex flex-wrap items-end gap-3">
       <div>
         <label className="block text-xs text-slate-400">جست‌وجو (کد یا نام)</label>
@@ -388,7 +389,7 @@ export default function SiteCmsPage() {
 
     <Surface className="mt-6 overflow-hidden">
       <div className="flex items-center justify-between p-4">
-        <h2 className="text-sm font-bold text-white">سفارش‌های سایت</h2>
+        <h2 id="site-orders" className="scroll-mt-24 text-sm font-bold text-white">سفارش‌های سایت</h2>
         <button onClick={() => void loadOrders()} className="rounded-lg border border-white/10 px-3 py-1.5 text-[10px] text-slate-300 hover:bg-white/[0.05]">به‌روزرسانی</button>
       </div>
       <div className="overflow-x-auto">

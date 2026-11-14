@@ -36,6 +36,18 @@ def catalog_intent(question):
     return any(word in q for word in ("برند", "موجودی", "انبار", "کاردکس", "کالا", "محصول", "سفارش", "قیمت"))
 
 
+
+def aggregate_question(question):
+    """Recognize whole-company totals without swallowing named products or date filters."""
+    q = normalize(question).strip('؟?!. ')
+    suffix = r'(?: (?:چقدره|چقدر است|چقدر هست|چنده|چند است|چقدر میشه|را بگو|رو بگو))?'
+    if re.fullmatch(r'(?:ارزش(?: ریالی| کل)?|قیمت کل) (?:کل )?(?:موجودی )?انبار' + suffix, q):
+        return 'inventory_value'
+    if re.fullmatch(r'(?:(?:صورت حساب|صورتحساب|جمع|مجموع|مبلغ|مانده|کل) )?(?:کل )?(?:بدهکاران|مطالبات|بدهی مشتریان)' + suffix, q):
+        return 'debt_summary'
+    return None
+
+
 def question_window(question, today):
     q=normalize(question).translate(str.maketrans('۰۱۲۳۴۵۶۷۸۹٠١٢٣٤٥٦٧٨٩','01234567890123456789'))
     match=re.search(r'(\d{1,3})\s*روز',q)
