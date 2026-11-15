@@ -14,6 +14,7 @@ from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy import text
 
 from db import engine
+from stock_reservations import reservation_totals, reserved_quantity
 from operations import current_user, role_has_module_permission
 
 logger = logging.getLogger("kiarad_platforms")
@@ -155,18 +156,17 @@ def _create_platform_order_proforma(conn, platform: str, order_ref: str, items: 
     return proforma_id
 
 
-def holoo_stock(conn, code: str) -> int:
-    return int(conn.execute(text("SELECT COALESCE(stock,0) FROM products WHERE code=:c"), {"c": code}).scalar() or 0)
+def holoo_stock(conn, code: str) -> float:
+    return float(conn.execute(text("SELECT COALESCE(stock,0) FROM products WHERE code=:c"), {"c": code}).scalar() or 0)
 
 
-def reserved_count(conn, code: str) -> int:
-    return int(conn.execute(text(
-        "SELECT COALESCE(SUM(qty),0) FROM platform_reservations WHERE code=:c AND status='active'"),
-        {"c": code}).scalar() or 0)
+def reserved_count(conn, code: str) -> float:
+    product_id = conn.execute(text('SELECT id FROM products WHERE code=:code'), {'code': code}).scalar()
+    return reserved_quantity(conn, product_id) if product_id is not None else 0.0
 
 
 def available_stock(conn, code: str) -> int:
-    return max(0, holoo_stock(conn, code) - reserved_count(conn, code))
+    return int(max(0, holoo_stock(conn, code) - reserved_count(conn, code)))
 
 
 def auto_price_irr(conn, code: str, factor=1.0) -> int | None:
@@ -325,14 +325,16 @@ def overview(user: dict = Depends(current_user)):
     with engine.begin() as conn:
         ensure(conn)
         rows = conn.execute(text("""
-            SELECT l.*, COALESCE(p.stock,0) AS holoo_stock,
-                   COALESCE(p.name,'') AS product_name,
-                   COALESCE(p.stock,0) - COALESCE((SELECT SUM(qty) FROM platform_reservations r
-                       WHERE r.code=l.code AND r.status='active'),0) AS available
+            SELECT l.*, p.id AS product_id, COALESCE(p.stock,0) AS holoo_stock,
+                   COALESCE(p.name,'') AS product_name
             FROM platform_listings l LEFT JOIN products p ON p.code=l.code
             ORDER BY l.platform, p.name
         """)).mappings().all()
-    return {"items": [dict(r) for r in rows]}
+        items = [dict(r) for r in rows]
+        totals = reservation_totals(conn, [r['product_id'] for r in items if r['product_id'] is not None])
+        for item in items:
+            item['available'] = int(max(0, float(item['holoo_stock']) - totals.get(item['product_id'], 0)))
+    return {"items": items}
 
 
 @router.post("/listing")

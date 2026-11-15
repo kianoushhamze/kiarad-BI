@@ -18,6 +18,7 @@ from sqlalchemy.exc import SQLAlchemyError
 # ----------------------------------------------------------------------------
 
 from db import engine
+from stock_reservations import reservation_totals
 from iran_time import iran_today, iran_month_bounds
 from assistant_engine import router as assistant_router
 from operations import (
@@ -412,7 +413,7 @@ def public_catalog():
             conn.execute(text("ALTER TABLE cms_product_meta ADD COLUMN IF NOT EXISTS discount_price_irr BIGINT"))
             rows = conn.execute(text(
                 """
-                SELECT p.code, p.name,
+                SELECT p.id, p.code, p.name,
                        COALESCE(NULLIF(m.site_category, ''), p.category) AS category,
                        p.price, p.stock, m.image_url, m.discount_price_irr, NOW() AS generated_at
                 FROM products p
@@ -421,10 +422,17 @@ def public_catalog():
                 ORDER BY p.name
                 """
             )).mappings().all()
+            totals = reservation_totals(conn, [r['id'] for r in rows])
+            products = []
+            for row in rows:
+                item = dict(row)
+                product_id = item.pop('id')
+                item['stock'] = max(0, float(item['stock'] or 0) - totals.get(product_id, 0))
+                products.append(item)
         return {
             "store": {"name": "Ordibeauty", "tagline": "اردی‌بیوتی — زیبایی اورجینال، با قیمت و موجودی زنده"},
             "currency": "IRR",
-            "products": [dict(r) for r in rows],
+            "products": products,
         }
     except SQLAlchemyError:
         raise HTTPException(status_code=503, detail="catalog unavailable")

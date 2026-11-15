@@ -58,6 +58,11 @@ SAFE_KEYS = {
 
 
 def ensure_financial_snapshot_schema(conn):
+    if conn.execute(text("SELECT to_regclass('holoo_financial_snapshots')")).scalar() is not None:
+        return
+    # IF NOT EXISTS alone cannot serialize concurrent PostgreSQL catalog writes
+    # on the first two treasury requests. Hold this lock until DDL is committed.
+    conn.execute(text("SELECT pg_advisory_xact_lock(hashtextextended('kiarad:financial-snapshot-schema',0))"))
     conn.execute(text("""CREATE TABLE IF NOT EXISTS holoo_financial_snapshots (
         id BIGSERIAL PRIMARY KEY, captured_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
         payload JSONB NOT NULL, source_hash VARCHAR(64) NOT NULL)"""))

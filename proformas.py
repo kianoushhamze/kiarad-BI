@@ -11,6 +11,7 @@ from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field
 from sqlalchemy import text
 from db import engine
+from stock_reservations import reservation_totals, reserved_quantity
 from iran_time import iran_today
 from operations import MANAGER_ROLES, current_user, require_manager
 from daily_proforma_export import EXPORT_DIR, build_export
@@ -177,19 +178,15 @@ def get_customer_directory(q: Optional[str] = Query(default=None, max_length=100
 def get_products_dropdown():
     with engine.connect() as conn:
         rows = conn.execute(text("""
-            SELECT p.id, p.code, p.name, p.price, p.price2, p.stock, p.category,
-                   GREATEST(0, COALESCE(p.stock, 0) - COALESCE(r.reserved_quantity, 0)) AS available_stock,
-                   COALESCE(r.reserved_quantity, 0) AS reserved_quantity
+            SELECT p.id, p.code, p.name, p.price, p.price2, p.stock, p.category
             FROM products p
-            LEFT JOIN (
-                SELECT product_id, SUM(quantity) AS reserved_quantity
-                FROM inventory_reservations
-                WHERE status = 'reserved'
-                GROUP BY product_id
-            ) r ON r.product_id = p.id
             ORDER BY p.category, p.name LIMIT 5000
         """)).mappings().all()
         res = [dict(r) for r in rows]
+        totals = reservation_totals(conn, [r['id'] for r in res])
+        for product in res:
+            product['reserved_quantity'] = totals.get(product['id'], 0)
+            product['available_stock'] = max(0, float(product['stock'] or 0) - product['reserved_quantity'])
         return res
 
 # ۳. استخراج معین حساب مشتری از اسناد و فاکتورهای هلو
@@ -445,14 +442,12 @@ def create_proforma(data: ProformaCreate, user: dict = Depends(current_user)):
                     raise HTTPException(status_code=422, detail="هر کالا را فقط در یک سطر وارد کنید")
                 seen_product_ids.add(product_id)
                 product = conn.execute(text("""
-                    SELECT p.name, p.price, p.price2, p.stock,
-                           COALESCE((SELECT SUM(ir.quantity) FROM inventory_reservations ir
-                                    WHERE ir.product_id=p.id AND ir.status='reserved'), 0) AS reserved_quantity
+                    SELECT p.name, p.price, p.price2, p.stock
                     FROM products p WHERE p.id=:id FOR UPDATE
                 """), {"id": product_id}).mappings().first()
                 if not product:
                     raise HTTPException(status_code=404, detail="کالا یافت نشد")
-                available_stock = float(product["stock"] or 0) - float(product["reserved_quantity"] or 0)
+                available_stock = float(product["stock"] or 0) - reserved_quantity(conn, product_id)
                 if quantity > available_stock:
                     raise HTTPException(
                         status_code=409,

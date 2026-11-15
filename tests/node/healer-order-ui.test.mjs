@@ -18,6 +18,7 @@ function setup(fetch) {
     setCoErr(message) { ctx.message = message; },
     toast(message) { ctx.message = message; },
     closeDrawer() {}, paintAuth() {}, renderDrawer() {}, saveCart() {}, paintCart() {},
+    refreshData() { ctx.catalogRefreshes = (ctx.catalogRefreshes || 0) + 1; },
   };
   vm.createContext(ctx);
   vm.runInContext(page.slice(start, end), ctx);
@@ -33,6 +34,7 @@ function setup(fetch) {
   await pending;
   assert.equal(ctx.lastOrder.order_id, 5);
   assert.equal(ctx.cart.items.length, 0);
+  assert.equal(ctx.catalogRefreshes, 1, 'confirmed checkout refreshes sellable stock');
 }
 for (const fetch of [
   async () => { throw new Error('offline'); },
@@ -43,6 +45,7 @@ for (const fetch of [
   assert.equal(ctx.cart.items.length, 1);
   assert.equal(ctx.lastOrder, undefined);
   assert.equal(ctx.orderPending, false);
+  assert.equal(ctx.catalogRefreshes, undefined, 'failed checkout must preserve the existing cart/catalog');
   assert.equal(button.disabled, false);
   assert.ok(ctx.message);
 }
