@@ -152,12 +152,6 @@ jobs:
       - run: python -m playwright install --with-deps chromium
       - name: Render handbook with local Persian fonts
         run: python scripts/build_training_pdf.py --output "$RUNNER_TEMP/handbook"
-      - uses: actions/upload-artifact@v4
-        with:
-          name: Kiarad-Training-Manual
-          path: ${{ runner.temp }}/handbook/
-          if-no-files-found: error
-          retention-days: 30
 
   powershell-51-compat:
     name: Windows PowerShell 5.1 transfer-kit compatibility
@@ -197,6 +191,8 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw 'Windows PowerShell 5.1 transfer-kit guards failed.' }
 
   transfer-kit:
+    permissions:
+      contents: write
     name: Build and verify transfer kit
     needs: [backend-offline-tests, frontend-build, cms-and-storefront-regressions, storefront-browser, training-manual, powershell-51-compat]
     runs-on: ubuntu-latest
@@ -208,26 +204,25 @@ jobs:
           python-version: '3.12'
       - name: Build kit from exact checked-out Git tree
         run: python scripts/build_transfer_kit.py --output "$RUNNER_TEMP/Kiarad-Transfer-20261113"
-      - name: Download same-run training manual
-        uses: actions/download-artifact@v4
-        with:
-          pattern: Kiarad-Training-Manual
-          path: ${{ runner.temp }}/release-extras
+      - name: Render same-source manual without Actions storage
+        run: |
+          pip install playwright==1.58.0
+          python -m playwright install --with-deps chromium
+          python scripts/build_training_pdf.py --output "$RUNNER_TEMP/release-extras/Kiarad-Training-Manual"
       - name: Attach checksummed training deliverables
         run: python scripts/attach_release_extras.py --kit "$RUNNER_TEMP/Kiarad-Transfer-20261113" --extras "$RUNNER_TEMP/release-extras"
       - name: Verify kit and guards
         shell: pwsh
         run: ./tests/test_transfer_kit.ps1 -KitRoot (Join-Path $env:RUNNER_TEMP 'Kiarad-Transfer-20261113') -DockerGuards
-      - name: Upload private repository transfer artifact
-        if: github.ref == 'refs/heads/main' || github.event_name == 'pull_request'
-        uses: actions/upload-artifact@v4
-        with:
-          name: Kiarad-Transfer-20261113
-          path: ${{ runner.temp }}/Kiarad-Transfer-20261113/
-          if-no-files-found: error
-          retention-days: 30
+      - name: Archive verified package in a draft Release
+        if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python scripts/publish_ci_package.py --kit "$RUNNER_TEMP/Kiarad-Transfer-20261113"
 
   offline-images:
+    permissions:
+      contents: write
     name: Build Linux images and verify offline stack
     if: github.ref == 'refs/heads/main' || github.event_name == 'pull_request'
     needs: [transfer-kit]
@@ -240,20 +235,18 @@ jobs:
           python-version: '3.12'
       - name: Build images, smoke test containers and export exact release
         run: bash scripts/ci_build_offline_transfer.sh
-      - name: Download same-run training manual
-        uses: actions/download-artifact@v4
-        with:
-          pattern: Kiarad-Training-Manual
-          path: ${{ runner.temp }}/release-extras
+      - name: Render same-source manual without Actions storage
+        run: |
+          pip install playwright==1.58.0
+          python -m playwright install --with-deps chromium
+          python scripts/build_training_pdf.py --output "$RUNNER_TEMP/release-extras/Kiarad-Training-Manual"
       - name: Attach checksummed training deliverables
         run: python scripts/attach_release_extras.py --kit "$RUNNER_TEMP/Kiarad-Transfer-20261113-Offline" --extras "$RUNNER_TEMP/release-extras"
       - name: Verify offline kit and guards
         shell: pwsh
         run: ./tests/test_transfer_kit.ps1 -KitRoot (Join-Path $env:RUNNER_TEMP 'Kiarad-Transfer-20261113-Offline') -DockerGuards
-      - name: Upload private offline transfer kit
-        uses: actions/upload-artifact@v4
-        with:
-          name: Kiarad-Transfer-20261113-Offline
-          path: ${{ runner.temp }}/Kiarad-Transfer-20261113-Offline/
-          if-no-files-found: error
-          retention-days: 7
+      - name: Archive verified package in a draft Release
+        if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python scripts/publish_ci_package.py --kit "$RUNNER_TEMP/Kiarad-Transfer-20261113-Offline"

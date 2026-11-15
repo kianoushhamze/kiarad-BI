@@ -67,6 +67,7 @@ def build(root, snapshot, output, evidence=None, provisional=False):
     handoffs = {'docs/General_Debug_20261112.md', 'docs/Completion_Validation_20261113.md',
                 'docs/Traccar_Bridge_Handoff_20261113.md', 'docs/Software_Finalization_20261114.md',
                 'docs/Offsite_Review_20261115.md', 'docs/Offsite_Upgrade_Plan_20261115.md',
+                'docs/Release_Delivery_20261115.md',
                 'docs/Company_Deployment_Handoff_20261114.md', 'docs/Connection_Recheck_20261114.md'}
     with zipfile.ZipFile(output / 'source.zip') as archive:
         for name in archive.namelist():
