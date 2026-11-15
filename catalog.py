@@ -7,6 +7,7 @@ from pydantic import BaseModel, Field, ConfigDict
 from sqlalchemy import text
 
 from db import engine
+from stock_reservations import reservation_totals, reserved_quantity
 from operations import current_user
 from data_sources import ensure_source_storage, save_manual_fields, restore_holoo_fields
 
@@ -110,17 +111,16 @@ def products(user=Depends(reader)):
         rows = conn.execute(text("""
             SELECT p.id, p.code, p.name, p.category, p.price, p.price2, p.stock, p.min_stock,
                    p.is_active, p.updated_at,
-                   ARRAY(SELECT o.field FROM data_field_overrides o WHERE o.entity='products' AND o.local_id=p.id ORDER BY o.field) AS manual_fields,
-                   COALESCE(r.reserved_quantity, 0) AS reserved_quantity,
-                   GREATEST(0, COALESCE(p.stock, 0) - COALESCE(r.reserved_quantity, 0)) AS available_stock
+                   ARRAY(SELECT o.field FROM data_field_overrides o WHERE o.entity='products' AND o.local_id=p.id ORDER BY o.field) AS manual_fields
             FROM products p
-            LEFT JOIN (
-                SELECT product_id, SUM(quantity) AS reserved_quantity
-                FROM inventory_reservations WHERE status='reserved' GROUP BY product_id
-            ) r ON r.product_id=p.id
             ORDER BY p.id
         """)).mappings().all()
-    return {"items": [dict(r) for r in rows]}
+        items = [dict(r) for r in rows]
+        totals = reservation_totals(conn, [r['id'] for r in items])
+        for product in items:
+            product['reserved_quantity'] = totals.get(product['id'], 0)
+            product['available_stock'] = max(0, float(product['stock'] or 0) - product['reserved_quantity'])
+    return {"items": items}
 
 @router.patch("/products/{product_id}")
 def update_product(product_id: int, data: ProductUpdate, user=Depends(manager)):
@@ -166,7 +166,7 @@ def reserve(product_id: int, data: Reservation, user=Depends(manager)):
     with engine.begin() as conn:
         product=conn.execute(text('SELECT stock FROM products WHERE id=:id FOR UPDATE'),{'id':product_id}).mappings().first()
         if not product:raise HTTPException(404,'کالا پیدا نشد.')
-        reserved=conn.execute(text("SELECT COALESCE(SUM(quantity),0) FROM inventory_reservations WHERE product_id=:id AND status='reserved'"),{'id':product_id}).scalar()
+        reserved=reserved_quantity(conn, product_id)
         if data.quantity>float(product['stock'] or 0)-float(reserved or 0):
             raise HTTPException(409,'موجودی آزاد برای این رزرو کافی نیست.')
         try:

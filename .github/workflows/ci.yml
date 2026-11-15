@@ -190,11 +190,57 @@ jobs:
           & .\tests\test_transfer_kit.ps1 -KitRoot $kit
           if ($LASTEXITCODE -ne 0) { throw 'Windows PowerShell 5.1 transfer-kit guards failed.' }
 
+  business-journeys:
+    name: Real API and browser business journeys
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: kiarad_e2e
+          POSTGRES_PASSWORD: ci-disposable-journey-only
+          POSTGRES_DB: kiarad_e2e_ci
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U kiarad_e2e -d kiarad_e2e_ci"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      DB_HOST: 127.0.0.1
+      DB_PORT: '5432'
+      DB_USER: kiarad_e2e
+      DB_NAME: kiarad_e2e_ci
+      POSTGRES_PASSWORD: ci-disposable-journey-only
+      KIARAD_REVIEW_DISPOSABLE_DB: '1'
+      KIARAD_API_URL: http://127.0.0.1:58810
+      NEXT_PUBLIC_API_URL: http://127.0.0.1:58810
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: kiarad-dashboard/package-lock.json
+      - run: pip install -r requirements.txt playwright==1.65.0
+      - run: python -m playwright install --with-deps chromium
+      - run: npm ci
+        working-directory: kiarad-dashboard
+      - run: npm run build
+        working-directory: kiarad-dashboard
+      - name: Run real login, role, stock, visit, task and checkout journeys
+        run: python scripts/run_business_journeys.py --output "$RUNNER_TEMP/business-journeys"
+
   transfer-kit:
     permissions:
       contents: write
     name: Build and verify transfer kit
-    needs: [backend-offline-tests, frontend-build, cms-and-storefront-regressions, storefront-browser, training-manual, powershell-51-compat]
+    needs: [backend-offline-tests, frontend-build, cms-and-storefront-regressions, storefront-browser, training-manual, powershell-51-compat, business-journeys]
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     steps:

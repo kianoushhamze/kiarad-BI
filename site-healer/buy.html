@@ -865,6 +865,7 @@ body{background:radial-gradient(ellipse at 95% 12%,#f0dce1 0,transparent 38%),va
       lastOrder = d;
       step = 1;
       renderDrawer();
+      if (healerMode) refreshData();
     }).catch(function (ex) {
       if (healerMode) {
         orderPending = false;

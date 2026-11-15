@@ -12,6 +12,7 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator
 from sqlalchemy import text
 
 from db import engine
+from stock_reservations import reservation_totals
 from iran_time import iran_today
 from operations import current_user
 from inventory_intelligence import analyze_inventory
@@ -469,8 +470,8 @@ def load_inventory(conn,days):
     maps=conn.execute(text("SELECT local_id,holoo_erp_code FROM holoo_entity_mappings WHERE entity_type='product'")).mappings().all()
     by_erp={}
     for row in maps:by_erp.setdefault(row['holoo_erp_code'],[]).append(row['local_id'])
-    reserve_table=conn.execute(text("SELECT to_regclass('inventory_reservations') IS NOT NULL")).scalar()
-    reserves={r['product_id']:r['q'] for r in conn.execute(text("SELECT product_id,SUM(quantity) AS q FROM inventory_reservations WHERE status='reserved' GROUP BY product_id")).mappings()} if reserve_table else {}
+    reserve_table=conn.execute(text("SELECT to_regclass('inventory_reservations') IS NOT NULL OR to_regclass('platform_reservations') IS NOT NULL")).scalar()
+    reserves=reservation_totals(conn) if reserve_table else {}
     reservations={code:reserves.get(ids[0],0) for code,ids in by_erp.items() if len(ids)==1} if reserve_table else {}
     if reserve_table and not reserves:
         # A complete but empty reservation table proves zero without SKU mapping.
