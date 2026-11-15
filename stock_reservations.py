@@ -2,6 +2,16 @@
 from sqlalchemy import bindparam, inspect, text
 
 
+def lock_products(conn, *, product_ids=None, codes=None):
+    """Every multi-product writer acquires product rows in database ID order."""
+    keys = product_ids if product_ids is not None else codes
+    if not keys:
+        return
+    column = 'id' if product_ids is not None else 'code'
+    statement = text(f'SELECT id FROM products WHERE {column} IN :keys ORDER BY id FOR UPDATE')
+    conn.execute(statement.bindparams(bindparam('keys', expanding=True)), {'keys': list(set(keys))}).all()
+
+
 def reservation_totals(conn, product_ids=None):
     if product_ids is not None and not product_ids:
         return {}

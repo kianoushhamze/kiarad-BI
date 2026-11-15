@@ -28,6 +28,9 @@ _PHONE_RE = re.compile(r"^09\d{9}$")
 
 
 def ensure(conn):
+    if conn.execute(text("SELECT to_regclass('site_customers')")).scalar() is not None:
+        return
+    conn.execute(text("SELECT pg_advisory_xact_lock(hashtextextended('kiarad:site-customer-schema',0))"))
     conn.execute(text("""
         CREATE TABLE IF NOT EXISTS site_customers(
             id SERIAL PRIMARY KEY,
@@ -114,19 +117,17 @@ class LoginIn(BaseModel):
 
 @router.post("/register")
 def register(data: RegisterIn):
+    _secret()
     email, phone = _normalize_contact(data.contact)
     with engine.begin() as conn:
         ensure(conn)
-        dup = conn.execute(text(
-            "SELECT 1 FROM site_customers WHERE (:e IS NOT NULL AND email = :e) OR (:p IS NOT NULL AND phone = :p)"
-        ), {"e": email, "p": phone}).first()
-        if dup:
-            raise HTTPException(409, "این ایمیل یا شماره قبلاً ثبت شده است؛ وارد شوید.")
         row = conn.execute(text(
             "INSERT INTO site_customers(email, phone, name, password_hash) "
-            "VALUES (:e, :p, :n, :h) RETURNING id"
+            "VALUES (:e, :p, :n, :h) ON CONFLICT DO NOTHING RETURNING id"
         ), {"e": email, "p": phone, "n": data.name.strip(),
             "h": hash_password(data.password)}).mappings().first()
+        if not row:
+            raise HTTPException(409, "این ایمیل یا شماره قبلاً ثبت شده است؛ وارد شوید.")
     return {"token": create_site_token(int(row["id"])), "name": data.name.strip()}
 
 

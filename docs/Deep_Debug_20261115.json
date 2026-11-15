@@ -1,0 +1,78 @@
+{
+  "scope": "real HTTP and production-browser journeys on synthetic local data",
+  "company_data_used": false,
+  "checks": [
+    {
+      "name": "concurrent_cold_registration_and_duplicate_conflict",
+      "passed": true
+    },
+    {
+      "name": "concurrent_first_financial_snapshot_requests",
+      "passed": true
+    },
+    {
+      "name": "real_login_and_role_boundaries",
+      "passed": true
+    },
+    {
+      "name": "proforma_storefront_stock_approval_cancel_and_retry",
+      "passed": true
+    },
+    {
+      "name": "concurrent_cross_channel_last_units",
+      "passed": true
+    },
+    {
+      "name": "sixteen_parallel_two_sku_checkouts_and_invalid_numeric_input",
+      "passed": true
+    },
+    {
+      "name": "visit_plan_checkin_evidence_and_manager_visibility",
+      "passed": true
+    },
+    {
+      "name": "source_backed_assistant_financial_questions",
+      "passed": true
+    },
+    {
+      "name": "browser_ceo_assign_worker_report_ceo_approve",
+      "passed": true
+    },
+    {
+      "name": "browser_proforma_create_reload_cancel_restores_stock",
+      "passed": true
+    },
+    {
+      "name": "browser_role_routes_desktop_mobile_no_runtime_crash",
+      "passed": true
+    },
+    {
+      "name": "browser_registration_checkout_and_same_database_receipt",
+      "passed": true
+    },
+    {
+      "name": "password_change_revokes_own_browser_session_preserves_other_user",
+      "passed": true
+    }
+  ],
+  "passed": true,
+  "limits": [
+    "No real ERP/model/channel requests",
+    "No physical GPS or company-server acceptance"
+  ],
+  "verification": {
+    "postgresql": {
+      "groups": 31,
+      "tests": 371,
+      "passed": true
+    },
+    "offline": {
+      "run": 935,
+      "skipped": 292,
+      "failures": 0,
+      "errors": 0
+    }
+  },
+  "review_date": "2026-11-15",
+  "company_acceptance_complete": false
+}

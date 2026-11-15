@@ -7,7 +7,10 @@ from typing import Optional
 from uuid import uuid4
 
 import jwt
+import math
 from fastapi import Depends, FastAPI, HTTPException, Header, Request, UploadFile
+from fastapi.encoders import jsonable_encoder
+from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse
 from sqlalchemy import text
@@ -42,6 +45,18 @@ from data_entry import router as data_entry_router
 # App setup
 # ----------------------------------------------------------------------------
 app = FastAPI(title="Kiarad BI API")
+
+
+@app.exception_handler(RequestValidationError)
+async def validation_error_response(request: Request, exc: RequestValidationError):
+    # Valid JSON exponents such as 1e309 overflow Python floats. Reporting the
+    # rejected value as an infinite JSON number would itself raise a 500.
+    errors = jsonable_encoder(exc.errors(), custom_encoder={
+        float: lambda value: value if math.isfinite(value) else str(value),
+    })
+    return JSONResponse(status_code=422, content={'detail': errors})
+
+
 from agent_center import router as agent_center_router
 from live_tracking import router as live_tracking_router
 app.include_router(agent_center_router)

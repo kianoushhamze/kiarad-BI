@@ -18,6 +18,7 @@ $groups = @(
   @{ File = "test_base_registry.py"; Flag = "KIARAD_TEST_BASE_REGISTRY_DB" },
   @{ File = "test_base_route_workflow.py"; Flag = "KIARAD_TEST_BASE_ROUTE_DB" },
   @{ File = "test_data_entry.py"; Flag = "KIARAD_TEST_TREASURY_DB" },
+  @{ File = "test_deep_checkout_concurrency.py"; Flag = "KIARAD_TEST_DEEP_CHECKOUT_DB" },
   @{ File = "test_field_day_workflow.py"; Flag = "KIARAD_TEST_PAYROLL_DB" },
   @{ File = "test_field_intelligence.py"; Flag = "KIARAD_TEST_TREASURY_DB" },
   @{ File = "test_holoo_operational_sync.py"; Flag = "KIARAD_TEST_TREASURY_DB" },

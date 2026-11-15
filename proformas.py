@@ -8,10 +8,10 @@ from pathlib import Path
 from typing import Optional, List, Dict, Any
 from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import FileResponse
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy import text
 from db import engine
-from stock_reservations import reservation_totals, reserved_quantity
+from stock_reservations import lock_products, reservation_totals, reserved_quantity
 from iran_time import iran_today
 from operations import MANAGER_ROLES, current_user, require_manager
 from daily_proforma_export import EXPORT_DIR, build_export
@@ -80,9 +80,10 @@ class LocationRecord(BaseModel):
     activity: Optional[str] = "visiting"
 
 class ProformaCreate(BaseModel):
+    model_config = ConfigDict(allow_inf_nan=False)
     customer_id: int
     salesperson_id: Optional[int] = None
-    total_amount: Optional[float] = Field(default=None, gt=0)
+    total_amount: Optional[float] = Field(default=None, gt=0, lt=10**16)
     notes: Optional[str] = None
     items: List[Dict[str, Any]] = Field(default_factory=list)
 
@@ -430,17 +431,26 @@ def create_proforma(data: ProformaCreate, user: dict = Depends(current_user)):
         normalized_items = []
         seen_product_ids = set()
         if data.items:
+            parsed_items = []
             for item in data.items:
                 try:
-                    product_id = int(item.get("product_id"))
+                    raw_id = item.get('product_id')
+                    if isinstance(raw_id, bool) or (isinstance(raw_id, float) and not raw_id.is_integer()):
+                        raise ValueError()
+                    product_id = int(raw_id)
+                    if product_id <= 0 or isinstance(item.get('quantity'), bool):
+                        raise ValueError()
                     quantity = float(item.get("quantity"))
-                except (TypeError, ValueError):
+                except (TypeError, ValueError, OverflowError):
                     raise HTTPException(status_code=422, detail="قلم پیش‌فاکتور نامعتبر است")
                 if not math.isfinite(quantity) or quantity <= 0:
                     raise HTTPException(status_code=422, detail="تعداد هر کالا باید بیشتر از صفر باشد")
                 if product_id in seen_product_ids:
                     raise HTTPException(status_code=422, detail="هر کالا را فقط در یک سطر وارد کنید")
                 seen_product_ids.add(product_id)
+                parsed_items.append((product_id, quantity, item))
+            lock_products(conn, product_ids=seen_product_ids)
+            for product_id, quantity, item in parsed_items:
                 product = conn.execute(text("""
                     SELECT p.name, p.price, p.price2, p.stock
                     FROM products p WHERE p.id=:id FOR UPDATE
@@ -448,7 +458,7 @@ def create_proforma(data: ProformaCreate, user: dict = Depends(current_user)):
                 if not product:
                     raise HTTPException(status_code=404, detail="کالا یافت نشد")
                 available_stock = float(product["stock"] or 0) - reserved_quantity(conn, product_id)
-                if quantity > available_stock:
+                if not math.isfinite(available_stock) or quantity > available_stock:
                     raise HTTPException(
                         status_code=409,
                         detail=f"موجودی قابل فروش «{product['name']}» کافی نیست؛ موجودی آزاد {available_stock:g} است",
@@ -468,8 +478,8 @@ def create_proforma(data: ProformaCreate, user: dict = Depends(current_user)):
         elif data.total_amount is not None:
             total_amount = float(data.total_amount)
 
-        if total_amount <= 0:
-            raise HTTPException(status_code=422, detail="مبلغ پیش‌فاکتور باید بیشتر از صفر باشد")
+        if not math.isfinite(total_amount) or not 0 < total_amount < 10**16:
+            raise HTTPException(status_code=422, detail="مبلغ پیش‌فاکتور باید مثبت و در محدودهٔ قابل ثبت باشد")
 
         balance = conn.execute(text("""
             SELECT

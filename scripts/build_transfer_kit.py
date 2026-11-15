@@ -69,6 +69,7 @@ def build(root, snapshot, output, evidence=None, provisional=False):
                 'docs/Offsite_Review_20261115.md', 'docs/Offsite_Upgrade_Plan_20261115.md',
                 'docs/Release_Delivery_20261115.md',
                 'docs/E2E_Review_20261115.md', 'docs/E2E_Review_20261115.json',
+                'docs/Deep_Debug_20261115.md', 'docs/Deep_Debug_20261115.json',
                 'docs/Company_Deployment_Handoff_20261114.md', 'docs/Connection_Recheck_20261114.md'}
     with zipfile.ZipFile(output / 'source.zip') as archive:
         for name in archive.namelist():

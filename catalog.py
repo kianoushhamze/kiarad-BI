@@ -1,4 +1,5 @@
 from datetime import date, datetime
+import math
 from zoneinfo import ZoneInfo
 from typing import Optional
 
@@ -167,7 +168,8 @@ def reserve(product_id: int, data: Reservation, user=Depends(manager)):
         product=conn.execute(text('SELECT stock FROM products WHERE id=:id FOR UPDATE'),{'id':product_id}).mappings().first()
         if not product:raise HTTPException(404,'کالا پیدا نشد.')
         reserved=reserved_quantity(conn, product_id)
-        if data.quantity>float(product['stock'] or 0)-float(reserved or 0):
+        available = float(product['stock'] or 0) - float(reserved or 0)
+        if not math.isfinite(available) or data.quantity > available:
             raise HTTPException(409,'موجودی آزاد برای این رزرو کافی نیست.')
         try:
             row = conn.execute(text("""INSERT INTO inventory_reservations(product_id,channel,external_order_id,quantity,status,created_at) VALUES (:p,:c,:o,:q,'reserved',NOW()) RETURNING id"""), {"p":product_id,"c":data.channel,"o":data.external_order_id,"q":data.quantity}).first()

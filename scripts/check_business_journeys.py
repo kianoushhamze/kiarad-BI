@@ -96,6 +96,16 @@ def main():
     proxy_catalog = requests.get(args.storefront + '/api/public/catalog', timeout=15)
     assert proxy_catalog.status_code == 200 and any(p['code'] == probe_code for p in proxy_catalog.json()['products'])
 
+    def parallel_registration():
+        def register(n):
+            return requests.post(args.api + '/site-auth/register', timeout=25, json={
+                'name': 'ثبت‌نام هم‌زمان ساختگی', 'password': password,
+                'contact': f'parallel-{n}-{suffix}@example.test'}).status_code
+        with ThreadPoolExecutor(max_workers=4) as pool:
+            statuses = list(pool.map(register, (0, 0, 1, 2)))
+        assert sorted(statuses) == [200, 200, 200, 409], statuses
+    check('concurrent_cold_registration_and_duplicate_conflict', parallel_registration)
+
     buyer_contact = 'journey-' + suffix + '@example.test'
     buyer = call('POST', '/site-auth/register', role=None, json={'name': 'خریدار ساختگی ' + suffix, 'contact': buyer_contact, 'password': password})
     sessions['buyer'] = {'Authorization': 'Bearer ' + buyer['token']}
@@ -178,6 +188,29 @@ def main():
         assert statuses.count(200) == 1 and all(s in {200, 400, 409} for s in statuses), statuses
         assert stock(code) == 1
     check('concurrent_cross_channel_last_units', concurrent_orders)
+
+    def multi_item_stress():
+        a, code_a = product('stress-B')
+        b, code_b = product('stress-A')
+        def buy(n):
+            if n % 2:
+                path, role = '/operations/proformas', 'alice'
+                ids = (a, b) if n % 4 == 1 else (b, a)
+                data = {'customer_id': customer, 'items': [{'product_id': pid, 'quantity': 1} for pid in ids]}
+            else:
+                path, role = '/site-orders', 'buyer'
+                data = {'customer_name': 'Synthetic stress', 'phone': '09000000000', 'city': 'Test',
+                        'address': 'Synthetic stress address', 'request_id': uuid4().hex,
+                        'items': [{'code': code_b, 'qty': 1}, {'code': code_a, 'qty': 1}]}
+            return requests.post(args.api + path, headers=sessions[role], json=data, timeout=30).status_code
+        with ThreadPoolExecutor(max_workers=8) as pool:
+            statuses = list(pool.map(buy, range(16)))
+        assert statuses.count(200) == 5 and all(s in {200, 400, 409} for s in statuses), statuses
+        assert stock(code_a) == stock(code_b) == 0
+        raw = json.dumps({'customer_id': customer, 'total_amount': 'replace-with-exponent'}).replace('"replace-with-exponent"', '1e309')
+        response = requests.post(args.api + '/operations/proformas', headers={**sessions['alice'], 'Content-Type': 'application/json'}, data=raw, timeout=15)
+        assert response.status_code == 422, (response.status_code, response.text[:200])
+    check('sixteen_parallel_two_sku_checkouts_and_invalid_numeric_input', multi_item_stress)
 
     def visits():
         today = iran_today()
