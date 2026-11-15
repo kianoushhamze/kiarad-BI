@@ -1,0 +1,124 @@
+{
+  "keep": [
+    {
+      "id": 14120085060,
+      "node_id": "MDg6QXJ0aWZhY3QxNDEyMDA4NTA2MA==",
+      "name": "Kiarad-Transfer-20261113",
+      "size_in_bytes": 2614319,
+      "url": "https://api.github.com/repos/kianoushhamze/kiarad-BI/actions/artifacts/14120085060",
+      "archive_download_url": "https://api.github.com/repos/kianoushhamze/kiarad-BI/actions/artifacts/14120085060/zip",
+      "expired": false,
+      "digest": "sha256:8115ed3860c3ac85075fb42d7fe6f1d69a0a708bcdf51cff1baf8416007ad079",
+      "created_at": "2026-11-14T15:22:09Z",
+      "updated_at": "2026-11-14T15:22:09Z",
+      "expires_at": "2026-12-14T15:22:07Z",
+      "workflow_run": {
+        "id": 43609589087,
+        "repository_id": 1380062848,
+        "head_repository_id": 1380062848,
+        "head_branch": "main",
+        "head_sha": "f48212cc1537e920aed36a102beb76a704c08f54"
+      }
+    },
+    {
+      "id": 14119424433,
+      "node_id": "MDg6QXJ0aWZhY3QxNDExOTQyNDQzMw==",
+      "name": "Kiarad-Training-Manual",
+      "size_in_bytes": 487762,
+      "url": "https://api.github.com/repos/kianoushhamze/kiarad-BI/actions/artifacts/14119424433",
+      "archive_download_url": "https://api.github.com/repos/kianoushhamze/kiarad-BI/actions/artifacts/14119424433/zip",
+      "expired": false,
+      "digest": "sha256:26b1dd12974965dce43258019183c6a4b714fa8da10acd8e0fa87d4794a3189e",
+      "created_at": "2026-11-14T15:21:01Z",
+      "updated_at": "2026-11-14T15:21:01Z",
+      "expires_at": "2026-12-14T15:21:00Z",
+      "workflow_run": {
+        "id": 43609589087,
+        "repository_id": 1380062848,
+        "head_repository_id": 1380062848,
+        "head_branch": "main",
+        "head_sha": "f48212cc1537e920aed36a102beb76a704c08f54"
+      }
+    },
+    {
+      "id": 14118939249,
+      "node_id": "MDg6QXJ0aWZhY3QxNDExODkzOTI0OQ==",
+      "name": "Kiarad-Transfer-20261113-Offline",
+      "size_in_bytes": 708661437,
+      "url": "https://api.github.com/repos/kianoushhamze/kiarad-BI/actions/artifacts/14118939249",
+      "archive_download_url": "https://api.github.com/repos/kianoushhamze/kiarad-BI/actions/artifacts/14118939249/zip",
+      "expired": false,
+      "digest": "sha256:e50b161d342122e3a005e81b749aa87468b9dd853422d8cee3db8601d2271c9b",
+      "created_at": "2026-11-14T15:26:40Z",
+      "updated_at": "2026-11-14T15:26:40Z",
+      "expires_at": "2026-11-21T15:26:19Z",
+      "workflow_run": {
+        "id": 43609589087,
+        "repository_id": 1380062848,
+        "head_repository_id": 1380062848,
+        "head_branch": "main",
+        "head_sha": "f48212cc1537e920aed36a102beb76a704c08f54"
+      }
+    },
+    {
+      "id": 14105830319,
+      "node_id": "MDg6QXJ0aWZhY3QxNDEwNTgzMDMxOQ==",
+      "name": "Kiarad-Transfer-20261113-Offline",
+      "size_in_bytes": 708651094,
+      "url": "https://api.github.com/repos/kianoushhamze/kiarad-BI/actions/artifacts/14105830319",
+      "archive_download_url": "https://api.github.com/repos/kianoushhamze/kiarad-BI/actions/artifacts/14105830319/zip",
+      "expired": false,
+      "digest": "sha256:b7fbc41c1f3d65bb1977de1dd8390a36a18b0acff3f994e8104798a497bd4608",
+      "created_at": "2026-11-14T07:58:46Z",
+      "updated_at": "2026-11-14T07:58:46Z",
+      "expires_at": "2026-11-21T07:58:21Z",
+      "workflow_run": {
+        "id": 43573058058,
+        "repository_id": 1380062848,
+        "head_repository_id": 1380062848,
+        "head_branch": "main",
+        "head_sha": "2e1c2a0c8f8fa37e87b541ca60d0b56c17cc71f2"
+      }
+    },
+    {
+      "id": 14105376169,
+      "node_id": "MDg6QXJ0aWZhY3QxNDEwNTM3NjE2OQ==",
+      "name": "Kiarad-Transfer-20261113",
+      "size_in_bytes": 2603311,
+      "url": "https://api.github.com/repos/kianoushhamze/kiarad-BI/actions/artifacts/14105376169",
+      "archive_download_url": "https://api.github.com/repos/kianoushhamze/kiarad-BI/actions/artifacts/14105376169/zip",
+      "expired": false,
+      "digest": "sha256:1f0ca49c681beb8e829f735c262d975155a11bbf2781f5e6d6c7ee71b1e6a9ee",
+      "created_at": "2026-11-14T07:54:04Z",
+      "updated_at": "2026-11-14T07:54:04Z",
+      "expires_at": "2026-12-14T07:54:03Z",
+      "workflow_run": {
+        "id": 43573058058,
+        "repository_id": 1380062848,
+        "head_repository_id": 1380062848,
+        "head_branch": "main",
+        "head_sha": "2e1c2a0c8f8fa37e87b541ca60d0b56c17cc71f2"
+      }
+    },
+    {
+      "id": 14105331105,
+      "node_id": "MDg6QXJ0aWZhY3QxNDEwNTMzMTEwNQ==",
+      "name": "Kiarad-Training-Manual",
+      "size_in_bytes": 487762,
+      "url": "https://api.github.com/repos/kianoushhamze/kiarad-BI/actions/artifacts/14105331105",
+      "archive_download_url": "https://api.github.com/repos/kianoushhamze/kiarad-BI/actions/artifacts/14105331105/zip",
+      "expired": false,
+      "digest": "sha256:be4d1e60166ce94713fd8c7436a789794859017f7113a811fa175f8c368dcd1c",
+      "created_at": "2026-11-14T07:52:56Z",
+      "updated_at": "2026-11-14T07:52:56Z",
+      "expires_at": "2026-12-14T07:52:55Z",
+      "workflow_run": {
+        "id": 43573058058,
+        "repository_id": 1380062848,
+        "head_repository_id": 1380062848,
+        "head_branch": "main",
+        "head_sha": "2e1c2a0c8f8fa37e87b541ca60d0b56c17cc71f2"
+      }
+    }
+  ]
+}
