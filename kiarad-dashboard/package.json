@@ -8,7 +8,7 @@
     "prestart": "node scripts/prepare-standalone.mjs",
     "start": "node .next/standalone/server.js",
     "lint": "node scripts/run-tool.cjs lint",
-    "typecheck": "node scripts/run-tool.cjs typecheck"
+    "typecheck": "node node_modules/next/dist/bin/next typegen && node scripts/run-tool.cjs typecheck"
   },
   "dependencies": {
     "leaflet": "^1.9.4",
