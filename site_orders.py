@@ -11,12 +11,14 @@ role manager/ceo — same policy as site_cms (_ceo).
 import json
 import logging
 import hashlib
+import math
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
 from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy import text
 
 from db import engine
+from stock_reservations import lock_products
 from operations import current_user
 from site_auth import current_site_customer
 from site_cms import ensure as ensure_catalog
@@ -73,7 +75,14 @@ class StatusIn(BaseModel):
 
 def _consumer_unit_irr(price: int | None, discount: int | None) -> int | None:
     """Unit price in IRR the site customer pays (never trusts client)."""
-    base = round(price * CONSUMER_FACTOR) if price is not None and price >= 0 else None
+    try:
+        price = float(price)
+    except (TypeError, ValueError, OverflowError):
+        return None
+    marked_up = price * CONSUMER_FACTOR
+    if price < 0 or not math.isfinite(marked_up):
+        return None
+    base = round(marked_up)
     if discount is not None and 0 < discount < (base or 0):
         return discount
     return base
@@ -87,6 +96,7 @@ def _recompute(conn, items: list[OrderItemIn]) -> tuple[list[dict], int]:
     quantities: dict[str, int] = {}
     for it in items:
         quantities[it.code] = quantities.get(it.code, 0) + it.qty
+    lock_products(conn, codes=quantities)
     for code, qty in sorted(quantities.items()):
         row = conn.execute(text(
             "SELECT p.name, p.price, p.stock, m.discount_price_irr "
@@ -99,10 +109,13 @@ def _recompute(conn, items: list[OrderItemIn]) -> tuple[list[dict], int]:
         unit = _consumer_unit_irr(row["price"], row["discount_price_irr"])
         if unit is None:
             raise HTTPException(400, f"قیمت کالای {code} مشخص نیست؛ سفارش ثبت نشد.")
-        if max(0, (row["stock"] or 0) - reserved_count(conn, code)) < qty:
+        physical_stock = float(row['stock'] or 0)
+        if not math.isfinite(physical_stock) or max(0, physical_stock - reserved_count(conn, code)) < qty:
             raise HTTPException(400, f"موجودی کالای {row['name']} ({code}) کافی نیست.")
         line_total = unit * qty
         total_irr += line_total
+        if total_irr > 2**63 - 1:
+            raise HTTPException(400, 'مبلغ سفارش خارج از محدودهٔ قابل ثبت است.')
         totals.append({"code": code, "name": row["name"], "qty": qty,
                        "unit_price_irr": unit, "line_total_irr": line_total})
     return totals, total_irr
@@ -135,7 +148,7 @@ def _reserve_items(conn, order_id, items):
             {"ref": f"storefront:{order_id}", "code": item["code"], "qty": item["qty"]})
 
 
-def _reserve_legacy_pending(conn):
+def _reserve_legacy_pending(conn, additional_codes=()):
     """Account for pre-upgrade pending orders before admitting a new checkout.
 
     Already shipped legacy orders are deliberately not inferred from Holoo stock.
@@ -155,8 +168,9 @@ def _reserve_legacy_pending(conn):
             quantities[code] = quantities.get(code, 0) + qty
         snapshots.append((row["id"], [{"code": code, "qty": qty} for code, qty in quantities.items()]))
         codes.update(quantities)
-    for code in sorted(codes):
-        conn.execute(text("SELECT code FROM products WHERE code=:code FOR UPDATE"), {"code": code}).all()
+    # Acquire legacy and new-cart products together: locking them in two batches
+    # can still deadlock with a proforma that touches both batches.
+    lock_products(conn, codes=codes | set(additional_codes))
     for order_id, items in snapshots:
         _reserve_items(conn, order_id, items)
         conn.execute(text("UPDATE site_orders SET reservation_managed=TRUE WHERE id=:id"), {"id": order_id})
@@ -185,7 +199,7 @@ def create_order(data: OrderIn, background_tasks: BackgroundTasks, customer: dic
                 if existing["request_fingerprint"] != fingerprint:
                     raise HTTPException(409, "شناسهٔ درخواست قبلاً برای سفارش دیگری استفاده شده است.")
                 return _order_response(existing, replayed=True)
-        touched = _reserve_legacy_pending(conn)
+        touched = _reserve_legacy_pending(conn, {item.code for item in data.items})
         items, total_irr = _recompute(conn, data.items)
         row = conn.execute(text(
             "INSERT INTO site_orders(customer_id, customer_name, phone, city, address, items, total_irr, "
@@ -266,8 +280,7 @@ def set_status(order_id: int, data: StatusIn, background_tasks: BackgroundTasks,
             touched = [r[0] for r in conn.execute(text(
                 "SELECT code FROM platform_reservations WHERE platform='site' AND external_ref=:ref ORDER BY code"
             ), {"ref": f"storefront:{order_id}"}).all()]
-            for code in touched:
-                conn.execute(text("SELECT code FROM products WHERE code=:code FOR UPDATE"), {"code": code}).all()
+            lock_products(conn, codes=touched)
             conn.execute(text("UPDATE platform_reservations SET status='released' "
                               "WHERE platform='site' AND external_ref=:ref"), {"ref": f"storefront:{order_id}"})
         row = conn.execute(text(

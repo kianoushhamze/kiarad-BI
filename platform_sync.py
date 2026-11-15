@@ -14,7 +14,7 @@ from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy import text
 
 from db import engine
-from stock_reservations import reservation_totals, reserved_quantity
+from stock_reservations import lock_products, reservation_totals, reserved_quantity
 from operations import current_user, role_has_module_permission
 
 logger = logging.getLogger("kiarad_platforms")
@@ -91,7 +91,8 @@ def _platform_customer_id(conn, platform: str) -> int:
     if row:
         return int(row)
     return int(conn.execute(text(
-        "INSERT INTO customers(code, name, credit_limit) VALUES (:c,:n,0) RETURNING id"),
+        "INSERT INTO customers(code, name, credit_limit) VALUES (:c,:n,0) "
+        "ON CONFLICT(code) DO UPDATE SET code=EXCLUDED.code RETURNING id"),
         {"c": code, "n": name}).scalar())
 
 
@@ -188,14 +189,21 @@ def apply_order(platform: str, order_ref: str, items: list[dict], status: str | 
     Repeated polls are idempotent. Cancellation releases all previous lines;
     reinstatement reactivates them, and removed lines stop reserving stock.
     """
+    if platform not in PLATFORMS:
+        raise ValueError('Unsupported platform')
     quantities: dict[str, int] = {}
     prices: dict[str, object] = {}
     for item in items:
         code = item.get("code")
-        qty = int(item.get("qty") or 0)
-        if not code or qty <= 0:
+        raw_qty = item.get('qty')
+        if isinstance(raw_qty, bool) or (isinstance(raw_qty, float) and not raw_qty.is_integer()):
+            raise ValueError('Order quantities must be integers')
+        qty = int(raw_qty or 0)
+        if not isinstance(code, str) or not code.strip() or not 0 < qty <= 2147483647:
             raise ValueError("Order lines require a product code and positive quantity")
         quantities[code] = quantities.get(code, 0) + qty
+        if quantities[code] > 2147483647:
+            raise ValueError('Combined order quantity exceeds storage range')
         if item.get("price_irr") is not None:
             if code in prices and prices[code] != item["price_irr"]:
                 raise ValueError("Duplicate order lines have conflicting prices")
@@ -217,10 +225,7 @@ def apply_order(platform: str, order_ref: str, items: list[dict], status: str | 
         previous = [row[0] for row in conn.execute(text(
             "SELECT code FROM platform_reservations WHERE platform=:p AND external_ref=:r"
         ), {"p": platform, "r": order_ref}).all()]
-        # All reservation writers share these sorted product-row locks with
-        # storefront checkout, preventing a check/reserve race across platforms.
-        for code in sorted(set(previous) | set(quantities)):
-            conn.execute(text("SELECT code FROM products WHERE code=:code FOR UPDATE"), {"code": code}).all()
+        lock_products(conn, codes=set(previous) | set(quantities))
         conn.execute(text("""UPDATE platform_reservations SET status='released'
             WHERE platform=:p AND external_ref=:r"""), {"p": platform, "r": order_ref})
         if not released:
@@ -408,7 +413,7 @@ def ingest_order(payload: dict, user: dict = Depends(current_user)):
     try:
         return apply_order(str(payload["platform"]), str(payload["order_ref"]),
                            list(payload.get("items") or []), payload.get("status"))
-    except (KeyError, TypeError) as exc:
+    except (KeyError, TypeError, ValueError, OverflowError, AttributeError) as exc:
         raise HTTPException(422, "ساختار سفارش نامعتبر است.") from exc
 
 
