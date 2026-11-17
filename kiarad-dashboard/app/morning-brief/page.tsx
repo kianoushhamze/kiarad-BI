@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { InteractiveChart } from "../../components/interactive-chart";
 import { PortalShell, Surface, fieldClass, primaryButton } from "../../components/portal-shell";
 import { secureApi, getSavedUser } from "../../lib/secure-api";
 import { formatJalaliDateInput } from "../../lib/iran-date";
@@ -257,6 +258,16 @@ export default function MorningBriefPage() {
         {history.length > 0 && (
           <Surface className="md:col-span-2">
             <h3 className="font-bold mb-2">📜 ۱۴ روز اخیر</h3>
+            <div className="mb-4">
+              <InteractiveChart
+                ariaLabel="روند فروش و سفارش‌های سایت در ۱۴ روز اخیر"
+                labels={[...history].sort((a, b) => a.biz_date.localeCompare(b.biz_date)).map((r) => jdate(r.biz_date))}
+                series={[
+                  { name: "فروش (میلیون تومان)", color: "#8b7cff", values: [...history].sort((a, b) => a.biz_date.localeCompare(b.biz_date)).map((r) => (r.net_sales_irr == null ? null : Math.round(Number(r.net_sales_irr) / 10_000_000 * 10) / 10)) },
+                  { name: "سفارش سایت", color: "#3ddc97", values: [...history].sort((a, b) => a.biz_date.localeCompare(b.biz_date)).map((r) => (r.new_orders == null ? null : Number(r.new_orders))) },
+                ]}
+              />
+            </div>
             <table className="w-full text-sm">
               <thead><tr className="text-slate-400 text-xs"><th className="text-right pb-1">تاریخ</th><th className="text-right pb-1">فروش</th><th className="text-right pb-1">سفارش سایت</th><th className="text-right pb-1">وضعیت</th></tr></thead>
               <tbody>

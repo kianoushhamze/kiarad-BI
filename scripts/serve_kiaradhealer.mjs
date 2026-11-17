@@ -12,6 +12,8 @@ if (!['http:', 'https:'].includes(api.protocol) || api.username || api.password)
 }
 const routes = new Map([
   ['/api/public/catalog', 'GET'],
+  ['/api/public/feeds/torob', ['GET', 'POST']],
+  ['/api/public/feeds/products.json', 'GET'],
   ['/api/site-banners', 'GET'],
   ['/api/site-auth/me', 'GET'],
   ['/api/site-auth/login', 'POST'],
@@ -36,12 +38,13 @@ function reply(res, status, detail) {
 }
 
 async function proxy(req, res, pathname) {
-  const method = routes.get(pathname);
-  if (!method) return reply(res, 404, 'Unknown storefront endpoint');
-  if (req.method !== method) {
-    res.setHeader('Allow', method);
+  const allowed = [].concat(routes.get(pathname) || []);
+  if (!allowed.length) return reply(res, 404, 'Unknown storefront endpoint');
+  if (!allowed.includes(req.method)) {
+    res.setHeader('Allow', allowed.join(', '));
     return reply(res, 405, 'Method not allowed');
   }
+  const method = req.method;
   const headers = {Accept: 'application/json'};
   if (req.headers.authorization) headers.Authorization = req.headers.authorization;
   let body;

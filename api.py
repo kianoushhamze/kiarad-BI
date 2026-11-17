@@ -125,6 +125,8 @@ from monthly_visit_plans import router as monthly_visit_plans_router
 app.include_router(monthly_visit_plans_router)
 from route_builder import router as route_builder_router
 app.include_router(route_builder_router)
+from marketplace_feeds import router as marketplace_feeds_router
+app.include_router(marketplace_feeds_router)
 app.include_router(crud_router)
 
 
@@ -139,6 +141,7 @@ _KIARAD_API_KEY = _os.getenv("KIARAD_API_KEY", "")
 _KIARAD_JWT = _os.getenv("KIARAD_JWT_SECRET", "")
 _OPEN_PATHS = ["/", "/health", "/docs", "/redoc", "/openapi.json", "/auth/login", "/auth/recovery/request", "/auth/recovery/confirm",
                "/public/catalog", "/public/catalog/prices",
+               "/public/feeds/torob", "/public/feeds/products.json", "/public/feeds/products.csv",
                "/site-auth/login", "/site-auth/register", "/site-auth/me"]
 _AUTH_METADATA_PATHS = {"/auth/me", "/auth/permissions", "/auth/password"}
 

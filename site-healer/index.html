@@ -273,7 +273,42 @@ header::after {
   html { scroll-behavior: auto; }
 }
 </style>
-<style id="kiarad-showcase-refresh">:root[data-theme="nude"]{--bg:#faf7f4;--text:#292721;--muted:#746b65;--accent:#95475e}body{background:radial-gradient(ellipse at 10% 10%,#ead4dc55,transparent 50%),#faf7f4}header{background:#fffdfbf0!important;backdrop-filter:blur(18px)}.hero{border-radius:32px;background:linear-gradient(135deg,#f4e3e9,#f8efe4);padding:64px 30px;position:relative;overflow:hidden}.hero h1{letter-spacing:-1px;line-height:1.6}.hero-badge{letter-spacing:2px}.corp-card{border-radius:24px;box-shadow:0 12px 40px #49312708}.btn-primary{border-radius:14px}.logo-mark{background:#95475e!important}.cat-ring{background:#fff8!important;box-shadow:none!important}.container{max-width:1240px}a:focus-visible,button:focus-visible{outline:3px solid #95475e;outline-offset:3px}@media(max-width:640px){.hero{padding:36px 18px;border-radius:23px}.hero h1{font-size:31px}.hero-badge{font-size:9px;letter-spacing:1px}}@media(prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}</style></head>
+<style id="kiarad-lilac-refresh">
+:root[data-theme="nude"]{--bg:#f8f5fc;--bg-bar:#f0eaf8;--bg-header:rgba(250,247,254,.88);--card:#fff;--card-inner:#f6f1fb;--stage-bg:#fff;--stage-pod:radial-gradient(circle,#fbf8ff 0%,#e9def6 88%);--border:#e4d9f1;--text:#2a2236;--muted:#716785;--accent:#6b46a8;--accent-light:#8660c4;--accent-soft:#efe6fa;--accent-border:#d9c7f0;--btn-bg:linear-gradient(135deg,#7d57bd,#5d3b96);--btn-text:#fff;--btn-shadow:rgba(93,59,150,.28);--card-shadow:rgba(107,70,168,.12);--ring-bg:linear-gradient(145deg,#fff,#efe6fa);--switch-bg:#ebe2f6;--hero-glow:rgba(134,96,196,.16)}
+body{background:radial-gradient(ellipse at 12% 8%,#e6d8f7aa,transparent 52%),radial-gradient(ellipse at 90% 30%,#f3d9ec66,transparent 50%),var(--bg)}
+header{backdrop-filter:blur(18px) saturate(1.3)}
+.hero{border-radius:32px;background:linear-gradient(135deg,#efe3fb,#f9eef6 60%,#f4ecfb);padding:64px 30px;position:relative;overflow:hidden}
+:root[data-theme="dark"] .hero{background:linear-gradient(135deg,#150f28,#0a0714)}
+.hero h1{line-height:1.6}
+.corp-card{border-radius:24px;box-shadow:0 12px 40px var(--card-shadow);transition:transform .35s,box-shadow .35s}
+.corp-card:hover{transform:translateY(-4px);box-shadow:0 20px 50px var(--card-shadow)}
+.btn-primary{border-radius:14px}
+.logo-mark{background:linear-gradient(135deg,#8660c4,#5d3b96)!important}
+.cat-ring{background:#fff8!important;box-shadow:none!important}
+.container{max-width:1240px}
+a:focus-visible,button:focus-visible,input:focus-visible{outline:3px solid #8660c4;outline-offset:3px}
+@media(max-width:920px){header .container{flex-wrap:wrap;gap:12px}.search-header{display:block!important;order:3;flex-basis:100%;max-width:none}}
+@media(max-width:640px){header{position:static}.hero{padding:36px 18px;border-radius:23px}.hero h1{font-size:31px}.hero-badge{font-size:9px;letter-spacing:1px}}
+/* ---- scroll banners: bottles spin in while scrolling and settle in the banner ---- */
+#scroll-banners{padding:56px 0 8px}
+.buy-banner{position:relative;display:grid;grid-template-columns:1.1fr 1fr;align-items:center;gap:20px;min-height:290px;margin:22px 0;padding:34px 44px;border-radius:32px;overflow:hidden;border:1px solid var(--accent-border);box-shadow:0 18px 50px var(--card-shadow)}
+.buy-banner.b1{background:linear-gradient(120deg,#f1e7fc,#e3d2f7)}
+.buy-banner.b2{background:linear-gradient(120deg,#e8def8,#d6c4f1 70%,#e8d3ee)}
+.buy-banner.b3{background:linear-gradient(120deg,#f6e8f3,#e6d3f3)}
+:root[data-theme="dark"] .buy-banner.b1{background:linear-gradient(120deg,#1a1233,#120c25)}
+:root[data-theme="dark"] .buy-banner.b2{background:linear-gradient(120deg,#20143d,#150e2b)}
+:root[data-theme="dark"] .buy-banner.b3{background:linear-gradient(120deg,#241236,#140c26)}
+.buy-banner::before{content:"";position:absolute;inset:auto auto -90px -70px;width:320px;height:320px;border-radius:50%;background:radial-gradient(circle,rgba(134,96,196,.28),transparent 68%);pointer-events:none}
+.bb-text{position:relative;z-index:2}
+.bb-tag{display:inline-block;padding:4px 14px;border-radius:99px;font-size:12px;font-weight:700;background:var(--accent-soft);color:var(--accent);border:1px solid var(--accent-border);margin-bottom:12px}
+.bb-text h3{font-family:'Lalezar',cursive;font-size:34px;line-height:1.5;color:var(--text);margin-bottom:8px}
+.bb-text p{color:var(--muted);font-size:14.5px;max-width:460px;margin-bottom:18px}
+.bb-stage{position:relative;height:250px;display:flex;align-items:flex-end;justify-content:center;perspective:900px}
+.bb-bottle{position:relative;height:240px;width:auto;will-change:transform;filter:drop-shadow(0 22px 24px rgba(60,30,110,.3));transform-origin:50% 70%}
+.bb-bottle.second{height:200px;margin-inline-start:-46px}
+@media(max-width:820px){.buy-banner{grid-template-columns:1fr;padding:26px 20px;min-height:0}.bb-stage{height:200px}.bb-bottle{height:190px}.bb-bottle.second{height:158px;margin-inline-start:-34px}.bb-text h3{font-size:27px}}
+@media(prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}.bb-bottle{transform:none!important}}
+</style></head>
 <body>
 
   <div class="top-bar">
@@ -424,6 +459,49 @@ header::after {
           </div>
         </div>
       </div>
+    </section>
+
+    <section id="scroll-banners" aria-label="مسیرهای خرید از کیاراد">
+      <div class="sec-head">
+        <h2>سه مسیر خرید از کیاراد</h2>
+        <p>با اسکرول، محصولات می‌چرخند و در جای خود روی بنرها می‌نشینند.</p>
+      </div>
+      <article class="buy-banner b1" data-banner>
+        <div class="bb-text">
+          <span class="bb-tag">تک‌فروشی آنلاین</span>
+          <h3>مراقبت پوست و مو، مستقیم به دست شما</h3>
+          <p>محصولات اورجینال ۱۰ برند با قیمت مصرف‌کننده و ثبت سفارش همراه با شماره پیگیری.</p>
+          <a class="btn-primary" href="/buy/" style="display:inline-block">مشاهدهٔ کاتالوگ و خرید</a>
+        </div>
+        <div class="bb-stage">
+          <img class="bb-bottle" data-pid="VV1" data-dir="1" data-tilt="-5" alt="فوم شستشوی V&amp;V" width="216" height="240">
+          <img class="bb-bottle second" data-pid="SOL1" data-dir="-1" data-tilt="6" alt="شامپوی Solamor" width="180" height="200">
+        </div>
+      </article>
+      <article class="buy-banner b2" data-banner>
+        <div class="bb-text">
+          <span class="bb-tag">همکاران: داروخانه و گالری</span>
+          <h3>تعرفهٔ عمده و خرید اعتباری ویژهٔ همکاران</h3>
+          <p>قیمت عمده، حاشیهٔ سود و آفرهای حجمی را پس از ورود به پرتال همکاران ببینید.</p>
+          <button class="btn-primary" onclick="toggleAuthModal(true)">ورود به پرتال همکاران</button>
+        </div>
+        <div class="bb-stage">
+          <img class="bb-bottle" data-pid="DRM1" data-dir="-1" data-tilt="5" alt="شامپوی Dermalist" width="216" height="240">
+          <img class="bb-bottle second" data-pid="CIP1" data-dir="1" data-tilt="-6" alt="ژل CIP" width="180" height="200">
+        </div>
+      </article>
+      <article class="buy-banner b3" data-banner>
+        <div class="bb-text">
+          <span class="bb-tag">کلینیک و پزشک متخصص</span>
+          <h3>مزوتراپی و ترمیم‌کنندهٔ کلینیکال</h3>
+          <p>ویال و کوکتل استریل MC Cosmetics و سرم‌های HLM، با دسترسی ویژهٔ پزشکان.</p>
+          <button class="btn-primary" onclick="toggleAuthModal(true)">ورود کلینیک‌ها و پزشکان</button>
+        </div>
+        <div class="bb-stage">
+          <img class="bb-bottle" data-pid="MCC1" data-dir="1" data-tilt="-4" alt="ویال MC Cosmetics" width="216" height="240">
+          <img class="bb-bottle second" data-pid="HLM1" data-dir="-1" data-tilt="6" alt="سرم HLM" width="180" height="200">
+        </div>
+      </article>
     </section>
 
     <section id="store-sec">
@@ -625,6 +703,8 @@ header::after {
       const labelBorder = isDark ? '#252538' : '#E2D6C3';
       const brandTextCol = isDark ? '#FFFFFF' : '#2A2421';
 
+      const esc = (v) => String(v).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+      brand = esc(brand); model = esc(model); sub = esc(sub);
       const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 360 400" width="360" height="400">
         <defs>
           <radialGradient id="g" cx="50%" cy="45%" r="55%">
@@ -960,6 +1040,47 @@ header::after {
     updateStage(PRODUCTS[0]);
     renderStore();
     renderCart();
+
+    /* ---- scroll-driven bottles: spin in and settle inside each banner ---- */
+    function paintBanners() {
+      document.querySelectorAll('.bb-bottle').forEach(function (img) {
+        var p = PRODUCTS.find(function (x) { return x.id === img.dataset.pid; });
+        if (p) img.src = p.img;
+      });
+    }
+    (function initBannerScroll() {
+      var reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+      var banners = Array.prototype.slice.call(document.querySelectorAll('[data-banner]'));
+      var ticking = false;
+      function frame() {
+        ticking = false;
+        var vh = window.innerHeight, small = window.innerWidth < 720;
+        banners.forEach(function (b) {
+          var r = b.getBoundingClientRect();
+          var raw = (vh * 0.95 - r.top) / (vh * 0.6);
+          var p = reduce ? 1 : Math.max(0, Math.min(1, raw));
+          var e = 1 - Math.pow(1 - p, 3);
+          b.querySelectorAll('.bb-bottle').forEach(function (img, i) {
+            var dir = parseFloat(img.dataset.dir) || 1, tilt = parseFloat(img.dataset.tilt) || 0;
+            var spin = (1 - e) * dir * (small ? 200 : 420);
+            var tx = (1 - e) * dir * (small ? -60 : -150);
+            var ty = (1 - e) * (small ? -90 : -170);
+            var sc = 0.5 + 0.5 * e;
+            img.style.opacity = String(0.15 + 0.85 * Math.min(1, e * 1.4));
+            img.style.transform = 'translate3d(' + tx.toFixed(1) + 'px,' + ty.toFixed(1) + 'px,0) rotate(' + (tilt + spin).toFixed(1) + 'deg) scale(' + sc.toFixed(3) + ')';
+          });
+        });
+      }
+      function onScroll() { if (!ticking) { ticking = true; requestAnimationFrame(frame); } }
+      window.addEventListener('scroll', onScroll, { passive: true });
+      window.addEventListener('resize', onScroll);
+      paintBanners();
+      frame();
+    })();
+    (function () {
+      var original = toggleTheme;
+      toggleTheme = function () { original.apply(this, arguments); paintBanners(); };
+    })();
   </script>
 </body>
 </html>

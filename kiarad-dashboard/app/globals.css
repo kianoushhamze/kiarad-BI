@@ -1,5 +1,7 @@
-@import url('https://fonts.googleapis.com/css2?family=Vazirmatn:wght@200;400;500;600;700;800&display=swap');
 @import "tailwindcss";
+/* Self-hosted: Google Fonts is unreliable from inside Iran. */
+@font-face{font-family:"Vazirmatn";src:url("/fonts/Vazirmatn-Regular.ttf") format("truetype");font-weight:200 600;font-style:normal;font-display:swap}
+@font-face{font-family:"Vazirmatn";src:url("/fonts/Vazirmatn-Bold.ttf") format("truetype");font-weight:700 900;font-style:normal;font-display:swap}
 
 :root {
   color-scheme: dark;
@@ -387,4 +389,14 @@
 
 ::-webkit-scrollbar-thumb:hover {
   background: #51465e;
+}
+
+
+/* ---- shell upgrades: collapsible rail, glass hover, reduced motion ---- */
+.kiarad-rail{transition:width .28s cubic-bezier(.2,.8,.2,1)}
+.kiarad-main{transition:margin-right .28s cubic-bezier(.2,.8,.2,1)}
+.kiarad-glass{transition:transform .25s ease,border-color .25s ease,box-shadow .25s ease}
+.kiarad-glass:hover{border-color:rgba(139,124,255,.32);box-shadow:0 14px 40px rgba(80,60,200,.16)}
+@media (prefers-reduced-motion: reduce){
+  .kiarad-rail,.kiarad-main,.kiarad-glass{transition:none}
 }

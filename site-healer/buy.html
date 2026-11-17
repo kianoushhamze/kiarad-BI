@@ -246,9 +246,12 @@
   }
 </style>
 <style id="kiarad-design-20261113">
-:root{--bg:#faf7f4;--surface:#fffdfb;--ink:#292721;--muted:#746b65;--line:#e8ded7;--accent:#95475e;--accent-ink:#743249}
-body{background:radial-gradient(ellipse at 95% 12%,#f0dce1 0,transparent 38%),var(--bg)}
-.wrap{max-width:1240px}.nav{background:#fffdfbeb;border-color:var(--line)}.nav .brand{letter-spacing:-.7px}.hero{position:relative;isolation:isolate;text-align:right;padding:85px 25px 65px;min-height:365px;overflow:hidden}.hero h2{max-width:740px;font-size:clamp(34px,5.5vw,66px);line-height:1.55;letter-spacing:-2px}.hero h2 .grad{background:linear-gradient(110deg,#ad6e4b,#95475e);background-clip:text;-webkit-background-clip:text;color:transparent}.hero p{max-width:640px;font-size:17px;color:#746b65}.hero:after{content:"K";position:absolute;z-index:-1;left:6%;top:5%;font:italic 300px Georgia,serif;color:#b37b6220;transform:rotate(-12deg)}.hero .cta{padding:13px 27px;box-shadow:0 10px 25px #95475e25}.hero .cta:hover,.addbtn:hover{background:#743249}.hero .live{padding:6px 13px;background:#fff8;border:1px solid var(--line);border-radius:50px}.grid{gap:22px}.card{border:1px solid var(--line);border-radius:23px;background:var(--surface);box-shadow:0 8px 32px #44332605;transition:transform .2s,box-shadow .2s}.card:hover{transform:translateY(-4px);box-shadow:0 18px 40px #44332610}.card img{background:#f3eee9}.addbtn{border-radius:12px}.chip.active{background:var(--accent);border-color:var(--accent)}.drawer{background:var(--surface)}footer{background:#eee7e1}.shop-principles{display:grid;grid-template-columns:repeat(3,1fr);gap:1px;background:var(--line);border:1px solid var(--line);border-radius:20px;overflow:hidden;margin-bottom:38px}.shop-principles>div{padding:22px;background:var(--surface)}.shop-principles strong{display:block;font-size:15px}.shop-principles p{font-size:12px;color:var(--muted);margin-top:6px}button,input,select{font-family:inherit}:focus-visible{outline:3px solid #95475e;outline-offset:3px}@media(max-width:640px){.hero{padding:40px 22px 30px;min-height:0}.hero h2{letter-spacing:-1px}.hero:after{font-size:220px;left:-30px;top:50px}.shop-principles{grid-template-columns:1fr;margin:0 16px 25px}.shop-principles>div{padding:15px}.grid{gap:12px}}@media(prefers-reduced-motion:reduce){*{scroll-behavior:auto!important;transition:none!important}.reveal{opacity:1;transform:none}}
+:root{--bg:#f8f5fc;--surface:#fffeff;--ink:#2a2236;--muted:#716785;--line:#e4d9f1;--accent:#6b46a8;--accent-ink:#4f2f86}
+body{background:radial-gradient(ellipse at 95% 12%,#e6d8f7 0,transparent 38%),var(--bg)}
+.wrap{max-width:1240px}.nav{background:#fffeffeb;border-color:var(--line)}.nav .brand{letter-spacing:-.7px}.hero{position:relative;isolation:isolate;text-align:right;padding:85px 25px 65px;min-height:365px;overflow:hidden}.hero h2{max-width:740px;font-size:clamp(34px,5.5vw,66px);line-height:1.55;letter-spacing:-2px}.hero h2 .grad{background:linear-gradient(110deg,#8660c4,#6b46a8);background-clip:text;-webkit-background-clip:text;color:transparent}.hero p{max-width:640px;font-size:17px;color:#716785}.hero:after{content:"K";position:absolute;z-index:-1;left:6%;top:5%;font:italic 300px Georgia,serif;color:#b37b6220;transform:rotate(-12deg)}.hero .cta{padding:13px 27px;box-shadow:0 10px 25px #6b46a825}.hero .cta:hover,.addbtn:hover{background:#4f2f86}.hero .live{padding:6px 13px;background:#fff8;border:1px solid var(--line);border-radius:50px}.grid{gap:22px}.card{border:1px solid var(--line);border-radius:23px;background:var(--surface);box-shadow:0 8px 32px #44332605;transition:transform .2s,box-shadow .2s}.card:hover{transform:translateY(-4px);box-shadow:0 18px 40px #44332610}.card img{background:#f3eee9}.addbtn{border-radius:12px}.chip.active{background:var(--accent);border-color:var(--accent)}.drawer{background:var(--surface)}footer{background:#eee7e1}.shop-principles{display:grid;grid-template-columns:repeat(3,1fr);gap:1px;background:var(--line);border:1px solid var(--line);border-radius:20px;overflow:hidden;margin-bottom:38px}.shop-principles>div{padding:22px;background:var(--surface)}.shop-principles strong{display:block;font-size:15px}.shop-principles p{font-size:12px;color:var(--muted);margin-top:6px}button,input,select{font-family:inherit}:focus-visible{outline:3px solid #6b46a8;outline-offset:3px}@media(max-width:640px){.hero{padding:40px 22px 30px;min-height:0}.hero h2{letter-spacing:-1px}.hero:after{font-size:220px;left:-30px;top:50px}.shop-principles{grid-template-columns:1fr;margin:0 16px 25px}.shop-principles>div{padding:15px}.grid{gap:12px}}@media(prefers-reduced-motion:reduce){*{scroll-behavior:auto!important;transition:none!important}.reveal{opacity:1;transform:none}}
+
+.card{transition:transform .3s,box-shadow .3s}.card:hover{transform:translateY(-4px);box-shadow:0 16px 40px rgba(107,70,168,.16)}
+@media(prefers-reduced-motion:reduce){.card{transition:none}.card:hover{transform:none}}
 </style>
 </head>
 <body>
@@ -560,6 +563,15 @@ body{background:radial-gradient(ellipse at 95% 12%,#f0dce1 0,transparent 38%),va
     q = e.target.value.trim().toLowerCase();
     render();
   });
+  // Deep link used by price-comparison feeds: /buy/?p=<product code>
+  (function () {
+    var code = new URLSearchParams(location.search).get("p");
+    if (!code) return;
+    code = code.slice(0, 100);
+    document.getElementById("q").value = code;
+    q = code.trim().toLowerCase();
+    render();
+  })();
 
   // ---------- banners slider ----------
   var banners = [], bIdx = 0, bTimer = null;
