@@ -380,12 +380,12 @@ export default function ManagementDashboard() {
                   )}
                   <div className="mt-3">
                     <InteractiveChart
-                      ariaLabel="?????? ?????? ???? ???? ??????"
+                      ariaLabel="نمودار تعاملی روند فروش ماهانه"
                       height={150}
                       labels={trendLabels}
                       series={[
                         {
-                          name: "???? (?????? ?????)",
+                          name: "فروش (میلیون تومان)",
                           color: "#8b7cff",
                           values: trendValues.map((v) => Math.round((v / 10_000_000) * 10) / 10),
                         },
