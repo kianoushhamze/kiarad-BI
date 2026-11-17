@@ -7,7 +7,7 @@ class IntegrationReadinessTests(unittest.TestCase):
     def test_every_requested_channel_is_available(self):
         self.assertEqual(
             set(CHANNELS),
-            {"digikala", "basalam", "divar", "emalls", "torob", "instagram", "youtube", "tiktok", "linkedin", "telegram", "bale", "rubika", "whatsapp"},
+            {"digikala", "basalam", "snappshop", "isam", "divar", "emalls", "torob", "instagram", "youtube", "tiktok", "linkedin", "telegram", "bale", "rubika", "whatsapp"},
         )
 
     def test_draft_and_old_sync_do_not_claim_live_connection(self):

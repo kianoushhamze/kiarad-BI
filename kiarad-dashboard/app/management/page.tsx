@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
+import { InteractiveChart } from "../../components/interactive-chart";
 import { PortalShell, Surface } from "../../components/portal-shell";
 import { authFetch, getToken } from "../../lib/secure-api";
 import { formatIranDate, formatIranDateTime } from "../../lib/iran-date";
@@ -377,9 +378,19 @@ export default function ManagementDashboard() {
                       {monthDelta >= 0 ? "▲" : "▼"} {faDigits(Math.abs(monthDelta).toLocaleString("fa-IR"))}٪ نسبت به ماه قبل · {trendLabels[trendLabels.length - 1] ?? ""}
                     </div>
                   )}
-                  <Sparkline values={trendValues} />
-                  <div aria-hidden="true" className="mt-1 flex justify-between text-[9px] text-slate-500">
-                    {trendLabels.map((label) => <span key={label}>{label}</span>)}
+                  <div className="mt-3">
+                    <InteractiveChart
+                      ariaLabel="?????? ?????? ???? ???? ??????"
+                      height={150}
+                      labels={trendLabels}
+                      series={[
+                        {
+                          name: "???? (?????? ?????)",
+                          color: "#8b7cff",
+                          values: trendValues.map((v) => Math.round((v / 10_000_000) * 10) / 10),
+                        },
+                      ]}
+                    />
                   </div>
                 </Tile>
 

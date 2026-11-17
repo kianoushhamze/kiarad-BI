@@ -9,6 +9,8 @@ type Channel = { id: string; label: string; kind: string; account_label: string;
 const connectionText:Record<string,string>={not_checked:"هنوز بررسی نشده",verified:"خواندن حساب فروشنده تأیید شد",credentials_missing:"اطلاعات ورود سرویس روی میزبان موجود نیست",authentication_failed:"اجازهٔ حساب فروشنده تأیید نشد؛ ورود سرویس باید تازه شود",endpoint_error:"مسیر سرویس پاسخ موفق نداد",unverified_response:"پاسخ سرویس برای تأیید حساب کافی نیست",network_error:"ارتباط شبکه با دیجی‌کالا برقرار نشد",credentials_or_response_invalid:"اطلاعات ورود یا پاسخ سرویس معتبر نیست"};
 const steps: Record<string, string> = {
   digikala: "دسترسی رسمی فروشنده، نگاشت شناسهٔ کالا و آزمون سفارش، قیمت و موجودی",
+  snappshop: "درخواست همکاری، پذیرش فروشگاه و دریافت روش فنی اتصال",
+  isam: "حساب فروشنده، نگاشت کالا و مدیریت دستی سفارش‌ها",
   basalam: "مجوز فروشگاه و رابط رسمی، نگاشت کالا و آزمون سفارش و موجودی",
   divar: "دسترسی تجاری و مجوز مسیر رسمی آگهی و پیام",
   emalls: "تأیید فروشگاه و روش رسمی دریافت فهرست کالا و قیمت",

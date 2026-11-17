@@ -53,6 +53,7 @@ foreach ($folder in $mediaSources) {
   }
 }
 if ($mediaFiles.Count -gt 0) {
+  Add-Type -AssemblyName System.IO.Compression
   Add-Type -AssemblyName System.IO.Compression.FileSystem
   $mediaArchive = Join-Path $destination "media.zip"
   $zip = [IO.Compression.ZipFile]::Open($mediaArchive, [IO.Compression.ZipArchiveMode]::Create)

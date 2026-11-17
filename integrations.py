@@ -18,6 +18,8 @@ router = APIRouter(prefix="/integrations", tags=["integrations"])
 CHANNELS = {
     "digikala": ("دیجی‌کالا", "فروش"),
     "basalam": ("باسلام", "فروش"),
+    "snappshop": ("اسنپ‌شاپ", "فروش"),
+    "isam": ("ایسام", "فروش"),
     "divar": ("دیوار", "آگهی"),
     "emalls": ("ایمالز", "مقایسهٔ قیمت"),
     "torob": ("ترب", "مقایسهٔ قیمت"),
