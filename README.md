@@ -8,6 +8,8 @@
 
 **وضعیت انتشار:** کد و خروجی‌های خودکار از پذیرش عملیاتی شرکت جدا هستند. نتیجهٔ آزمون و شناسهٔ دقیق هر بسته را از [CI همان نسخه](https://github.com/kianoushhamze/kiarad-BI/actions/workflows/ci.yml)، `release.json`، `ci.json` و `checksums.json` بخوانید. موفقیت CI به معنی پذیرش هلو، دادهٔ مالی، سرور شرکت یا GPS روی گوشی واقعی نیست.
 
+راهنمای زیرساخت جدید: [اتصال VPS آروان به سرور شرکت پشت NAT](docs/ArvanCloud_NAT_Relay_Deployment_20261119.md) — مستند آماده‌سازی است و به معنی اجرای تنظیمات روی VPS یا شرکت نیست.
+
 مرجع جاری: [هنداف نهایی نرم‌افزار](docs/Software_Finalization_20261114.md) · [راهنمای انتقال](transfer/README-fa.md) · [راهنمای Traccar](docs/Traccar_Bridge_Handoff_20261113.md). اسناد تاریخ‌دار قبلی و بخش‌های قدیمی `HANDOFF.md` تاریخچه‌اند؛ دستور استقرار قدیمی را با stage فعلی مخلوط نکنید.
 
 > **آماده‌سازی خارج از شرکت — ۱۵ نوامبر:** [گزارش بررسی](docs/Offsite_Review_20261115.md)، [برنامهٔ ارتقای نصب موجود](docs/Offsite_Upgrade_Plan_20261115.md) و [راهنمای دریافت بسته](docs/Release_Delivery_20261115.md). خروجی‌های جدید CI در Draft Releases ذخیره می‌شوند تا به سهمیهٔ Artifacts وابسته نباشند؛ وجود بسته به معنی پذیرش شرکت نیست.
