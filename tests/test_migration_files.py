@@ -24,4 +24,5 @@ class MigrationFilesTests(unittest.TestCase):
         self.assertIn("0008_visit_treasury_columns.sql", [p.name for p in files])
         self.assertIn("0009_assistant_operations_storage.sql", [p.name for p in files])
         self.assertIn("0010_treasury_excel_storage.sql", [p.name for p in files])
+        self.assertIn("0011_site_auth_rate_limits.sql", [p.name for p in files])
         self.assertEqual(files, sorted(files))

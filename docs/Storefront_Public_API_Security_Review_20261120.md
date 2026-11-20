@@ -45,7 +45,14 @@ Apply migrations 0005 and 0006 through the normal backup/review process before d
 
 ## Remaining deployment requirement
 
-Application-level rate limiting is not yet implemented for public customer login/registration. Before exposing the API publicly, configure rate limits at the trusted ingress/reverse proxy for both endpoints. Only trust forwarded client-IP headers from explicitly configured proxy addresses; do not trust arbitrary client-supplied `X-Forwarded-For` values.
+Application-level rate limiting is implemented for public customer authentication and is backed by the shared PostgreSQL table provisioned by migration `0011_site_auth_rate_limits.sql`:
+
+- `POST /site-auth/login`: 10 attempts per 15 minutes per client IP.
+- `POST /site-auth/register`: 5 attempts per hour per client IP.
+- Exceeded requests return HTTP 429 with a `Retry-After` header. Bucket keys are HMAC-SHA256 values; raw IP addresses are not stored.
+- Forwarded client-IP headers are accepted only when the immediate TCP peer belongs to an explicit CIDR configured in `KIARAD_TRUSTED_PROXY_CIDRS`. Otherwise the TCP peer address is used and forwarded headers are ignored.
+
+Migration 0011 must be applied through the normal backup/review process before deploying this code. Keep complementary rate limits and abuse controls at the trusted ingress; application limits are not a substitute for edge protection.
 
 ## Validation status
 

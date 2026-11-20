@@ -54,3 +54,12 @@ Commands:
 - 0010_treasury_excel_storage.sql provisions Treasury Excel batch storage. Preview, commit, list, export, and forecasting requests do not run schema DDL.
 
 - Apply migration 0010 before deploying Treasury Excel import and forecasting changes.
+
+
+## Public customer authentication rate limits
+
+- `0011_site_auth_rate_limits.sql` provisions shared PostgreSQL buckets for `POST /site-auth/login` and `POST /site-auth/register`; no request-time schema creation is used.
+- The default limits are 10 login attempts per 15 minutes and 5 registration attempts per hour, per client IP. Exceeded requests receive HTTP 429 with a `Retry-After` header.
+- Bucket keys are HMAC-SHA256 values derived from the client IP and endpoint using `KIARAD_JWT_SECRET`; raw client addresses are not stored. Stale buckets are pruned opportunistically.
+- Forwarded client-IP headers are used only when the immediate peer matches an explicit CIDR in `KIARAD_TRUSTED_PROXY_CIDRS`. An empty setting means the TCP peer address is used and forwarded headers are ignored.
+- Apply migration 0011 before deploying the rate-limited customer authentication code. Keep complementary rate limits at the trusted ingress.
