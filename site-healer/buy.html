@@ -418,7 +418,7 @@ body{background:radial-gradient(ellipse at 95% 12%,#e6d8f7 0,transparent 38%),va
       h += '<div class="thumb" aria-hidden="true">' + (img ? '<img src="' + esc(img) + '" alt="" loading="lazy">' : '🖼') + '</div>';
       h += '<h3>' + esc(p.title) + '</h3>';
       h += '<div class="cat">' + esc(p.category || "بدون دسته") + ' · کد: ' + esc(p.code) + '</div>';
-      h += '<div class="stock ' + (p.stock > 0 ? "ok" : "out") + '">' + (p.stock > 0 ? "موجود: " + fa(p.stock) + " عدد" : "ناموجود") + '</div>';
+      h += '<div class="stock ' + (p.in_stock ? "ok" : "out") + '">' + (p.in_stock ? "موجود" : "ناموجود") + '</div>';
       h += '<div class="pricebox">';
       if (off) {
         h += '<span class="badge off">تخفیف ' + fa(off) + '٪</span>';
@@ -426,7 +426,7 @@ body{background:radial-gradient(ellipse at 95% 12%,#e6d8f7 0,transparent 38%),va
       }
       h += '<span class="price">' + (unit ? fa(unit) + ' تومان' : '—') + '</span>';
       h += '</div>';
-      h += '<button type="button" class="addbtn"' + (p.stock > 0 ? '' : ' disabled') + ' data-add="' + esc(p.code) + '">' + (p.stock > 0 ? 'افزودن به سبد' : 'ناموجود') + '</button>';
+      h += '<button type="button" class="addbtn"' + (p.in_stock ? '' : ' disabled') + ' data-add="' + esc(p.code) + '">' + (p.in_stock ? 'افزودن به سبد' : 'ناموجود') + '</button>';
       el.innerHTML = h;
       grid.appendChild(el);
       if (io) io.observe(el);
@@ -500,7 +500,7 @@ body{background:radial-gradient(ellipse at 95% 12%,#e6d8f7 0,transparent 38%),va
               image_url: p.image_url || null,
               price_holoo: isNaN(irr) ? null : Math.round(irr / 10),
               discount_price_irr: (disc && !isNaN(disc)) ? disc : null,
-              stock: p.stock || 0
+              in_stock: p.in_stock === true
             };
           })
         };
@@ -533,7 +533,7 @@ body{background:radial-gradient(ellipse at 95% 12%,#e6d8f7 0,transparent 38%),va
           image_url: p.image_url || null,
           price_holoo: pick(p, ["price_holoo", "price"]),
           discount_price_irr: p.discount_price_irr || null,
-          stock: pick(p, ["stock_holoo", "stock"]) || 0
+          in_stock: (typeof p.in_stock === "boolean") ? p.in_stock : Number(p.stock_holoo || 0) > 0
         };
       });
       var dot = document.getElementById("liveDot"), txt = document.getElementById("liveTxt");
