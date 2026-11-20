@@ -30,7 +30,7 @@ Commands:
 ## Employee chat and CRM storage
 
 - 0007_chat_crm_storage.sql provisions the shared employee chat and CRM interaction tables and their indexes.
-- Existing CRM rows are assigned to an employee only when the legacy visitor label maps unambiguously to exactly one user. Ambiguous or unmatched rows remain unassigned and manager-visible only.
+- Legacy CRM ownership is transferred only when visitor_name exactly matches one unique username, with or without the leading @. Display/full-name matching is deliberately not used. Ambiguous or unmatched rows remain unassigned and manager-visible only.
 - API startup no longer creates or alters chat/CRM tables. Apply the migration through the normal backup, dry-run and release process before deploying this code.
 
 
