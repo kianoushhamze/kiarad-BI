@@ -221,21 +221,6 @@ def parse_report_rows(headers,values,kind,unit,sheet="دستی",from_date="",to_
     return result
 
 
-def ensure_excel_schema(conn):
-    conn.execute(text("""CREATE TABLE IF NOT EXISTS treasury_excel_batches (
-        id BIGSERIAL PRIMARY KEY, kind VARCHAR(30) NOT NULL, title VARCHAR(200) NOT NULL,
-        source_note TEXT NOT NULL, content_hash VARCHAR(64) NOT NULL, payload JSONB NOT NULL,
-        status VARCHAR(20) NOT NULL DEFAULT 'preview', created_by INTEGER NOT NULL,
-        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), committed_by INTEGER, committed_at TIMESTAMPTZ,
-        UNIQUE(kind,content_hash))"""))
-
-
-@router.on_event("startup")
-def initialize_excel_schema():
-    with engine.begin() as conn:
-        ensure_excel_schema(conn)
-
-
 async def upload(file):
     return await file.read(MAX_FILE+1)
 
