@@ -77,7 +77,7 @@ class CMSDatabaseTests(unittest.TestCase):
 
 class BannerInputSecurityTests(unittest.TestCase):
     def test_banner_links_reject_scriptable_and_protocol_relative_urls(self):
-        for value in ("javascript:alert(1)", "data:text/html,<script>", "//attacker.invalid/path", "https://user:pass@example.test/"):
+        for value in ("javascript:alert(1)", "data:text/html,<script>", "//attacker.invalid/path", "https://user:pass@example.test/", "https://[::1"):
             with self.subTest(value=value), self.assertRaises(HTTPException):
                 cms._clean_link_url(value)
         self.assertEqual(cms._clean_link_url("/campaign/summer"), "/campaign/summer")
