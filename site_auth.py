@@ -6,7 +6,6 @@
 """
 import os
 import re
-import secrets
 from datetime import datetime, timedelta, timezone
 from typing import Optional
 
@@ -25,21 +24,6 @@ TOKEN_DAYS = 7
 
 _EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
 _PHONE_RE = re.compile(r"^09\d{9}$")
-
-
-def ensure(conn):
-    if conn.execute(text("SELECT to_regclass('site_customers')")).scalar() is not None:
-        return
-    conn.execute(text("SELECT pg_advisory_xact_lock(hashtextextended('kiarad:site-customer-schema',0))"))
-    conn.execute(text("""
-        CREATE TABLE IF NOT EXISTS site_customers(
-            id SERIAL PRIMARY KEY,
-            email TEXT UNIQUE,
-            phone TEXT UNIQUE,
-            name TEXT NOT NULL,
-            password_hash TEXT NOT NULL,
-            created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-        )"""))
 
 
 def _normalize_contact(contact: str) -> tuple[Optional[str], Optional[str]]:
@@ -120,7 +104,6 @@ def register(data: RegisterIn):
     _secret()
     email, phone = _normalize_contact(data.contact)
     with engine.begin() as conn:
-        ensure(conn)
         row = conn.execute(text(
             "INSERT INTO site_customers(email, phone, name, password_hash) "
             "VALUES (:e, :p, :n, :h) ON CONFLICT DO NOTHING RETURNING id"
@@ -135,7 +118,6 @@ def register(data: RegisterIn):
 def login(data: LoginIn):
     email, phone = _normalize_contact(data.contact)
     with engine.begin() as conn:
-        ensure(conn)
         row = conn.execute(text(
             "SELECT id, name, password_hash FROM site_customers "
             "WHERE (:e IS NOT NULL AND email = :e) OR (:p IS NOT NULL AND phone = :p) LIMIT 1"
