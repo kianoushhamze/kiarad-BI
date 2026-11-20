@@ -1,17 +1,14 @@
 """CRM schema bootstrapping tests; no real database writes are performed."""
 import unittest
-from unittest.mock import MagicMock
+from pathlib import Path
 
-from api import _ensure_crm_table
+ROOT = Path(__file__).resolve().parents[1]
 
 
 class CrmSchemaTests(unittest.TestCase):
-    def test_empty_schema_contains_required_fields_without_seed_rows(self):
-        conn = MagicMock()
-        _ensure_crm_table(conn)
-
-        sql = "\n".join(str(call.args[0]) for call in conn.execute.call_args_list)
-        for field in ("customer_name", "visitor_name", "next_followup_date", "followup_time", "status"):
+    def test_versioned_migration_contains_required_fields_without_seed_rows(self):
+        sql = (ROOT / "migrations" / "0007_chat_crm_storage.sql").read_text(encoding="utf-8-sig")
+        for field in ("customer_name", "visitor_name", "next_followup_date", "followup_time", "status", "owner_user_id"):
             self.assertIn(field, sql)
         self.assertNotIn("INSERT INTO", sql.upper())
 
