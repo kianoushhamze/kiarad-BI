@@ -23,64 +23,9 @@ router = APIRouter(prefix="/platforms", tags=["platforms"])
 PLATFORMS = ["digikala", "site"]  # extend with basalam, torob, ... as connectors land
 
 
-def ensure(conn):
-    conn.execute(text("""CREATE TABLE IF NOT EXISTS platform_listings(
-        id SERIAL PRIMARY KEY, platform TEXT NOT NULL, code TEXT NOT NULL,
-        external_id TEXT, price_mode TEXT NOT NULL DEFAULT 'auto',
-        manual_price_irr BIGINT, price_factor NUMERIC(6,3) DEFAULT 1.0,
-        active BOOLEAN NOT NULL DEFAULT TRUE, last_push_at TIMESTAMPTZ,
-        UNIQUE(platform, code))"""))
-    conn.execute(text("""CREATE TABLE IF NOT EXISTS platform_reservations(
-        id SERIAL PRIMARY KEY, platform TEXT NOT NULL, external_ref TEXT NOT NULL,
-        code TEXT NOT NULL, qty INT NOT NULL DEFAULT 1, status TEXT NOT NULL DEFAULT 'active',
-        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-        UNIQUE(platform, external_ref, code))"""))
-    conn.execute(text("""CREATE TABLE IF NOT EXISTS platform_orders_raw(
-        id SERIAL PRIMARY KEY, platform TEXT NOT NULL, order_ref TEXT NOT NULL,
-        status TEXT, raw JSONB, fetched_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-        UNIQUE(platform, order_ref))"""))
-    # Side table linking platform orders to internal proforma drafts.
-    # Holoo is NEVER written from this flow: the owner invoices manually in
-    # Holoo and then ticks holoo_registered in the dashboard.
-    # Product-creation proposals are drafts for manual Seller Center listing.
-    # Seller Open API v1 has no verified create route; variants are mapped only
-    # after the seller creates the listing manually. Never issue a guessed POST.
-    conn.execute(text("""CREATE TABLE IF NOT EXISTS platform_create_proposals(
-        id SERIAL PRIMARY KEY, platform TEXT NOT NULL DEFAULT 'digikala',
-        code TEXT NOT NULL, product_name TEXT NOT NULL,
-        suggested_title TEXT NOT NULL, category_id BIGINT,
-        price_irr BIGINT, stock INT NOT NULL DEFAULT 0,
-        image_url TEXT, gtin TEXT, notes TEXT,
-        status TEXT NOT NULL DEFAULT 'pending',
-        payload JSONB, receipt JSONB,
-        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-        confirmed_at TIMESTAMPTZ)"""))
-    conn.execute(text("""CREATE TABLE IF NOT EXISTS platform_order_proformas(
-        id SERIAL PRIMARY KEY, platform TEXT NOT NULL, order_ref TEXT NOT NULL,
-        proforma_id INTEGER NOT NULL, source TEXT NOT NULL DEFAULT 'platform',
-        status TEXT NOT NULL DEFAULT 'draft',
-        holoo_registered BOOLEAN NOT NULL DEFAULT FALSE,
-        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-        UNIQUE(platform, order_ref))"""))
-
-
 def _require_manager(user):
     if user.get("role") != "ceo" and not role_has_module_permission(str(user.get("role", "")), "online-sales", "can_write"):
         raise HTTPException(403, "این عملیات فقط برای مدیر فروش آنلاین است.")
-
-
-def _ensure_platform_proforma_storage(conn):
-    conn.execute(text("""CREATE TABLE IF NOT EXISTS proforma_invoices (
-        id SERIAL PRIMARY KEY,
-        customer_id INTEGER NOT NULL REFERENCES customers(id),
-        salesperson_id INTEGER REFERENCES salespersons(id),
-        total_amount NUMERIC(18, 2) NOT NULL,
-        status VARCHAR(20) NOT NULL DEFAULT 'pending',
-        credit_grade VARCHAR(20),
-        notes TEXT,
-        items_json JSONB NOT NULL DEFAULT '[]'::jsonb,
-        created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
-    )"""))
 
 
 def _platform_customer_id(conn, platform: str) -> int:
@@ -215,8 +160,6 @@ def apply_order(platform: str, order_ref: str, items: list[dict], status: str | 
         raise ValueError("An active order snapshot must contain at least one line")
     proforma_id: int | None = None
     with engine.begin() as conn:
-        ensure(conn)
-        _ensure_platform_proforma_storage(conn)
         # The unique order upsert also serializes concurrent snapshots of this order.
         conn.execute(text("""INSERT INTO platform_orders_raw(platform, order_ref, status, raw)
             VALUES (:p,:r,:s,CAST(:raw AS JSONB))
@@ -275,7 +218,6 @@ def push_stock_many(codes: list[str]) -> list[dict]:
     """Push available stock (and current target price) to each platform listing."""
     results = []
     with engine.begin() as conn:
-        ensure(conn)
         listings = conn.execute(text(
             "SELECT * FROM platform_listings WHERE active AND code = ANY(:codes)"),
             {"codes": codes}).mappings().all()
@@ -328,7 +270,6 @@ class ListingUpsert(BaseModel):
 def overview(user: dict = Depends(current_user)):
     _require_manager(user)
     with engine.begin() as conn:
-        ensure(conn)
         rows = conn.execute(text("""
             SELECT l.*, p.id AS product_id, COALESCE(p.stock,0) AS holoo_stock,
                    COALESCE(p.name,'') AS product_name
@@ -348,7 +289,6 @@ def upsert_listing(data: ListingUpsert, user: dict = Depends(current_user)):
     if data.price_mode == "manual" and not data.manual_price_irr:
         raise HTTPException(422, "برای قیمت دستی، manual_price_irr لازم است.")
     with engine.begin() as conn:
-        ensure(conn)
         conn.execute(text("""
             INSERT INTO platform_listings (platform, code, external_id, price_mode, manual_price_irr, price_factor, active)
             VALUES (:p,:c,:e,:m,:mp,:pf,:a)
@@ -385,7 +325,6 @@ async def import_prices(file: UploadFile = File(...), user: dict = Depends(curre
             rows.append(dict(zip(header, values)))
     applied, skipped = 0, []
     with engine.begin() as conn:
-        ensure(conn)
         for row in rows:
             code = str(row.get("code") or "").strip()
             price_irr = row.get("price_irr")
@@ -422,7 +361,6 @@ def push_all(user: dict = Depends(current_user)):
     """Full reconciliation push for every active listing."""
     _require_manager(user)
     with engine.begin() as conn:
-        ensure(conn)
         codes = [r[0] for r in conn.execute(text(
             "SELECT DISTINCT code FROM platform_listings WHERE active")).all()]
     return {"pushed": push_stock_many(codes)}
@@ -433,8 +371,6 @@ def list_platform_orders(user: dict = Depends(current_user)):
     """Platform orders with their internal proforma draft id and Holoo tick state."""
     _require_manager(user)
     with engine.begin() as conn:
-        ensure(conn)
-        _ensure_platform_proforma_storage(conn)
         rows = conn.execute(text("""
             SELECT o.platform, o.order_ref, o.status AS order_status, o.fetched_at,
                    op.proforma_id, op.status AS proforma_status,
@@ -463,8 +399,6 @@ def mark_holoo_registered(platform: str, order_ref: str, user: dict = Depends(cu
     if platform not in PLATFORMS:
         raise HTTPException(400, "سکوی فروش نامعتبر است.")
     with engine.begin() as conn:
-        ensure(conn)
-        _ensure_platform_proforma_storage(conn)
         updated = conn.execute(text("""
             UPDATE platform_order_proformas SET holoo_registered=TRUE, status='registered'
             WHERE platform=:p AND order_ref=:r
@@ -497,7 +431,6 @@ def unlisted_products(user: dict = Depends(current_user)):
     """Holoo products with no digikala_variants row (not yet listed on DK)."""
     _require_manager(user)
     with engine.begin() as conn:
-        ensure(conn)
         rows = conn.execute(text("""
             SELECT p.code, p.name, p.price, COALESCE(p.stock,0) AS stock
             FROM products p
@@ -513,7 +446,6 @@ def unlisted_products(user: dict = Depends(current_user)):
 def list_create_proposals(user: dict = Depends(current_user)):
     _require_manager(user)
     with engine.begin() as conn:
-        ensure(conn)
         rows = conn.execute(text(
             "SELECT * FROM platform_create_proposals ORDER BY created_at DESC LIMIT 200")).mappings().all()
     return {"items": [dict(r) for r in rows]}
@@ -523,7 +455,6 @@ def list_create_proposals(user: dict = Depends(current_user)):
 def create_proposal(data: CreateProposalInput, user: dict = Depends(current_user)):
     _require_manager(user)
     with engine.begin() as conn:
-        ensure(conn)
         product = conn.execute(text("SELECT code, name, price, stock FROM products WHERE code=:c"),
                                {"c": data.code}).mappings().first()
         if not product:
@@ -548,7 +479,6 @@ def confirm_create_proposal(proposal_id: int, user: dict = Depends(current_user)
     """Fail closed until Digikala publishes a verified product-creation API."""
     _require_manager(user)
     with engine.begin() as conn:
-        ensure(conn)
         prop = conn.execute(text("SELECT * FROM platform_create_proposals WHERE id=:i"),
                             {"i": proposal_id}).mappings().first()
         if not prop:
@@ -565,7 +495,6 @@ def confirm_create_proposal(proposal_id: int, user: dict = Depends(current_user)
 def reject_create_proposal(proposal_id: int, user: dict = Depends(current_user)):
     _require_manager(user)
     with engine.begin() as conn:
-        ensure(conn)
         updated = conn.execute(text(
             "UPDATE platform_create_proposals SET status='rejected', confirmed_at=NOW() WHERE id=:i AND status='pending'"),
             {"i": proposal_id}).rowcount
