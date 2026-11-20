@@ -249,7 +249,7 @@ Cutover فقط پس از امضای پذیرش Stage و تأیید مسئول ف
 8. پس از پذیرش شرکت و توقف تمام زمان‌بندهای قدیمی، در صورت استفاده از نصب Stage و تأیید موفق Checkها، Sync هلو را فقط روی مقصد جدید فعال کنید:
 
 \`\`\`powershell
-.\\06-Enable-Sync.ps1 -Destination $Destination -CompanyAcceptancePassed -OldSchedulersStopped
+.\06-Enable-Sync.ps1 -Destination $Destination -CompanyAcceptancePassed -OldSchedulersStopped
 \`\`\`
 
 این فرمان Sync خودکار هلو را فعال می‌کند؛ اتوماسیون دستیار، روتین‌ها و پیام‌های خروجی همچنان خاموش می‌مانند، مگر آنکه جداگانه و با تأیید صریح فعال شوند.
