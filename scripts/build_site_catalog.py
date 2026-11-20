@@ -4,6 +4,7 @@ Replaces the PowerShell pipeline whose cp1252 round-trip corrupted Persian
 titles/categories. Prices are stored in Toman (Rial / 10) as the site expects.
 """
 import json
+import math
 import sys
 from datetime import datetime
 from pathlib import Path
@@ -35,12 +36,14 @@ def main() -> int:
     products = []
     for row in rows:
         price = row["price"]
+        base_toman = math.floor(float(price) / 10 + 0.5) if price is not None else None
+        consumer_price = math.floor(base_toman * 1.15 + 0.5) if base_toman is not None else None
         products.append({
             "holoo_code": row["code"],
             "title": row["name"],
             "category": row["category"] or "بدون دسته",
             "image_url": row["image_url"],
-            "price_holoo": round(price / 10) if price is not None else None,
+            "consumer_price_toman": consumer_price,
             "in_stock": float(row["stock"] or 0) > 0,
         })
     payload = {
