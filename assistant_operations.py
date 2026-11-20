@@ -33,12 +33,6 @@ def ensure(conn):
         created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),expires_at TIMESTAMPTZ NOT NULL DEFAULT NOW()+INTERVAL '20 minutes')'''))
 
 
-@router.on_event('startup')
-def startup():
-    with engine.begin() as conn:
-        ensure(conn)
-
-
 def authorize(operation,user):
     from assistant_commands import COMMANDS,authorize as command_authorize
     if operation in COMMANDS:
