@@ -1,4 +1,4 @@
-# بستهٔ انتقال کیاراد BI برای جمعه ۱۳ نوامبر ۲۰۲۶
+# بستهٔ انتقال کیاراد BI برای جمعه ۲۰ نوامبر ۲۰۲۶
 
 این بسته برای **جایگزینی نصب موجود، پس از اجرای موازی و پذیرش** آماده شده است. سورس دقیق، شناسهٔ نسخه و checksum همراه بسته‌اند. نصب قبلی، دیتابیس قبلی و مقصد تونل را خودکار تغییر نمی‌دهد.
 
@@ -30,7 +30,7 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\01-Inspect-Server.ps1
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\02-Build-Images.ps1
 ```
 
-این فرمان از `source.zip` همین بسته، بک‌اند و فرانت‌اند را با برچسب نسخه می‌سازد؛ PostgreSQL 16 و Node 22 را نیز صادر می‌کند. خروجی در `payload\images.tar` و `payload\images.json` است. `images.json` شناسهٔ واقعی هر ایمیج، SHA نسخه و هش آرشیو را دارد. برای خروجی روی درایو دیگر، `-OutputDirectory 'D:\Kiarad-Payload-20261113'` بدهید و همین مسیر را در مرحلهٔ ۳ استفاده کنید.
+این فرمان از `source.zip` همین بسته، بک‌اند و فرانت‌اند را با برچسب نسخه می‌سازد؛ PostgreSQL 16 و Node 22 را نیز صادر می‌کند. خروجی در `payload\images.tar` و `payload\images.json` است. `images.json` شناسهٔ واقعی هر ایمیج، SHA نسخه و هش آرشیو را دارد. برای خروجی روی درایو دیگر، `-OutputDirectory 'D:\Kiarad-Payload-20261120'` بدهید و همین مسیر را در مرحلهٔ ۳ استفاده کنید.
 
 این مرحله دیتابیس شرکت را نمی‌خواند. فضای آزاد را هم برای مسیر خروجی و هم دیسک Docker Desktop بررسی کنید. ایمیج قدیمیِ هنداف یا ZIP انتقال قبلی را جایگزین این خروجی نکنید.
 
@@ -53,10 +53,10 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\03-Capture-Data.ps1 -S
 روی سرور، از پوشهٔ همین بسته:
 
 ```powershell
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\04-Install-Stage.ps1 -Destination "$env:USERPROFILE\kiarad-stage-20261113"
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\04-Install-Stage.ps1 -Destination "$env:USERPROFILE\kiarad-stage-20261120"
 ```
 
-مقصد باید وجود نداشته باشد. نام پروژهٔ پیش‌فرض `kiaradstage20261113` است؛ کانتینر و volume قبلی با این نام نیز باید وجود نداشته باشند. پورت‌های **۳۳۰۰، ۸۸۰۰ و ۸۱۹۰** باید آزاد باشند. نصب از ایمیج‌های صادرشده، بدون build و pull انجام می‌شود؛ دیتابیس جدید volume جدا دارد و PostgreSQL آن روی میزبان پورت عمومی ندارد.
+مقصد باید وجود نداشته باشد. نام پروژهٔ پیش‌فرض `kiaradstage20261120` است؛ کانتینر و volume قبلی با این نام نیز باید وجود نداشته باشند. پورت‌های **۳۳۰۰، ۸۸۰۰ و ۸۱۹۰** باید آزاد باشند. نصب از ایمیج‌های صادرشده، بدون build و pull انجام می‌شود؛ دیتابیس جدید volume جدا دارد و PostgreSQL آن روی میزبان پورت عمومی ندارد.
 
 - پنل: `http://127.0.0.1:3300/login`
 - بک‌اند: `http://127.0.0.1:8800/health`
