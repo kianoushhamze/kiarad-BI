@@ -141,12 +141,6 @@ class StorefrontOrderDatabaseTests(unittest.TestCase):
             root = Path(__file__).resolve().parents[1]
             for migration in ("0005_cms_product_meta.sql", "0006_storefront_platform_storage.sql"):
                 conn.exec_driver_sql((root / "migrations" / migration).read_text(encoding="utf-8-sig"))
-            conn.execute(text("""CREATE TABLE proforma_invoices(
-                id SERIAL PRIMARY KEY, customer_id INTEGER NOT NULL REFERENCES customers(id),
-                salesperson_id INTEGER REFERENCES salespersons(id), total_amount NUMERIC(18,2) NOT NULL,
-                status VARCHAR(20) NOT NULL DEFAULT 'pending', credit_grade VARCHAR(20), notes TEXT,
-                items_json JSONB NOT NULL DEFAULT '[]'::jsonb, created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
-            )"""))
 
     @classmethod
     def cleanup_schema(cls):
