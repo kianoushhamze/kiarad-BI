@@ -20,4 +20,5 @@ class MigrationFilesTests(unittest.TestCase):
         files = runner.migration_files()
         self.assertIn("0001_baseline.sql", [p.name for p in files])
         self.assertIn("0006_storefront_platform_storage.sql", [p.name for p in files])
+        self.assertIn("0007_chat_crm_storage.sql", [p.name for p in files])
         self.assertEqual(files, sorted(files))
