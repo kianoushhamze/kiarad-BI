@@ -37,7 +37,7 @@
 از ریشهٔ بسته اجرا کنید:
 
 ```powershell
-.`01-Inspect-Server.ps1 -ReportPath "$env:TEMP\kiarad-server-inspection.json"
+.\01-Inspect-Server.ps1 -ReportPath "$env:TEMP\kiarad-server-inspection.json"
 ```
 
 گزارش، کانتینرها و Imageها، mountهای PostgreSQL، پورت‌های در حال استفاده، فضای درایوها، سرویس‌های Cloudflare و Taskهای زمان‌بندی‌شدهٔ مرتبط را ثبت می‌کند. اسکریپت تغییری ایجاد نمی‌کند و رمز/توکن را در گزارش قرار نمی‌دهد.
@@ -75,7 +75,7 @@ $release | Format-List source_commit,image_tag,includes_images,includes_company_
 - اگر `includes_images=false` است، قبل از توقف ثبت‌های شرکت و روی دستگاه دارای اینترنت، ایمیج‌ها را بسازید:
 
 ```powershell
-.`02-Build-Images.ps1
+.\02-Build-Images.ps1
 ```
 
 تا زمانی که Imageها ساخته و هش آن‌ها تأیید نشده‌اند، ثبت کاربران و سرویس‌های شرکت را متوقف نکنید.
@@ -93,7 +93,7 @@ $release | Format-List source_commit,image_tag,includes_images,includes_company_
 ```powershell
 $SourceRoot = 'D:\مسیر-واقعی-نصب-فعال'
 $PostgresContainer = 'نام-واقعی-کانتینر-PostgreSQL'
-.`03-Capture-Data.ps1 -SourceRoot $SourceRoot -PostgresContainer $PostgresContainer -OutputDirectory '.\payload' -WritesStopped -SchedulesStopped
+.\03-Capture-Data.ps1 -SourceRoot $SourceRoot -PostgresContainer $PostgresContainer -OutputDirectory '.\payload' -WritesStopped -SchedulesStopped
 ```
 
 این مرحله با ابزار `backup_release.ps1` از دیتابیس و رسانه‌های تعریف‌شده Backup می‌گیرد و `.env` فعال، `secrets` و در صورت وجود مدل صوتی را به Payload خصوصی اضافه می‌کند. فایل `payload.json` برای فایل‌های Payload هش SHA256 ثبت می‌کند.
@@ -109,7 +109,7 @@ $PostgresContainer = 'نام-واقعی-کانتینر-PostgreSQL'
 ```powershell
 $Destination = 'D:\Kiarad-Stage-20261120'
 $PayloadDirectory = (Join-Path (Get-Location).Path 'payload')
-.`04-Install-Stage.ps1 -Destination $Destination -PayloadDirectory $PayloadDirectory -ProjectName 'kiaradstage20261120' -HolooUrl 'آدرس-تأییدشده-وب‌سرویس-هلو'
+.\04-Install-Stage.ps1 -Destination $Destination -PayloadDirectory $PayloadDirectory -ProjectName 'kiaradstage20261120' -HolooUrl 'آدرس-تأییدشده-وب‌سرویس-هلو'
 ```
 
 مقدار `-HolooUrl` را از تنظیمات واقعی شرکت تأیید کنید؛ مقدار پیش‌فرض اسکریپت یک آدرس نمونه/قدیمی است و نباید بدون تطبیق استفاده شود.
@@ -164,7 +164,7 @@ $PayloadDirectory = (Join-Path (Get-Location).Path 'payload')
 
 ```powershell
 $ComposeArgs = @('compose','--env-file',(Join-Path $Destination '.env'),'-p','kiaradstage20261120','-f',(Join-Path $Destination 'compose.transfer.yml'))
-docker @ComposeArgs exec -T backend python scripts/run_migrations.py --status
+& docker @ComposeArgs exec -T backend python scripts/run_migrations.py --status
 ```
 
 نتیجهٔ مورد انتظار: `status=checked` و فهرست `pending` خالی باشد. اگر نسخه‌ای معوق، خطای checksum یا Migration ثبت‌شدهٔ مفقود مشاهده شد، پذیرش را متوقف کنید و علت را بررسی کنید.
@@ -192,7 +192,7 @@ docker @ComposeArgs exec -T backend python scripts/run_migrations.py --status
 اجرا:
 
 ```powershell
-.`05-Check-Stage.ps1 -Destination $Destination -CheckHoloo
+.\05-Check-Stage.ps1 -Destination $Destination -CheckHoloo
 ```
 
 این اسکریپت سلامت Backend، پنل، پراکسی API، صفحهٔ فروشگاه و کاتالوگ عمومی را بررسی می‌کند. `-CheckHoloo` فقط ورود وب‌سرویس را می‌سنجد؛ موفقیت Login به‌تنهایی تازگی Snapshot یا صحت مانده‌های مالی را ثابت نمی‌کند.
@@ -246,6 +246,13 @@ Cutover فقط پس از امضای پذیرش Stage و تأیید مسئول ف
 5. Backend و Frontend جدید بالا بیایند؛ سلامت، نقش‌ها، داده‌های مالی و آخرین Snapshot کنترل شود.
 6. فقط پس از موفقیت آزمون‌ها، مسیر عمومی به مقصد پذیرفته‌شده هدایت و ثبت کاربران باز شود.
 7. فقط یک نصب و یک مجموعه Scheduler نویسنده باشد. زمان‌بندهای قدیمی تا تأیید کامل خاموش بمانند.
+8. پس از پذیرش شرکت و توقف تمام زمان‌بندهای قدیمی، در صورت استفاده از نصب Stage و تأیید موفق Checkها، Sync هلو را فقط روی مقصد جدید فعال کنید:
+
+\`\`\`powershell
+.\\06-Enable-Sync.ps1 -Destination $Destination -CompanyAcceptancePassed -OldSchedulersStopped
+\`\`\`
+
+این فرمان Sync خودکار هلو را فعال می‌کند؛ اتوماسیون دستیار، روتین‌ها و پیام‌های خروجی همچنان خاموش می‌مانند، مگر آنکه جداگانه و با تأیید صریح فعال شوند.
 
 ### بازگشت
 
