@@ -24,7 +24,7 @@ def public_image_url(value):
     if not isinstance(value, str):
         return None
     value = value.strip()
-    if not value or "\\\\" in value or any(ord(ch) < 32 or ch.isspace() for ch in value):
+    if not value or "\\" in value or any(ord(ch) < 32 or ch.isspace() for ch in value):
         return None
     if value.startswith("/") and not value.startswith("//"):
         return value
