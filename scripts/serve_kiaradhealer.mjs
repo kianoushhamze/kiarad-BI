@@ -46,7 +46,7 @@ async function proxy(req, res, pathname) {
     return reply(res, 405, 'Method not allowed');
   }
   const method = req.method;
-  const headers = {Accept: 'application/json'};
+  const headers = {Accept: pathname.endsWith('.csv') ? 'text/csv' : 'application/json'};
   if (req.headers.authorization) headers.Authorization = req.headers.authorization;
   let body;
   if (method === 'POST') {
