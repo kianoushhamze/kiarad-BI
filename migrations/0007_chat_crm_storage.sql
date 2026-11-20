@@ -51,17 +51,16 @@ BEGIN
     IF NOT had_owner THEN
         ALTER TABLE customer_interactions ADD COLUMN owner_user_id INTEGER;
 
-        -- Resolve only unambiguous legacy labels. Ambiguous/unmatched labels
-        -- stay manager-only; future display-name changes never transfer ownership.
+        -- Transfer only exact username labels, with or without "@", when they
+        -- resolve to one user. Never infer ownership from a display/full name.
+        -- Ambiguous and unmatched legacy rows remain unassigned.
         WITH candidates AS (
             SELECT ci.id, MIN(u.id) AS user_id
             FROM customer_interactions ci
-            JOIN users u ON (
-                (ci.visitor_name LIKE '@%' AND ci.visitor_name = '@' || u.username)
-                OR (ci.visitor_name NOT LIKE '@%' AND ci.visitor_name = u.full_name)
-            )
+            JOIN users u
+              ON ci.visitor_name IN (u.username, '@' || u.username)
             GROUP BY ci.id
-            HAVING COUNT(*) = 1
+            HAVING COUNT(DISTINCT u.id) = 1
         )
         UPDATE customer_interactions ci
         SET owner_user_id = candidates.user_id
