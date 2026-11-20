@@ -104,7 +104,7 @@ from platform_sync import router as platforms_router
 app.include_router(platforms_router)
 from digikala_router import router as digikala_router
 app.include_router(digikala_router)
-from site_cms import router as site_cms_router, banner_router as site_banner_router
+from site_cms import router as site_cms_router, banner_router as site_banner_router, _safe_public_link
 app.include_router(site_cms_router)
 app.include_router(site_banner_router)
 from site_auth import router as site_auth_router
@@ -462,6 +462,7 @@ def public_catalog():
                 except (TypeError, ValueError, OverflowError):
                     item['discount_price_irr'] = None
                 item.pop('generated_at', None)
+                item['image_url'] = _safe_public_link(item.get('image_url'))
                 item['in_stock'] = available > 0
                 products.append(item)
         return {
