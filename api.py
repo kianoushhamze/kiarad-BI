@@ -445,6 +445,12 @@ def public_catalog():
                 item = dict(row)
                 product_id = item.pop('id')
                 available = max(0, float(item.pop('stock') or 0) - totals.get(product_id, 0))
+                raw_price = item.pop('price', None)
+                if raw_price is None:
+                    item['consumer_price_toman'] = None
+                else:
+                    base_toman = math.floor(float(raw_price) / 10 + 0.5)
+                    item['consumer_price_toman'] = math.floor(base_toman * 1.15 + 0.5)
                 item.pop('generated_at', None)
                 item['in_stock'] = available > 0
                 products.append(item)
