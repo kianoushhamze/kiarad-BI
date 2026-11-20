@@ -72,12 +72,6 @@ def ensure(conn):
     conn.execute(text("CREATE INDEX IF NOT EXISTS ix_marketing_leads_city ON marketing_leads(city)"))
 
 
-@router.on_event('startup')
-def startup():
-    with engine.begin() as conn:
-        ensure(conn)
-
-
 # ----------------------------------------------------------------- leads (لید مشتری)
 
 PRIVATE_EXPORTS = Path(os.getenv('KIARAD_PRIVATE_EXPORTS',

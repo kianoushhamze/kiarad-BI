@@ -68,11 +68,6 @@ def ensure_table():
             checked_at TIMESTAMPTZ NOT NULL,checked_by INT NOT NULL)'''))
 
 
-@router.on_event("startup")
-def initialize_integration_storage():
-    ensure_table()
-
-
 def migrate_draft_schema(conn):
     """Preserve existing legacy public identifiers when upgrading a draft table."""
     had_label = conn.execute(text("""SELECT EXISTS (SELECT 1 FROM pg_attribute

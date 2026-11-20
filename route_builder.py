@@ -36,12 +36,6 @@ def ensure(conn):
     conn.execute(text("CREATE UNIQUE INDEX IF NOT EXISTS ux_physicians_name_city ON physicians(name, (COALESCE(city, '')))"))
     conn.execute(text('CREATE INDEX IF NOT EXISTS ix_physicians_city ON physicians(city)'))
 
-@router.on_event('startup')
-def startup():
-    with engine.begin() as conn:
-        ensure(conn)
-
-
 def _manager(user):
     """دسترسی مدیر: مدیرعامل، یا نقشی که روی ماژول manager دسترسی نوشتن دارد."""
     if not user or not user.get('id'):

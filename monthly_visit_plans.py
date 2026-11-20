@@ -48,11 +48,6 @@ def ensure(conn):
     conn.execute(text("CREATE UNIQUE INDEX IF NOT EXISTS monthly_visit_one_approved ON monthly_visit_plans(user_id,month) WHERE status='approved'"))
 
 
-@router.on_event('startup')
-def startup():
-    with engine.begin() as conn:ensure(conn)
-
-
 class Strict(BaseModel):
     model_config=ConfigDict(extra='forbid',allow_inf_nan=False)
 
