@@ -36,6 +36,7 @@ def ensure(conn):
 @router.on_event('startup')
 def startup():
     with engine.begin() as conn:
+        ensure(conn)
 
 
 def authorize(operation,user):
@@ -109,7 +110,6 @@ def prepare(args,user):
         baseline={'rule_version':current.get('rule_version'),'display':{'salesperson_id':name}}
     ident=str(uuid4())
     with engine.begin() as conn:
-        ensure(conn)
         import hashlib
         encoded=json.dumps(payload,ensure_ascii=False,sort_keys=True,allow_nan=False)
         digest=hashlib.sha256(encoded.encode()).hexdigest()
