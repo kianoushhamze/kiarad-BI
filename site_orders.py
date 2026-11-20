@@ -21,35 +21,13 @@ from db import engine
 from stock_reservations import lock_products
 from operations import current_user
 from site_auth import current_site_customer
-from site_cms import ensure as ensure_catalog
-from platform_sync import ensure as ensure_platforms, reserved_count, push_stock_many
+from platform_sync import reserved_count, push_stock_many
 
 logger = logging.getLogger("kiarad_site_orders")
 router = APIRouter(prefix="/site-orders", tags=["site_orders"])
 
 CONSUMER_FACTOR = 1.15
 ORDER_STATUSES = ("جدید", "تأیید شده", "ارسال شد", "لغو شد")
-
-
-def ensure(conn):
-    conn.execute(text("""
-        CREATE TABLE IF NOT EXISTS site_orders(
-            id SERIAL PRIMARY KEY,
-            customer_id INTEGER NOT NULL,
-            customer_name TEXT NOT NULL,
-            phone TEXT,
-            city TEXT,
-            address TEXT,
-            items JSONB NOT NULL DEFAULT '[]'::jsonb,
-            total_irr BIGINT NOT NULL DEFAULT 0,
-            status TEXT NOT NULL DEFAULT 'جدید',
-            created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-        )"""))
-    conn.execute(text("ALTER TABLE site_orders ADD COLUMN IF NOT EXISTS request_key TEXT"))
-    conn.execute(text("ALTER TABLE site_orders ADD COLUMN IF NOT EXISTS request_fingerprint TEXT"))
-    conn.execute(text("ALTER TABLE site_orders ADD COLUMN IF NOT EXISTS reservation_managed BOOLEAN NOT NULL DEFAULT FALSE"))
-    conn.execute(text("CREATE UNIQUE INDEX IF NOT EXISTS site_orders_customer_request_key "
-                      "ON site_orders(customer_id, request_key) WHERE request_key IS NOT NULL"))
 
 
 class OrderItemIn(BaseModel):
@@ -186,9 +164,6 @@ def _order_response(row, replayed=False):
 @router.post("")
 def create_order(data: OrderIn, background_tasks: BackgroundTasks, customer: dict = Depends(current_site_customer)):
     with engine.begin() as conn:
-        ensure(conn)
-        ensure_catalog(conn)
-        ensure_platforms(conn)
         fingerprint = _fingerprint(data)
         if data.request_id:
             conn.execute(text("SELECT pg_advisory_xact_lock(hashtextextended(:key, 0))"),
@@ -231,7 +206,6 @@ def _shape(r) -> dict:
 @router.get("/mine")
 def my_orders(customer: dict = Depends(current_site_customer)):
     with engine.connect() as conn:
-        ensure(conn)
         rows = conn.execute(text(
             "SELECT * FROM site_orders WHERE customer_id = :cid ORDER BY id DESC LIMIT 100"
         ), {"cid": customer["id"]}).mappings().all()
@@ -253,7 +227,6 @@ def all_orders(status: str = "", user: dict = Depends(current_user)):
         params["s"] = status
     sql += " ORDER BY id DESC LIMIT 500"
     with engine.connect() as conn:
-        ensure(conn)
         rows = conn.execute(text(sql), params).mappings().all()
     return {"count": len(rows), "orders": [_shape(r) for r in rows]}
 
@@ -264,8 +237,6 @@ def set_status(order_id: int, data: StatusIn, background_tasks: BackgroundTasks,
     if data.status not in ORDER_STATUSES:
         raise HTTPException(400, f"وضعیت باید یکی از {list(ORDER_STATUSES)} باشد.")
     with engine.begin() as conn:
-        ensure(conn)
-        ensure_platforms(conn)
         old = conn.execute(text("SELECT status FROM site_orders WHERE id=:id FOR UPDATE"), {"id": order_id}).mappings().first()
         if not old:
             raise HTTPException(404, "سفارشی با این شناسه پیدا نشد.")
