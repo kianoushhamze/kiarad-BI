@@ -1,52 +1,57 @@
 {
-  "store": {
-    "name": "فروشگاه کیاراد",
-    "tagline": "کاتالوگ محصولات با قیمت به‌روز هلو و دیجی‌کالا",
-    "customer_code_demo": "PH-1042"
+ "store": {
+  "name": "فروشگاه کیاراد",
+  "tagline": "کاتالوگ محصولات با قیمت به‌روز هلو و دیجی‌کالا",
+  "customer_code_demo": "PH-1042"
+ },
+ "categories": [
+  "پوشاک",
+  "کفش",
+  "اکسسوری",
+  "لوازم خانگی"
+ ],
+ "products": [
+  {
+   "holoo_code": "H1001",
+   "title": "محصول نمونه الف — سایز ۱",
+   "category": "پوشاک",
+   "price_holoo": 260000,
+   "in_stock": true
   },
-  "categories": ["پوشاک", "کفش", "اکسسوری", "لوازم خانگی"],
-  "products": [
-    {
-      "holoo_code": "H1001",
-      "title": "محصول نمونه الف — سایز ۱",
-      "category": "پوشاک",
-      "price_holoo": 260000,
-      "stock_holoo": 12
-    },
-    {
-      "holoo_code": "H1002",
-      "title": "محصول نمونه ب — سایز ۲",
-      "category": "کفش",
-      "price_holoo": 210000,
-      "stock_holoo": 7
-    },
-    {
-      "holoo_code": "H1003",
-      "title": "محصول نمونه ج — سایز ۱",
-      "category": "پوشاک",
-      "price_holoo": 105000,
-      "stock_holoo": 0
-    },
-    {
-      "holoo_code": "H1004",
-      "title": "محصول نمونه د",
-      "category": "اکسسوری",
-      "price_holoo": 390000,
-      "stock_holoo": 3
-    },
-    {
-      "holoo_code": "H2001",
-      "title": "محصول نمونه و — خانگی کوچک",
-      "category": "لوازم خانگی",
-      "price_holoo": 180000,
-      "stock_holoo": 20
-    },
-    {
-      "holoo_code": "H2002",
-      "title": "محصول نمونه ز — خانگی بزرگ",
-      "category": "لوازم خانگی",
-      "price_holoo": 340000,
-      "stock_holoo": 5
-    }
-  ]
+  {
+   "holoo_code": "H1002",
+   "title": "محصول نمونه ب — سایز ۲",
+   "category": "کفش",
+   "price_holoo": 210000,
+   "in_stock": true
+  },
+  {
+   "holoo_code": "H1003",
+   "title": "محصول نمونه ج — سایز ۱",
+   "category": "پوشاک",
+   "price_holoo": 105000,
+   "in_stock": false
+  },
+  {
+   "holoo_code": "H1004",
+   "title": "محصول نمونه د",
+   "category": "اکسسوری",
+   "price_holoo": 390000,
+   "in_stock": true
+  },
+  {
+   "holoo_code": "H2001",
+   "title": "محصول نمونه و — خانگی کوچک",
+   "category": "لوازم خانگی",
+   "price_holoo": 180000,
+   "in_stock": true
+  },
+  {
+   "holoo_code": "H2002",
+   "title": "محصول نمونه ز — خانگی بزرگ",
+   "category": "لوازم خانگی",
+   "price_holoo": 340000,
+   "in_stock": true
+  }
+ ]
 }
