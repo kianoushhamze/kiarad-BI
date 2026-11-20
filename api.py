@@ -1512,7 +1512,6 @@ async def send_chat_message(request: Request, user: dict = Depends(current_user)
 
     try:
         with engine.begin() as conn:
-            _ensure_chat_table(conn)
             result = conn.execute(text("""
                 INSERT INTO chat_messages
                     (sender, message, room, attachment_key, attachment_name, attachment_type, attachment_size)
