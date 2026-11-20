@@ -14,6 +14,7 @@ const routes = new Map([
   ['/api/public/catalog', 'GET'],
   ['/api/public/feeds/torob', ['GET', 'POST']],
   ['/api/public/feeds/products.json', 'GET'],
+  ['/api/public/feeds/products.csv', 'GET'],
   ['/api/site-banners', 'GET'],
   ['/api/site-auth/me', 'GET'],
   ['/api/site-auth/login', 'POST'],
@@ -68,9 +69,10 @@ async function proxy(req, res, pathname) {
   const upstream = await fetch(new URL(pathname.slice(4), api.origin), {
     method, headers, body, redirect: 'error', signal: AbortSignal.timeout(15000),
   });
-  const payload = await upstream.json();
-  res.writeHead(upstream.status, {'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store'});
-  res.end(JSON.stringify(payload));
+  const payload = Buffer.from(await upstream.arrayBuffer());
+  const contentType = upstream.headers.get('content-type') || 'application/octet-stream';
+  res.writeHead(upstream.status, {'Content-Type': contentType, 'Cache-Control': 'no-store'});
+  res.end(payload);
 }
 
 createServer(async (req, res) => {
