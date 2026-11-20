@@ -77,6 +77,14 @@ class CMSDatabaseTests(unittest.TestCase):
         self.assertIn("در هلو تغییر نمی‌دهد", result["note"])
 
 
+
+    def test_product_image_urls_reject_scriptable_and_external_plain_http_targets(self):
+        for value in ("javascript:alert(1)", "data:image/svg+xml,<svg>", "//attacker.invalid/image.png", "http://attacker.invalid/image.png", "https://user:pass@example.test/image.png"):
+            with self.subTest(value=value):
+                self.assertIsNone(cms._safe_public_link(value))
+        self.assertEqual(cms._safe_public_link("/uploads/product.png"), "/uploads/product.png")
+        self.assertEqual(cms._safe_public_link("https://cdn.example.test/product.png"), "https://cdn.example.test/product.png")
+
 class BannerInputSecurityTests(unittest.TestCase):
     def test_banner_links_reject_scriptable_and_protocol_relative_urls(self):
         for value in ("javascript:alert(1)", "data:text/html,<script>", "//attacker.invalid/path", "https://user:pass@example.test/", "https://[::1"):
