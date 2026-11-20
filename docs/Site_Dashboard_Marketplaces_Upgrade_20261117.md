@@ -28,7 +28,7 @@
 فقط دیجی‌کالا حساب فعال دارد. برای ترب و ایمالز **فید عمومی فقط‌خواندنی** ساخته شد (`marketplace_feeds.py`):
 
 - `GET|POST /public/feeds/torob` — قالب API نسخهٔ ۲ ترب (`count`, `max_pages`, `products[]`؛ استعلام تک‌کالا با `page_unique` یا `page_url`).
-- `GET /public/feeds/products.json` و `products.csv` — قالب عمومی.
+- `GET /public/feeds/products.json` و `products.csv` — قالب عمومی. هر دو از پراکسی فروشگاه با مسیرهای `/api/public/feeds/products.json` و `/api/public/feeds/products.csv` در دسترس‌اند؛ پراکسی، محتوای CSV و `Content-Type` آن را بدون تبدیل JSON عبور می‌دهد.
 - فقط نام، قیمت (تومان)، `instock/outofstock`، تصویر و لینک؛ بدون قیمت خرید، تعداد موجودی یا داده مشتری. کالای بی‌قیمت منتشر نمی‌شود.
 - مبنای آدرس‌ها: متغیر `KIARAD_SITE_BASE_URL` (پیش‌فرض `https://shop.kiaradhealer.ir`).
 - مسیر ترب و `products.json` از طریق پراکسی فروشگاه هم در دسترس‌اند: `/api/public/feeds/...`.
