@@ -1780,7 +1780,6 @@ import reconciliation_engine as _rec_eng
 def get_plan_reconciliation_4buckets(plan_id: int, up_to_date: Optional[date] = None):
     session = _db_mod.SessionLocal()
     try:
-        _rec_eng.ensure_reconciliation_schema(session)
         return _rec_eng.calculate_monthly_reconciliation(session, plan_id, up_to_date)
     finally:
         session.close()
