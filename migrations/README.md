@@ -50,4 +50,6 @@ Commands:
 ## Remaining startup-provisioned module schemas
 
 - Traccar storage is provisioned by migration 0004; request handlers no longer create or alter device/shift tables.
-- Treasury Excel batch storage is initialized once at application startup; preview, commit, list, export, and forecasting requests do not run schema DDL.
+- 0010_treasury_excel_storage.sql provisions Treasury Excel batch storage. Preview, commit, list, export, and forecasting requests do not run schema DDL.
+
+- Apply migration 0010 before deploying Treasury Excel import and forecasting changes.
