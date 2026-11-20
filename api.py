@@ -143,6 +143,7 @@ _OPEN_PATHS = ["/", "/health", "/docs", "/redoc", "/openapi.json", "/auth/login"
                "/public/catalog",
                "/public/feeds/torob", "/public/feeds/products.json", "/public/feeds/products.csv",
                "/site-auth/login", "/site-auth/register", "/site-auth/me"]
+_PUBLIC_GET_ONLY_PATHS = {"/public/catalog", "/public/feeds/products.json", "/public/feeds/products.csv"}
 _AUTH_METADATA_PATHS = {"/auth/me", "/auth/permissions", "/auth/password"}
 
 
@@ -312,6 +313,8 @@ async def auth_gate(request, call_next):
         except HTTPException as exc: return JSONResponse(status_code=exc.status_code,content={"detail":exc.detail})
         return await call_next(request)
     if path in _OPEN_PATHS:
+        if path in _PUBLIC_GET_ONLY_PATHS and request.method not in {"GET", "HEAD"}:
+            return JSONResponse(status_code=401, content={"detail": "Authentication required"})
         return await call_next(request)
     if request.method in {"GET", "HEAD"} and (path == "/site-banners" or path.startswith("/site-banners/")):
         # Public, read-only CMS banners for the storefront (no personal data).
