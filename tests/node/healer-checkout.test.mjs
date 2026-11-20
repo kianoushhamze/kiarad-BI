@@ -6,6 +6,10 @@ import { once } from 'node:events';
 const upstream = createServer(async (req, res) => {
   res.setHeader('Content-Type', 'application/json');
   if (req.url === '/public/catalog') return res.end(JSON.stringify({products: [{code: 'TEST', in_stock: true}]}));
+  if (req.url === '/site-banners/42/image') {
+    res.setHeader('Content-Type', 'image/png');
+    return res.end(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]));
+  }
   if (req.url === '/public/feeds/products.csv') {
     res.setHeader('Content-Type', 'text/csv; charset=utf-8');
     return res.end('\uFEFFpage_unique,title\nA1,Test product\n');
@@ -41,6 +45,10 @@ try {
   assert.match(await (await fetch(base)).text(), /href="\/buy\/"/);
   assert.match(await (await fetch(base + '/buy/')).text(), /function submitOrder/);
   assert.deepEqual(await (await fetch(base + '/api/public/catalog')).json(), {products: [{code: 'TEST'}]});
+  const bannerImage = await fetch(base + '/api/site-banners/42/image');
+  assert.equal(bannerImage.status, 200);
+  assert.equal(bannerImage.headers.get('content-type'), 'image/png');
+  assert.deepEqual([...new Uint8Array(await bannerImage.arrayBuffer())], [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
   const csv = await fetch(base + '/api/public/feeds/products.csv');
   assert.equal(csv.status, 200);
   assert.match(csv.headers.get('content-type') || '', /^text\/csv/i);
