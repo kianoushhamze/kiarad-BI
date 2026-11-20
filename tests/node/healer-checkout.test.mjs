@@ -6,6 +6,10 @@ import { once } from 'node:events';
 const upstream = createServer(async (req, res) => {
   res.setHeader('Content-Type', 'application/json');
   if (req.url === '/public/catalog') return res.end(JSON.stringify({products: [{code: 'TEST'}]}));
+  if (req.url === '/public/feeds/products.csv') {
+    res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+    return res.end('\uFEFFpage_unique,title\\nA1,Test product\\n');
+  }
   if (req.url !== '/site-orders') {
     res.statusCode = 404;
     return res.end('{}');
@@ -37,6 +41,11 @@ try {
   assert.match(await (await fetch(base)).text(), /href="\/buy\/"/);
   assert.match(await (await fetch(base + '/buy/')).text(), /function submitOrder/);
   assert.deepEqual(await (await fetch(base + '/api/public/catalog')).json(), {products: [{code: 'TEST'}]});
+  const csv = await fetch(base + '/api/public/feeds/products.csv');
+  assert.equal(csv.status, 200);
+  assert.match(csv.headers.get('content-type') || '', /^text\\/csv/i);
+  assert.equal(await csv.text(), '\uFEFFpage_unique,title\\nA1,Test product\\n');
+  assert.equal((await fetch(base + '/api/public/feeds/products.csv', {method: 'POST'})).status, 405);
   assert.equal((await fetch(base + '/api/site-orders/all')).status, 404);
   assert.equal((await fetch(base + '/api/site-orders')).status, 405);
   const body = JSON.stringify({items: [{code: 'TEST', qty: 1}], request_id: 'checkout_test_fixture'});
