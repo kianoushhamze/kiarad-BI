@@ -39,7 +39,7 @@ function reply(res, status, detail) {
 }
 
 async function proxy(req, res, pathname) {
-  const bannerImage = /^\\/api\\/site-banners\\/\\d+\\/image$/.test(pathname);
+  const bannerImage = /^\/api\/site-banners\/\d+\/image$/.test(pathname);
   const allowed = bannerImage ? ['GET'] : [].concat(routes.get(pathname) || []);
   if (!allowed.length) return reply(res, 404, 'Unknown storefront endpoint');
   if (!allowed.includes(req.method)) {
