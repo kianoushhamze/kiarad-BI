@@ -1,5 +1,7 @@
 """CMS changes against disposable PostgreSQL schemas; never uses company data."""
 import os
+import base64
+from pathlib import Path
 import unittest
 from contextlib import nullcontext
 from unittest.mock import patch
@@ -36,6 +38,9 @@ class CMSDatabaseTests(unittest.TestCase):
         self.conn.execute(text(f"SET LOCAL search_path TO {schema}"))
         self.conn.execute(text("CREATE TABLE products(code TEXT PRIMARY KEY, name TEXT, price BIGINT)"))
         self.conn.execute(text("INSERT INTO products VALUES ('A','Synthetic product',10000)"))
+        root = Path(__file__).resolve().parents[1]
+        for migration in ("0005_cms_product_meta.sql", "0006_storefront_platform_storage.sql"):
+            self.conn.exec_driver_sql((root / "migrations" / migration).read_text(encoding="utf-8-sig"))
         patcher = patch.object(cms, "engine")
         mocked = patcher.start()
         self.addCleanup(patcher.stop)
@@ -68,3 +73,27 @@ class CMSDatabaseTests(unittest.TestCase):
         self.assertEqual(self.conn.execute(text("SELECT price FROM products WHERE code='A'")).scalar_one(), 12000)
         self.assertEqual(result["old_price_irr"], 10000)
         self.assertIn("در هلو تغییر نمی‌دهد", result["note"])
+
+
+class BannerInputSecurityTests(unittest.TestCase):
+    def test_banner_links_reject_scriptable_and_protocol_relative_urls(self):
+        for value in ("javascript:alert(1)", "data:text/html,<script>", "//attacker.invalid/path", "https://user:pass@example.test/"):
+            with self.subTest(value=value), self.assertRaises(HTTPException):
+                cms._clean_link_url(value)
+        self.assertEqual(cms._clean_link_url("/campaign/summer"), "/campaign/summer")
+        self.assertEqual(cms._clean_link_url("https://example.test/campaign"), "https://example.test/campaign")
+
+    def test_legacy_unsafe_banner_link_is_not_returned_to_public_site(self):
+        self.assertIsNone(cms._safe_public_link("javascript:alert(1)"))
+        self.assertIsNone(cms._safe_public_link("//attacker.invalid"))
+        self.assertEqual(cms._safe_public_link("/safe/path"), "/safe/path")
+
+    def test_banner_upload_requires_real_supported_image_bytes(self):
+        fake = base64.b64encode(b"not-an-image" * 8).decode("ascii")
+        with self.assertRaises(HTTPException):
+            cms._clean_image(fake)
+        png = b"\\x89PNG\\r\\n\\x1a\\n" + b"0" * 64
+        encoded = base64.b64encode(png).decode("ascii")
+        self.assertEqual(cms._image_media(cms._clean_image(encoded)), "image/png")
+        with self.assertRaises(HTTPException):
+            cms._clean_image("data:image/jpeg;base64," + encoded)
