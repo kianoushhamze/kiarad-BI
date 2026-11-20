@@ -264,7 +264,7 @@ def save_report_preview(payload,digest,title,source_note,user):
         if existing:
             raise HTTPException(409, "این فایل و شیت قبلاً پیش‌نمایش یا ثبت شده است؛ از فهرست گزارش‌ها بازش کنید.")
         if kind == "monthly":
-            from treasury_strategy import ensure_schema, _latest
+            from treasury_strategy import _latest
 
             payload["expected_revisions"] = {f"{r['kind']}:{r['month']}": (old["revision"] if (old := _latest(conn, f"{r['kind']}:{r['month']}")) else 0) for r in payload["normalized"]}
         row = conn.execute(text("""INSERT INTO treasury_excel_batches(kind,title,source_note,content_hash,payload,created_by)
@@ -340,7 +340,7 @@ def commit_report(batch_id: int, data: ConfirmImport, user: dict = Depends(requi
                 conn.execute(text("""INSERT INTO financial_documents(document_type,counterparty,amount,due_date,status,reference_number,collection_probability,notes,created_at)
                     VALUES(:document_type,:counterparty,:amount,:due_date,:status,:reference,:collection_probability,:note,NOW())"""), {**value, "note": f"ورود از اکسل؛ گزارش {batch_id}؛ " + row["source_note"]})
         elif row["kind"] == "monthly":
-            from treasury_strategy import _save, ensure_schema
+            from treasury_strategy import _save
 
             for value in payload["normalized"]:
                 scope = f"{value['kind']}:{value['month']}"
