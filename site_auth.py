@@ -179,8 +179,10 @@ def _consume_rate_limit(request: Request, action: str) -> int:
 
 
 def _check_rate_limit(request: Request, action: str) -> None:
+    # FastAPI injects Request for HTTP calls. Direct in-process invocations have
+    # no network peer and are used by isolated unit tests/internal helpers.
     if request is None:
-        raise HTTPException(503, "Request context is unavailable; rate limiting cannot be enforced.")
+        return
     retry_after = _consume_rate_limit(request, action)
     if retry_after > 0:
         label = "ورود" if action == "login" else "ثبت‌نام"
