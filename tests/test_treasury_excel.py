@@ -6,6 +6,7 @@ import json
 import os
 from types import SimpleNamespace
 import unittest
+from pathlib import Path
 from unittest.mock import patch
 from xml.sax.saxutils import escape
 from zipfile import ZipFile
@@ -151,7 +152,11 @@ class ExcelDatabaseTests(unittest.TestCase):
         self.conn=db.engine.connect();self.addCleanup(self.conn.close);self.addCleanup(self.conn.rollback)
         self.assertEqual(self.conn.exec_driver_sql('SHOW search_path').scalar(),'pg_temp')
         self.conn.execute(text('CREATE TEMP TABLE financial_documents(id SERIAL PRIMARY KEY,document_type TEXT,counterparty TEXT,amount NUMERIC,due_date DATE,status TEXT,reference_number TEXT,collection_probability NUMERIC,notes TEXT,created_at TIMESTAMPTZ)'))
-        excel.ensure_excel_schema(self.conn);strategy.ensure_schema(self.conn)
+        migration = Path(__file__).resolve().parents[1] / "migrations" / "0010_treasury_excel_storage.sql"
+        raw = self.conn.connection.driver_connection
+        with raw.cursor() as cursor:
+            cursor.execute(migration.read_text(encoding="utf-8-sig"))
+        strategy.ensure_schema(self.conn)
         @contextmanager
         def transaction():yield self.conn
         for p in (patch.object(excel,'engine',SimpleNamespace(begin=transaction)),):
