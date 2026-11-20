@@ -230,7 +230,6 @@ def plan_objective(data:Objective,user=Depends(current_user)):
     from assistant_commands import catalog
     sources=[]
     with engine.begin() as conn:
-        ensure(conn)
         for sid in data.source_ids:
             row=conn.execute(text('SELECT id,title,kind,content,source_date,url FROM agent_sources WHERE id=:id AND owner_id=:uid'),{'id':str(sid),'uid':user['id']}).mappings().first()
             if not row:raise HTTPException(404,'منبع متعلق به شما پیدا نشد.')
@@ -270,7 +269,6 @@ Prefer measurable outputs and explicit evidence, owner, due date, validation and
 def list_missions(user=Depends(current_user)):
     ceo(user)
     with engine.begin() as conn:
-        ensure(conn)
         rows=conn.execute(text('SELECT id,title,objective,domains,state,plan_digest,created_at,updated_at,last_monitor_at FROM agent_missions WHERE owner_id=:uid ORDER BY created_at DESC LIMIT 100'),{'uid':user['id']}).mappings().all()
     return {'items':[dict(r) for r in rows]}
 
@@ -518,7 +516,6 @@ def feedback(ident:UUID,data:Feedback,user=Depends(current_user)):
 def lessons(user=Depends(current_user)):
     ceo(user)
     with engine.begin() as conn:
-        ensure(conn)
         rows=conn.execute(text('SELECT id,domain,text,feedback_id,active,version,created_at FROM agent_lessons WHERE owner_id=:uid ORDER BY id DESC LIMIT 100'),{'uid':user['id']}).mappings().all()
     return {'items':[dict(r) for r in rows]}
 
@@ -566,7 +563,6 @@ def source_detail(ident:UUID,user=Depends(current_user)):
 def list_sources(user=Depends(current_user)):
     ceo(user)
     with engine.begin() as conn:
-        ensure(conn)
         return {'items':[dict(r) for r in conn.execute(text('SELECT id,title,kind,source_date,url,created_at FROM agent_sources WHERE owner_id=:uid ORDER BY created_at DESC LIMIT 100'),{'uid':user['id']}).mappings()]}
 
 
