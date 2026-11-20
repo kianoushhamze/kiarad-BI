@@ -44,7 +44,7 @@ try {
   const base = 'http://127.0.0.1:' + String(data).trim().split(' ').at(-1);
   assert.match(await (await fetch(base)).text(), /href="\/buy\/"/);
   assert.match(await (await fetch(base + '/buy/')).text(), /function submitOrder/);
-  assert.deepEqual(await (await fetch(base + '/api/public/catalog')).json(), {products: [{code: 'TEST'}]});
+  assert.deepEqual(await (await fetch(base + '/api/public/catalog')).json(), {products: [{code: 'TEST', in_stock: true}]});
   const bannerImage = await fetch(base + '/api/site-banners/42/image');
   assert.equal(bannerImage.status, 200);
   assert.equal(bannerImage.headers.get('content-type'), 'image/png');
