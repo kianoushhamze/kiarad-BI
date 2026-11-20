@@ -159,7 +159,3 @@ def review(ident:UUID,data:Review,user=Depends(current_user)):
             c.execute(text("UPDATE prospect_candidates SET review_status='approved',reviewed_by=:uid,reviewed_at=NOW(),review_note=:note,base_source=:source,base_id=:base WHERE id=:id"),{'id':str(ident),'uid':user['id'],'note':data.note,'source':target_source,'base':target_id});result={'state':'approved','base_source':target_source,'base_id':target_id,'existing_base_overwritten':bool(data.apply_base_update)}
         c.execute(text('INSERT INTO prospect_reviews(candidate_id,revision,actor_id,decision,note,payload) VALUES(:id,:revision,:uid,:decision,:note,CAST(:payload AS JSONB))'),{'id':str(ident),'revision':data.expected_revision,'uid':user['id'],'decision':data.decision,'note':data.note,'payload':encode(data.model_dump(mode='json'))})
     return result
-
-@router.on_event('startup')
-def startup():
-    with engine.begin() as c:ensure(c)

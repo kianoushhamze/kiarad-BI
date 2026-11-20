@@ -150,24 +150,5 @@ def obligation_task(ident:UUID,data:Obligation,user=Depends(current_user)):
 @router.get('/contract-reviews')
 def contract_history(user=Depends(current_user)):
     ceo(user)
-    with engine.begin() as c:ensure(c);rows=c.execute(text('SELECT r.*,s.title AS source_title FROM specialist_contract_reviews r JOIN agent_sources s ON s.id=r.source_id WHERE r.owner_id=:uid ORDER BY r.created_at DESC LIMIT 50'),{'uid':user['id']}).mappings().all()
+    with engine.begin() as c:rows=c.execute(text('SELECT r.*,s.title AS source_title FROM specialist_contract_reviews r JOIN agent_sources s ON s.id=r.source_id WHERE r.owner_id=:uid ORDER BY r.created_at DESC LIMIT 50'),{'uid':user['id']}).mappings().all()
     return {'items':[dict(r) for r in rows]}
-
-@router.on_event('startup')
-def startup():
-    with engine.begin() as c:ensure(c)
-
-@router.get('/programmes')
-def professional_programmes(user=Depends(current_user)):
-    ceo(user)
-    from business_programmes import PROGRAMMES
-    return {'items':[{'domain':d,**p} for d,p in PROGRAMMES.items()]}
-
-
-class MonitorRequest(Strict):
-    user_ids:list[int]=Field(min_length=1,max_length=50)
-
-@router.post('/team-signals')
-def team_signals(data:MonitorRequest,user=Depends(current_user)):
-    from specialist_monitor import signals
-    return signals(data.user_ids,user)

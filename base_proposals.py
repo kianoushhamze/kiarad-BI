@@ -31,11 +31,6 @@ def ensure_proposals(conn,*,temporary=False):
         holoo_status VARCHAR(40) NOT NULL DEFAULT 'not_requested',UNIQUE(created_by,submission_key))'''))
 
 
-@router.on_event('startup')
-def startup():
-    with engine.begin() as conn:ensure_proposals(conn)
-
-
 class ProposalInput(BaseModel):
     submission_key:UUID
     name:str=Field(min_length=2,max_length=160)
