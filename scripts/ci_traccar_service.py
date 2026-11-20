@@ -17,6 +17,7 @@ with engine.begin() as c:
     # CI provisions the same versioned Traccar schema as deployment; app startup is DDL-free.
     ensure_tracking(c)
     c.execute(text((ROOT/'migrations/0004_traccar_bridge.sql').read_text(encoding='utf-8')))
+    c.execute(text((ROOT/'migrations/0012_operational_module_storage.sql').read_text(encoding='utf-8')))
     c.execute(text('ALTER TABLE users ADD COLUMN IF NOT EXISTS password_version INTEGER NOT NULL DEFAULT 0'))
     c.execute(text('ALTER TABLE products ADD COLUMN IF NOT EXISTS price2 DOUBLE PRECISION'))
     c.execute(text("INSERT INTO products(code,name,category,price,price2,stock,is_active) SELECT 'CI-A','Synthetic GPS fixture','Test',10000,10000,10,1 WHERE NOT EXISTS(SELECT 1 FROM products WHERE code='CI-A')"))
