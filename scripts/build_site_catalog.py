@@ -20,9 +20,6 @@ OUT = ROOT / "site" / "data.json"
 
 def main() -> int:
     with engine.connect() as conn:
-        conn.execute(text("""CREATE TABLE IF NOT EXISTS cms_product_meta(
-            code VARCHAR(100) PRIMARY KEY, site_category TEXT, image_url TEXT,
-            hidden BOOLEAN NOT NULL DEFAULT FALSE, updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW())"""))
         rows = conn.execute(text(
             """
             SELECT p.code, p.name,
@@ -44,7 +41,7 @@ def main() -> int:
             "category": row["category"] or "بدون دسته",
             "image_url": row["image_url"],
             "price_holoo": round(price / 10) if price is not None else None,
-            "stock_holoo": row["stock"] or 0,
+            "in_stock": float(row["stock"] or 0) > 0,
         })
     payload = {
         "store": {"name": "Ordibeauty", "tagline": "اردی‌بیوتی — زیبایی اورجینال، با قیمت و موجودی زنده"},
