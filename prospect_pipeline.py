@@ -94,7 +94,7 @@ def ingest(c,run_id,items,city,max_items):
 def run_discovery(data:Discovery,user=Depends(current_user)):
     ceo(user)
     with engine.begin() as c:
-        ensure(c);c.execute(text('SELECT pg_advisory_xact_lock(hashtextextended(:key,0))'),{'key':f'discovery:{user["id"]}:{data.submission_key}'})
+        c.execute(text('SELECT pg_advisory_xact_lock(hashtextextended(:key,0))'),{'key':f'discovery:{user["id"]}:{data.submission_key}'})
         old=c.execute(text('SELECT id,state,summary FROM prospect_runs WHERE created_by=:uid AND submission_key=:key'),{'uid':user['id'],'key':str(data.submission_key)}).mappings().first()
         if old:
             if old['state']=='completed':return {'run_id':str(old['id']),'state':'completed','summary':old['summary'],'replayed':True}
@@ -119,7 +119,7 @@ def run_discovery(data:Discovery,user=Depends(current_user)):
 def candidates(state:str|None=None,user=Depends(current_user)):
     ceo(user)
     with engine.begin() as c:
-        ensure(c);rows=c.execute(text('''SELECT p.*,(SELECT COUNT(*) FROM prospect_candidates d WHERE d.identity_hint=p.identity_hint AND d.id<>p.id) AS possible_duplicate_count
+        rows=c.execute(text('''SELECT p.*,(SELECT COUNT(*) FROM prospect_candidates d WHERE d.identity_hint=p.identity_hint AND d.id<>p.id) AS possible_duplicate_count
         FROM prospect_candidates p WHERE (:state IS NULL OR review_status=:state) ORDER BY last_seen_at DESC LIMIT 500'''),{'state':state}).mappings().all()
     return {'items':[dict(r) for r in rows],'limited_to':500}
 
@@ -127,7 +127,7 @@ def candidates(state:str|None=None,user=Depends(current_user)):
 @router.get('/runs')
 def runs(user=Depends(current_user)):
     ceo(user)
-    with engine.begin() as c:ensure(c);rows=c.execute(text('SELECT * FROM prospect_runs WHERE created_by=:uid ORDER BY started_at DESC LIMIT 100'),{'uid':user['id']}).mappings().all()
+    with engine.begin() as c:rows=c.execute(text('SELECT * FROM prospect_runs WHERE created_by=:uid ORDER BY started_at DESC LIMIT 100'),{'uid':user['id']}).mappings().all()
     return {'items':[dict(r) for r in rows]}
 
 
@@ -159,3 +159,7 @@ def review(ident:UUID,data:Review,user=Depends(current_user)):
             c.execute(text("UPDATE prospect_candidates SET review_status='approved',reviewed_by=:uid,reviewed_at=NOW(),review_note=:note,base_source=:source,base_id=:base WHERE id=:id"),{'id':str(ident),'uid':user['id'],'note':data.note,'source':target_source,'base':target_id});result={'state':'approved','base_source':target_source,'base_id':target_id,'existing_base_overwritten':bool(data.apply_base_update)}
         c.execute(text('INSERT INTO prospect_reviews(candidate_id,revision,actor_id,decision,note,payload) VALUES(:id,:revision,:uid,:decision,:note,CAST(:payload AS JSONB))'),{'id':str(ident),'revision':data.expected_revision,'uid':user['id'],'decision':data.decision,'note':data.note,'payload':encode(data.model_dump(mode='json'))})
     return result
+
+@router.on_event('startup')
+def startup():
+    with engine.begin() as c:
