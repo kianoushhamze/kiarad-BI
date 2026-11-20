@@ -754,7 +754,6 @@ def create_task_in_connection(conn, data: TaskCreate, manager: dict):
         raise HTTPException(status_code=422, detail="عنوان کار را وارد کنید")
     if data.priority not in {"low", "normal", "high", "urgent"}:
         raise HTTPException(status_code=422, detail="Invalid priority")
-    _ensure_task_workflow(conn)
     assignee = conn.execute(
         text("SELECT id FROM users WHERE id=:id AND is_active::text IN ('1','true','t')"),
         {"id": data.assigned_to},
