@@ -125,6 +125,13 @@ class SiteAuthRateLimitTests(unittest.TestCase):
         self.assertEqual(error.exception.headers["Retry-After"], "45")
         connect.assert_not_called()
 
+    def test_auth_route_fails_closed_without_request_context(self):
+        data = site_auth.RegisterIn(name="Test User", contact="user@example.com", password="safe-password")
+        with patch.dict(os.environ, {"KIARAD_JWT_SECRET": "x" * 40}):
+            with self.assertRaises(HTTPException) as error:
+                site_auth.register(data)
+        self.assertEqual(error.exception.status_code, 503)
+
     def test_register_route_stops_before_insert_when_limited(self):
         request = request_for()
         data = site_auth.RegisterIn(name="Test User", contact="user@example.com", password="safe-password")

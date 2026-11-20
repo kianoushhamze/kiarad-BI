@@ -179,6 +179,8 @@ def _consume_rate_limit(request: Request, action: str) -> int:
 
 
 def _check_rate_limit(request: Request, action: str) -> None:
+    if request is None:
+        raise HTTPException(503, "Request context is unavailable; rate limiting cannot be enforced.")
     retry_after = _consume_rate_limit(request, action)
     if retry_after > 0:
         label = "ورود" if action == "login" else "ثبت‌نام"
@@ -236,7 +238,7 @@ class LoginIn(BaseModel):
 
 
 @router.post("/register")
-def register(data: RegisterIn, request: Request):
+def register(data: RegisterIn, request: Request = None):
     _secret()
     _check_rate_limit(request, "register")
     email, phone = _normalize_contact(data.contact)
@@ -252,7 +254,7 @@ def register(data: RegisterIn, request: Request):
 
 
 @router.post("/login")
-def login(data: LoginIn, request: Request):
+def login(data: LoginIn, request: Request = None):
     _secret()
     _check_rate_limit(request, "login")
     email, phone = _normalize_contact(data.contact)
