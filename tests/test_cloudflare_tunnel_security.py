@@ -22,10 +22,10 @@ class CloudflareTunnelSecurityTests(unittest.TestCase):
         self.assertIn("icacls.exe", SCRIPT)
         self.assertIn("S-1-5-18", SCRIPT)
         self.assertIn("S-1-5-32-544", SCRIPT)
-        self.assertIn("Protect-Directory $SvcDir", SCRIPT)
-        self.assertIn("Protect-Directory $LogDir", SCRIPT)
-        self.assertIn("Protect-File $credDestination", SCRIPT)
-        self.assertIn("Protect-File $configPath", SCRIPT)
+        self.assertIn("Protect-Path $SvcDir -Directory", SCRIPT)
+        self.assertIn("Protect-Path $LogDir -Directory", SCRIPT)
+        self.assertIn("Protect-Path $credDestination", SCRIPT)
+        self.assertIn("Protect-Path $configPath", SCRIPT)
 
     def test_existing_windows_service_is_reconfigured_not_deleted(self):
         self.assertIn("sc.exe config KiaradCloudflared", SCRIPT)
@@ -33,13 +33,13 @@ class CloudflareTunnelSecurityTests(unittest.TestCase):
         self.assertNotIn("Remove-Service", SCRIPT)
 
     def test_existing_tunnel_credentials_failure_is_non_destructive(self):
-        self.assertIn("Existing tunnel credentials are missing", SCRIPT)
-        self.assertIn("Do not delete or recreate the existing tunnel", SCRIPT)
+        self.assertIn("Credentials missing for existing tunnel", SCRIPT)
+        self.assertIn("do not delete/recreate it", SCRIPT)
         self.assertNotIn("tunnel delete", SCRIPT.lower())
 
     def test_config_validation_precedes_service_changes_and_quick_tunnel_is_preserved(self):
         self.assertLess(SCRIPT.index("ingress validate"), SCRIPT.index("Windows service"))
-        self.assertIn("Does not touch the current Quick Tunnel", SCRIPT)
+        self.assertIn("Quick Tunnel was not stopped", SCRIPT)
 
 
 if __name__ == "__main__":
