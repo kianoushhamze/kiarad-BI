@@ -30,7 +30,7 @@ This review covers the public storefront/catalog, customer authentication and or
 
 ## Schema lifecycle
 
-Migration `0006_storefront_platform_storage.sql` creates the customer, order, banner, listing, reservation, raw platform-order, proposal, and platform-order/proforma tables. It adds the order idempotency and reservation columns/index to legacy installations without deleting rows.
+Migration `0006_storefront_platform_storage.sql` creates the customer, order, banner, listing, platform reservation, raw platform-order, proposal, platform-order/proforma, proforma invoice, and inventory-reservation tables. It adds the order idempotency and reservation columns/index to legacy installations without deleting rows.
 
 Request-time schema creation was removed from:
 - `site_auth.py`
