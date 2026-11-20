@@ -15,38 +15,6 @@ from data_sources import ensure_source_storage, save_manual_fields, restore_holo
 router = APIRouter(prefix="/catalog", tags=["catalog"])
 MANAGERS = {"ceo", "sales_manager", "finance"}
 
-@router.on_event('startup')
-def initialize_data_sources():
-    with engine.begin() as conn:ensure_source_storage(conn)
-
-def manager(user=Depends(current_user)):
-    if user["role"] not in MANAGERS:
-        raise HTTPException(status_code=403, detail="دسترسی مدیریت کالا فقط برای نقش‌های مدیریتی مجاز است.")
-    return user
-
-
-def reader(user=Depends(current_user)):
-    return user
-
-class ChannelLink(BaseModel):
-    channel: str = Field(min_length=2, max_length=30)
-    external_id: str = Field(min_length=1, max_length=200)
-    is_active: bool = True
-
-class Reservation(BaseModel):
-    model_config = ConfigDict(allow_inf_nan=False)
-    channel: str = Field(min_length=2, max_length=30)
-    external_order_id: str = Field(min_length=1, max_length=200)
-    quantity: float = Field(gt=0, le=1000000000)
-
-class ProductUpdate(BaseModel):
-    model_config = ConfigDict(allow_inf_nan=False)
-    price: Optional[float] = Field(default=None, ge=0)
-    price2: Optional[float] = Field(default=None, ge=0)
-    stock: Optional[float] = Field(default=None, ge=0)
-    min_stock: Optional[float] = Field(default=None, ge=0)
-    is_active: Optional[bool] = None
-
 class InventoryBatchInput(BaseModel):
     batch_code: str = Field(min_length=1, max_length=100)
     expiry_date: date
@@ -72,7 +40,6 @@ def ensure_inventory_batches():
 
 @router.get("/products/{product_id}/batches")
 def list_inventory_batches(product_id: int, user=Depends(reader)):
-    ensure_inventory_batches()
     with engine.connect() as conn:
         if not conn.execute(text("SELECT 1 FROM products WHERE id=:id"), {"id": product_id}).first():
             raise HTTPException(status_code=404, detail="کالا پیدا نشد.")

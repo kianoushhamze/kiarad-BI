@@ -134,13 +134,6 @@ class AdvancedReportInput(BaseModel):
     raw_text: Optional[str] = Field(default=None, max_length=20000)
 
 
-@router.on_event("startup")
-def ensure_voice_report_schema():
-    with engine.begin() as conn:
-        conn.execute(text("ALTER TABLE daily_reports ADD COLUMN IF NOT EXISTS customer_id INTEGER REFERENCES customers(id)"))
-        _ensure_voice_entries(conn)
-
-
 def _ensure_voice_entries(conn, *, temporary=False):
     conn.execute(text(f"""CREATE {'TEMP ' if temporary else ''}TABLE IF NOT EXISTS voice_report_entries (
         id SERIAL PRIMARY KEY, created_by INTEGER NOT NULL REFERENCES users(id),

@@ -53,13 +53,6 @@ def ensure_entry_storage(conn):
         UNIQUE(entity,created_by,content_hash))'''))
 
 
-@router.on_event('startup')
-def initialize_entries():
-    from catalog import ensure_inventory_batches
-    ensure_inventory_batches()
-    with engine.begin() as conn:ensure_entry_storage(conn)
-
-
 @router.get('/schema')
 def schema(user=Depends(current_user)):
     if user.get('role') not in {'ceo','sales_manager','finance'}:raise HTTPException(403,'دسترسی مدیریتی لازم است.')
@@ -142,7 +135,6 @@ class ManualInput(BaseModel):
 
 
 def store_preview(conn,entity,rows,user,mode):
-    ensure_entry_storage(conn)
     if entity=='batches':
         # Storage exists at normal application startup; tests create isolated equivalents.
         if not conn.execute(text("SELECT to_regclass('inventory_batches') IS NOT NULL")).scalar():
@@ -246,7 +238,6 @@ def commit(entity:str,batch_id:int,data:Confirm,user=Depends(current_user)):
     allowed(entity,user)
     if not data.confirm:raise HTTPException(422,'تأیید صریح لازم است.')
     with engine.begin() as conn:
-        ensure_entry_storage(conn)
         conn.execute(text('SELECT pg_advisory_xact_lock(hashtextextended(:key,0))'),{'key':'data-entry:'+entity})
         batch=conn.execute(text('SELECT * FROM data_entry_batches WHERE id=:id FOR UPDATE'),{'id':batch_id}).mappings().first()
         if not batch or batch['entity']!=entity or batch['created_by']!=user['id']:raise HTTPException(404,'پیش‌نمایش متعلق به این حساب پیدا نشد.')

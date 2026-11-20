@@ -52,12 +52,6 @@ def _ensure_base_source_columns(conn):
         conn.execute(text(f"ALTER TABLE IF EXISTS {table} ADD COLUMN IF NOT EXISTS source TEXT"))
 
 
-@router.on_event("startup")
-def initialize_catalog_storage():
-    with engine.begin() as conn:
-        _ensure_product_media_table(conn)
-        _ensure_base_source_columns(conn)
-
 ALLOWED_TABLES = {
     "products": ["code", "name", "category", "price", "stock", "min_stock", "is_active"],
     "pharmacies": ["name", "city", "address", "phone", "type", "source"],
