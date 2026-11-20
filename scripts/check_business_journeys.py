@@ -98,7 +98,8 @@ def main():
     assert proxy_catalog.status_code == 200
     public_products = proxy_catalog.json()['products']
     assert any(p['code'] == probe_code for p in public_products)
-    assert all('stock' not in p and isinstance(p.get('in_stock'), bool) for p in public_products)
+    assert all('stock' not in p and 'price' not in p and isinstance(p.get('in_stock'), bool)
+               and 'consumer_price_toman' in p for p in public_products)
 
     def parallel_registration():
         def register(n):
