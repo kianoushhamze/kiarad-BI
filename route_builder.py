@@ -36,6 +36,10 @@ def ensure(conn):
     conn.execute(text("CREATE UNIQUE INDEX IF NOT EXISTS ux_physicians_name_city ON physicians(name, (COALESCE(city, '')))"))
     conn.execute(text('CREATE INDEX IF NOT EXISTS ix_physicians_city ON physicians(city)'))
 
+@router.on_event('startup')
+def startup():
+    with engine.begin() as conn:
+
 
 def _manager(user):
     """دسترسی مدیر: مدیرعامل، یا نقشی که روی ماژول manager دسترسی نوشتن دارد."""
@@ -278,7 +282,6 @@ def suggest_routes(data: SuggestRequest, user: dict = Depends(current_user)):
                 {'city': data.city}).mappings().all()
     else:
         with engine.connect() as conn:
-            ensure(conn)
             rows = conn.execute(text('''SELECT name, city, address, phone FROM physicians
                 WHERE (:city IS NULL OR city = :city) ORDER BY city, name'''),
                 {'city': data.city}).mappings().all()
