@@ -35,12 +35,6 @@ def ensure(conn):
     conn.execute(text('CREATE INDEX IF NOT EXISTS tracking_points_session_time ON tracking_points(session_id,recorded_at DESC)'))
 
 
-@router.on_event('startup')
-def startup():
-    with engine.begin() as conn:
-        ensure(conn)
-
-
 class Strict(BaseModel):
     model_config = ConfigDict(extra='forbid', allow_inf_nan=False)
 
@@ -113,7 +107,6 @@ def start_session(data: Start, user=Depends(current_user)):
     staff(user)
     now = datetime.now(timezone.utc)
     with engine.begin() as conn:
-        ensure(conn)
         return start_session_in_connection(conn,data,user,now=now)
 
 
@@ -141,7 +134,6 @@ def upload(data: Upload, user=Depends(current_user)):
     now = datetime.now(timezone.utc)
     accepted = []
     with engine.begin() as conn:
-        ensure(conn)
         session = own_session(conn, data.session_id, data.device_id, user, True)
         for sample in data.samples:
             timestamp = sample.recorded_at.astimezone(timezone.utc)

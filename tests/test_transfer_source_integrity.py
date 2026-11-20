@@ -21,7 +21,8 @@ class TransferSourceIntegrityTests(unittest.TestCase):
         self.git('config', 'user.name', 'Release fixture')
         paths = ['transfer/01-Inspect-Server.ps1', 'transfer/README-fa.md',
                  'docs/General_Debug_20261112.md', 'docs/Completion_Validation_20261113.md',
-                 'docs/Traccar_Bridge_Handoff_20261113.md', 'docs/Software_Finalization_20261114.md']
+                 'docs/Traccar_Bridge_Handoff_20261113.md', 'docs/Software_Finalization_20261114.md',
+                 'docs/Company_Secure_Deployment_Runbook_20261120.md']
         for name in paths:
             path = self.root / name
             path.parent.mkdir(parents=True, exist_ok=True)
@@ -47,7 +48,8 @@ class TransferSourceIntegrityTests(unittest.TestCase):
         (self.root / 'docs/General_Debug_20261112.md').write_text('uncommitted report')
         build(self.root, self.snapshot, self.output(), Path(self.temp.name) / 'absent')
         with zipfile.ZipFile(self.output() / 'source.zip') as archive:
-            for name in ('transfer/01-Inspect-Server.ps1', 'docs/General_Debug_20261112.md'):
+            for name in ('transfer/01-Inspect-Server.ps1', 'docs/General_Debug_20261112.md',
+                         'docs/Company_Secure_Deployment_Runbook_20261120.md'):
                 self.assertEqual((self.output() / Path(name).name).read_bytes(), archive.read(name))
         self.assertFalse((self.output() / 'untracked.ps1').exists())
         for record in json.loads((self.output() / 'checksums.json').read_text()):

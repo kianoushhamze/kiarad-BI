@@ -19,12 +19,6 @@ def ensure_portfolios(conn, *, temporary=False):
         ON base_portfolio_assignments (base_source,base_id) WHERE ended_at IS NULL'''))
 
 
-@router.on_event('startup')
-def startup():
-    with engine.begin() as conn:
-        ensure_portfolios(conn)
-
-
 class PortfolioInput(BaseModel):
     salesperson_id: int=Field(gt=0)
     source: Literal['pharmacies','cosmetics_shops','kerman_bases_manual']

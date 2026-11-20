@@ -21,13 +21,20 @@ def main():
     groups = re.findall(r'File = "([^"]+)"; Flag = "([^"]+)"', source)
     if not groups:
         raise RuntimeError('database_test_groups_missing')
-    if not any(name == 'test_site_cms_regressions.py' for name, _ in groups):
-        groups.append(('test_site_cms_regressions.py', 'KIARAD_TEST_CMS_DB'))
+    fallbacks = (
+        ('test_site_cms_regressions.py', 'KIARAD_TEST_CMS_DB'),
+        ('test_marketplace_feeds_db.py', 'KIARAD_TEST_MARKETPLACE_FEEDS_DB'),
+        ('test_crm_schema.py', 'KIARAD_TEST_CRM_SCHEMA_DB'),
+    )
+    for filename, flag in fallbacks:
+        if not any(name == filename for name, _ in groups):
+            groups.append((filename, flag))
     results = []
     for filename, flag in groups:
         env = {k: v for k, v in os.environ.items() if not (k.startswith('KIARAD_TEST_') and k.endswith('_DB'))}
         env.update({flag: '1', 'PGOPTIONS': '-c search_path=pg_temp -c statement_timeout=30000 -c lock_timeout=5000',
-                    'HOLO_AUTO_REFRESH_ENABLED': '0', 'KIARAD_AUTOMATIONS_DISABLED': '1'})
+                    'HOLO_API_URL': 'http://127.0.0.1:9', 'HOLO_AUTO_REFRESH_ENABLED': '0',
+                    'KIARAD_AUTOMATIONS_DISABLED': '1'})
         result = subprocess.run([sys.executable, '-m', 'unittest', 'discover', '-s', 'tests', '-p', filename, '-v'],
                                 cwd=ROOT, env=env, capture_output=True, text=True, timeout=180)
         sys.stdout.write(result.stdout)

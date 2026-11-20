@@ -240,7 +240,6 @@ def harvest_questions(user: dict = Depends(current_user)):
         candidates.extend(found)
     if candidates:
         with engine.begin() as conn:
-            ensure(conn)
             existing = [r[0] for r in conn.execute(text(
                 "SELECT question FROM market_questions ORDER BY id DESC LIMIT 2000")).all()]
             for q in dedup_questions(candidates, existing):
@@ -259,7 +258,6 @@ def harvest_questions(user: dict = Depends(current_user)):
 def list_questions(user: dict = Depends(current_user)):
     _require_manager(user)
     with engine.connect() as conn:
-        ensure(conn)
         rows = conn.execute(text("""SELECT id, asked_on, topic, question, source, signal_score, created_at
             FROM market_questions ORDER BY created_at DESC, id DESC LIMIT 100""")).mappings().all()
     groups: dict[str, list[dict]] = {}
@@ -288,7 +286,6 @@ def _kerman_sales_counts(conn) -> tuple[dict[str, float], int]:
 def refresh_demand(user: dict = Depends(current_user)):
     _require_manager(user)
     with engine.begin() as conn:
-        ensure(conn)
         sales_counts, product_count = _kerman_sales_counts(conn)
     pcts, total_qty = compute_kerman_sales_pct(sales_counts)
     has_sales = bool(pcts)
@@ -299,14 +296,12 @@ def refresh_demand(user: dict = Depends(current_user)):
         # No sales data: still fill web_signal for the active catalog so the
         # panel works, but the response says sales percentages are missing.
         with engine.connect() as conn:
-            ensure(conn)
             ranked = [(r[0], 0.0) for r in conn.execute(text(
                 "SELECT code FROM products WHERE COALESCE(is_active,1)=1 ORDER BY name LIMIT :n"),
                 {"n": DEMAND_TOP_PRODUCTS}).all()]
 
     searched, ratelimited, web_signals = 0, 0, {}
     with engine.connect() as conn:
-        ensure(conn)
         names = dict(conn.execute(text(
             "SELECT code, name FROM products WHERE code = ANY(:codes)"),
             {"codes": [c for c, _ in ranked]}).all())
@@ -330,7 +325,6 @@ def refresh_demand(user: dict = Depends(current_user)):
 
     updated = 0
     with engine.begin() as conn:
-        ensure(conn)
         for code, pct in ranked:
             category = conn.execute(text(
                 "SELECT COALESCE(category,'') FROM products WHERE code=:c"), {"c": code}).scalar()
@@ -356,7 +350,6 @@ def refresh_demand(user: dict = Depends(current_user)):
 def list_demand(user: dict = Depends(current_user)):
     _require_manager(user)
     with engine.connect() as conn:
-        ensure(conn)
         rows = conn.execute(text("""SELECT d.code, d.category, d.kerman_sales_pct, d.web_signal,
                 d.sales_source, d.updated_at, COALESCE(p.name, d.code) AS product_name
             FROM market_demand d LEFT JOIN products p ON p.code = d.code
@@ -383,7 +376,6 @@ def _fmt_pct(value) -> str:
 def generate_content(user: dict = Depends(current_user)):
     _require_manager(user)
     with engine.connect() as conn:
-        ensure(conn)
         demand = conn.execute(text("""SELECT d.kerman_sales_pct, d.web_signal, d.code,
                 COALESCE(p.name, d.code) AS product_name
             FROM market_demand d LEFT JOIN products p ON p.code=d.code
@@ -440,7 +432,6 @@ def generate_content(user: dict = Depends(current_user)):
     }
     saved = []
     with engine.begin() as conn:
-        ensure(conn)
         for key in ("post", "story", "seo"):
             lines = sections[key]
             if key == "post":
@@ -462,7 +453,6 @@ def generate_content(user: dict = Depends(current_user)):
 def list_content(kind: str | None = None, user: dict = Depends(current_user)):
     _require_manager(user)
     with engine.connect() as conn:
-        ensure(conn)
         sql = text("SELECT id, created_at, kind, title, body, based_on, status FROM marketing_content "
                    "WHERE (:k IS NULL OR kind=:k) ORDER BY created_at DESC, id DESC LIMIT 100")
         rows = conn.execute(sql, {"k": kind}).mappings().all()
@@ -474,14 +464,12 @@ def to_calendar(item_id: int, user: dict = Depends(current_user)):
     _require_manager(user)
     from integrations import CONTENT_CHANNELS, ensure_table
     with engine.begin() as conn:
-        ensure(conn)
         row = conn.execute(text("SELECT id, kind, title, body FROM marketing_content WHERE id=:i"),
                            {"i": item_id}).mappings().first()
         if not row:
             raise HTTPException(404, "پیش‌نویس مارکتینگ پیدا نشد.")
         if row["kind"] != "post":
             raise HTTPException(422, "فقط پست اینستاگرام مستقیم به تقویم محتوا می‌رود؛ استوری و سئو ابتدا باید بازبینی شوند.")
-    ensure_table()
     from datetime import datetime, timedelta, timezone
     from integrations import content_calendar
     with engine.begin() as conn:
@@ -519,7 +507,6 @@ def list_leads(source: str | None = None, city: str | None = None, status: str |
     query += " ORDER BY created_at DESC, id DESC LIMIT :limit"
     params["limit"] = limit
     with engine.connect() as conn:
-        ensure(conn)
         rows = conn.execute(text(query), params).mappings().all()
         counts = conn.execute(text(
             "SELECT source, count(*) FROM marketing_leads GROUP BY source ORDER BY 2 DESC")).all()
@@ -534,7 +521,6 @@ def create_lead(data: LeadCreate, user: dict = Depends(current_user)):
     if not name:
         raise HTTPException(422, "نام لید الزامی است.")
     with engine.begin() as conn:
-        ensure(conn)
         row = conn.execute(text("""INSERT INTO marketing_leads(source, name, city, phone, address, detail, status)
             VALUES (:source, :name, :city, :phone, :address, CAST(:detail AS JSONB), COALESCE(:status, 'new'))
             ON CONFLICT (name, (COALESCE(city, ''))) DO UPDATE SET
@@ -551,7 +537,6 @@ def create_lead(data: LeadCreate, user: dict = Depends(current_user)):
 def delete_lead(lead_id: int, user: dict = Depends(current_user)):
     _require_manager(user)
     with engine.begin() as conn:
-        ensure(conn)
         deleted = conn.execute(text("DELETE FROM marketing_leads WHERE id = :id"), {"id": lead_id}).rowcount
     if not deleted:
         raise HTTPException(404, "لید یافت نشد.")
@@ -565,7 +550,6 @@ def import_leads_from_files(user: dict = Depends(current_user)):
     _require_manager(user)
     per_file: dict[str, dict] = {}
     with engine.begin() as conn:
-        ensure(conn)
         for source, path in LEAD_IMPORT_FILES:
             records = lead_records_from_file(path, source)
             inserted = skipped = 0
@@ -712,7 +696,6 @@ def discover_leads(params: LeadDiscoveryRequest, user: dict = Depends(current_us
     inserted = skipped = 0
     if params.save and found:
         with engine.begin() as conn:
-            ensure(conn)
             for rec in found[:500]:
                 row = conn.execute(text("""INSERT INTO marketing_leads(source, name, city, phone, address, detail, status)
                     VALUES (:source, :name, :city, :phone, :address, CAST(:detail AS JSONB), 'new')

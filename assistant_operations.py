@@ -104,7 +104,6 @@ def prepare(args,user):
         baseline={'rule_version':current.get('rule_version'),'display':{'salesperson_id':name}}
     ident=str(uuid4())
     with engine.begin() as conn:
-        ensure(conn)
         import hashlib
         encoded=json.dumps(payload,ensure_ascii=False,sort_keys=True,allow_nan=False)
         digest=hashlib.sha256(encoded.encode()).hexdigest()
@@ -143,7 +142,7 @@ def read_proposal(ident: str,user=Depends(current_user)):
     try:UUID(ident)
     except ValueError:raise HTTPException(422,'شناسهٔ پیشنهاد معتبر نیست.') from None
     with engine.begin() as conn:
-        ensure(conn);row=proposal(conn,ident,user)
+        row=proposal(conn,ident,user)
     return {**{k:row[k] for k in ('id','operation','payload','status','receipt','expires_at')},
             'display':(row.get('baseline') or {}).get('display',{}),
             'before':(row.get('baseline') or {}).get('before'),

@@ -1,13 +1,15 @@
 """Rebuild site/data.json from the live products table with clean UTF-8.
 
 Replaces the PowerShell pipeline whose cp1252 round-trip corrupted Persian
-titles/categories. Prices are stored in Toman (Rial / 10) as the site expects.
+titles/categories. Only the final consumer price in Toman and a boolean stock flag are published.
 """
 import json
+import math
 import sys
 from datetime import datetime
 from pathlib import Path
 from uuid import uuid4
+from urllib.parse import urlsplit
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
@@ -18,11 +20,27 @@ from db import engine  # noqa: E402
 OUT = ROOT / "site" / "data.json"
 
 
+def public_image_url(value):
+    if not isinstance(value, str):
+        return None
+    value = value.strip()
+    if not value or "\\" in value or any(ord(ch) < 32 or ch.isspace() for ch in value):
+        return None
+    if value.startswith("/") and not value.startswith("//"):
+        return value
+    try:
+        parsed = urlsplit(value)
+        _ = parsed.port
+    except ValueError:
+        return None
+    if (parsed.scheme.lower() == "https" and parsed.hostname
+            and parsed.username is None and parsed.password is None):
+        return value
+    return None
+
+
 def main() -> int:
     with engine.connect() as conn:
-        conn.execute(text("""CREATE TABLE IF NOT EXISTS cms_product_meta(
-            code VARCHAR(100) PRIMARY KEY, site_category TEXT, image_url TEXT,
-            hidden BOOLEAN NOT NULL DEFAULT FALSE, updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW())"""))
         rows = conn.execute(text(
             """
             SELECT p.code, p.name,
@@ -38,13 +56,21 @@ def main() -> int:
     products = []
     for row in rows:
         price = row["price"]
+        try:
+            numeric_price = float(price) if price is not None else None
+            base_toman = (math.floor(numeric_price / 10 + 0.5)
+                          if numeric_price is not None and math.isfinite(numeric_price) and numeric_price >= 0
+                          else None)
+        except (TypeError, ValueError, OverflowError):
+            base_toman = None
+        consumer_price = math.floor(base_toman * 1.15 + 0.5) if base_toman is not None else None
         products.append({
             "holoo_code": row["code"],
             "title": row["name"],
             "category": row["category"] or "بدون دسته",
-            "image_url": row["image_url"],
-            "price_holoo": round(price / 10) if price is not None else None,
-            "stock_holoo": row["stock"] or 0,
+            "image_url": public_image_url(row["image_url"]),
+            "consumer_price_toman": consumer_price,
+            "in_stock": float(row["stock"] or 0) > 0,
         })
     payload = {
         "store": {"name": "Ordibeauty", "tagline": "اردی‌بیوتی — زیبایی اورجینال، با قیمت و موجودی زنده"},

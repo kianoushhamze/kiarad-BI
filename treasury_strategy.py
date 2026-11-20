@@ -145,14 +145,12 @@ def ensure_schema(conn):
         id BIGSERIAL PRIMARY KEY, scope VARCHAR(50) NOT NULL, revision INTEGER NOT NULL,
         payload JSONB NOT NULL, created_by INTEGER NOT NULL, approved_by INTEGER,
         created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), UNIQUE(scope, revision))"""))
-    if not conn.execute(text("SELECT 1 FROM pg_attribute WHERE attrelid=to_regclass('financial_documents') AND attname='fixed_expense_id' AND NOT attisdropped")).first():
-        conn.execute(text("ALTER TABLE financial_documents ADD COLUMN IF NOT EXISTS fixed_expense_id INTEGER"))
+
 
 
 @router.on_event("startup")
 def initialize_strategy_schema():
-    with engine.begin() as conn:
-        ensure_schema(conn)
+    # Schema is provisioned by migration 0012; startup only starts the refresh worker.
     start_automatic_refresh()
 
 
@@ -236,7 +234,6 @@ def action_list(projection, collections, reports, approved, targets):
 def strategy_overview(_: dict = Depends(require_treasury_access)):
     today = iran_today()
     with engine.begin() as conn:
-        ensure_schema(conn)
         settings_row = _latest(conn, "settings")
         settings = settings_row["payload"] if settings_row else default_settings(today)
         reports, approved = _reports(conn)
@@ -320,7 +317,6 @@ def save_operating_plan(data: OperatingPlan, user: dict = Depends(require_treasu
     payload["checks_registry_complete"] = False
     payload["attested_at"] = iran_today().isoformat()
     with engine.begin() as conn:
-        ensure_schema(conn)
         from treasury_excel import excel_balance_summary
         source = excel_balance_summary(conn) if data.balance_source == "excel" else latest_financial_snapshot(conn)
         if data.bank_balances_current and (not source or source["to_date"] != iran_today().isoformat() or not source["currency_verified"]
@@ -348,7 +344,6 @@ def save_strategy_settings(data: StrategySettings, user: dict = Depends(require_
     if data.baseline_month and month_index(data.baseline_month) >= month_index(month_of(iran_today())):
         raise HTTPException(422, "برای مبنای واقعی، یک ماه کامل‌شده انتخاب کنید.")
     with engine.begin() as conn:
-        ensure_schema(conn)
         if data.baseline_month and data.baseline_profit is None:
             row = conn.execute(text("""SELECT * FROM treasury_strategy_revisions WHERE scope=:scope AND approved_by IS NOT NULL
                 ORDER BY revision DESC LIMIT 1"""), {"scope": f"actual:{data.baseline_month}"}).mappings().first()
@@ -369,14 +364,12 @@ def save_monthly_finance(data: MonthlyFinance, user: dict = Depends(require_trea
         raise HTTPException(422, "ماه جاری یا آینده هنوز برای تأیید نهایی کامل نشده است.")
     payload = data.model_dump(mode="json", exclude={"expected_revision", "approve"})
     with engine.begin() as conn:
-        ensure_schema(conn)
         return _save(conn, f"{data.kind}:{data.month}", data.expected_revision, payload, user, data.approve)
 
 
 @router.post("/cash-scenario")
 def cash_scenario(data: CashScenario, _: dict = Depends(require_treasury_access)):
     with engine.begin() as conn:
-        ensure_schema(conn)
         accounts, documents, expenses = _load_sources(conn)
     return {"preview_only": True, "saved": False, "projection": liquidity_projection(accounts, documents, expenses, iran_today(), data.model_dump())}
 
@@ -384,7 +377,6 @@ def cash_scenario(data: CashScenario, _: dict = Depends(require_treasury_access)
 @router.post("/profit-scenario")
 def profit_scenario(data: ProfitScenario, _: dict = Depends(require_treasury_access)):
     with engine.begin() as conn:
-        ensure_schema(conn)
         report = conn.execute(text("""SELECT * FROM treasury_strategy_revisions WHERE scope=:scope AND approved_by IS NOT NULL
             ORDER BY revision DESC LIMIT 1"""), {"scope": f"actual:{data.month}"}).mappings().first()
         settings_row = _latest(conn, "settings")

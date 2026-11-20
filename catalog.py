@@ -15,10 +15,6 @@ from data_sources import ensure_source_storage, save_manual_fields, restore_holo
 router = APIRouter(prefix="/catalog", tags=["catalog"])
 MANAGERS = {"ceo", "sales_manager", "finance"}
 
-@router.on_event('startup')
-def initialize_data_sources():
-    with engine.begin() as conn:ensure_source_storage(conn)
-
 def manager(user=Depends(current_user)):
     if user["role"] not in MANAGERS:
         raise HTTPException(status_code=403, detail="دسترسی مدیریت کالا فقط برای نقش‌های مدیریتی مجاز است.")
@@ -72,7 +68,6 @@ def ensure_inventory_batches():
 
 @router.get("/products/{product_id}/batches")
 def list_inventory_batches(product_id: int, user=Depends(reader)):
-    ensure_inventory_batches()
     with engine.connect() as conn:
         if not conn.execute(text("SELECT 1 FROM products WHERE id=:id"), {"id": product_id}).first():
             raise HTTPException(status_code=404, detail="کالا پیدا نشد.")
@@ -84,7 +79,6 @@ def list_inventory_batches(product_id: int, user=Depends(reader)):
 
 @router.post("/products/{product_id}/batches")
 def create_inventory_batch(product_id: int, data: InventoryBatchInput, user=Depends(manager)):
-    ensure_inventory_batches()
     if not data.batch_code.strip():
         raise HTTPException(status_code=422, detail="شمارهٔ بچ نمی‌تواند خالی باشد.")
     if data.expiry_date < datetime.now(ZoneInfo("Asia/Tehran")).date():

@@ -14,6 +14,7 @@ const routes = new Map([
   ['/api/public/catalog', 'GET'],
   ['/api/public/feeds/torob', ['GET', 'POST']],
   ['/api/public/feeds/products.json', 'GET'],
+  ['/api/public/feeds/products.csv', 'GET'],
   ['/api/site-banners', 'GET'],
   ['/api/site-auth/me', 'GET'],
   ['/api/site-auth/login', 'POST'],
@@ -38,14 +39,15 @@ function reply(res, status, detail) {
 }
 
 async function proxy(req, res, pathname) {
-  const allowed = [].concat(routes.get(pathname) || []);
+  const bannerImage = /^\/api\/site-banners\/\d+\/image$/.test(pathname);
+  const allowed = bannerImage ? ['GET'] : [].concat(routes.get(pathname) || []);
   if (!allowed.length) return reply(res, 404, 'Unknown storefront endpoint');
   if (!allowed.includes(req.method)) {
     res.setHeader('Allow', allowed.join(', '));
     return reply(res, 405, 'Method not allowed');
   }
   const method = req.method;
-  const headers = {Accept: 'application/json'};
+  const headers = {Accept: pathname.endsWith('.csv') ? 'text/csv' : 'application/json'};
   if (req.headers.authorization) headers.Authorization = req.headers.authorization;
   let body;
   if (method === 'POST') {
@@ -68,9 +70,10 @@ async function proxy(req, res, pathname) {
   const upstream = await fetch(new URL(pathname.slice(4), api.origin), {
     method, headers, body, redirect: 'error', signal: AbortSignal.timeout(15000),
   });
-  const payload = await upstream.json();
-  res.writeHead(upstream.status, {'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store'});
-  res.end(JSON.stringify(payload));
+  const payload = Buffer.from(await upstream.arrayBuffer());
+  const contentType = upstream.headers.get('content-type') || 'application/octet-stream';
+  res.writeHead(upstream.status, {'Content-Type': contentType, 'Cache-Control': 'no-store'});
+  res.end(payload);
 }
 
 createServer(async (req, res) => {

@@ -1,4 +1,6 @@
-# بستهٔ انتقال کیاراد BI برای جمعه ۱۳ نوامبر ۲۰۲۶
+# بستهٔ انتقال کیاراد BI برای جمعه ۲۰ نوامبر ۲۰۲۶
+
+> پیش از هر تغییر عملیاتی، [راهنمای استقرار امن و مهاجرت دیتابیس](Company_Secure_Deployment_Runbook_20261120.md) را بخوانید. بستهٔ ساخته‌شده از شاخهٔ Draft/PR یا دارای `provisional_test_kit=true` فقط آزمایشی است؛ برای شرکت فقط Release تأییدشده از `main` مجاز است.
 
 این بسته برای **جایگزینی نصب موجود، پس از اجرای موازی و پذیرش** آماده شده است. سورس دقیق، شناسهٔ نسخه و checksum همراه بسته‌اند. نصب قبلی، دیتابیس قبلی و مقصد تونل را خودکار تغییر نمی‌دهد.
 
@@ -30,7 +32,7 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\01-Inspect-Server.ps1
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\02-Build-Images.ps1
 ```
 
-این فرمان از `source.zip` همین بسته، بک‌اند و فرانت‌اند را با برچسب نسخه می‌سازد؛ PostgreSQL 16 و Node 22 را نیز صادر می‌کند. خروجی در `payload\images.tar` و `payload\images.json` است. `images.json` شناسهٔ واقعی هر ایمیج، SHA نسخه و هش آرشیو را دارد. برای خروجی روی درایو دیگر، `-OutputDirectory 'D:\Kiarad-Payload-20261113'` بدهید و همین مسیر را در مرحلهٔ ۳ استفاده کنید.
+این فرمان از `source.zip` همین بسته، بک‌اند و فرانت‌اند را با برچسب نسخه می‌سازد؛ PostgreSQL 16 و Node 22 را نیز صادر می‌کند. خروجی در `payload\images.tar` و `payload\images.json` است. `images.json` شناسهٔ واقعی هر ایمیج، SHA نسخه و هش آرشیو را دارد. برای خروجی روی درایو دیگر، `-OutputDirectory 'D:\Kiarad-Payload-20261120'` بدهید و همین مسیر را در مرحلهٔ ۳ استفاده کنید.
 
 این مرحله دیتابیس شرکت را نمی‌خواند. فضای آزاد را هم برای مسیر خروجی و هم دیسک Docker Desktop بررسی کنید. ایمیج قدیمیِ هنداف یا ZIP انتقال قبلی را جایگزین این خروجی نکنید.
 
@@ -53,10 +55,10 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\03-Capture-Data.ps1 -S
 روی سرور، از پوشهٔ همین بسته:
 
 ```powershell
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\04-Install-Stage.ps1 -Destination "$env:USERPROFILE\kiarad-stage-20261113"
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\04-Install-Stage.ps1 -Destination "$env:USERPROFILE\kiarad-stage-20261120"
 ```
 
-مقصد باید وجود نداشته باشد. نام پروژهٔ پیش‌فرض `kiaradstage20261113` است؛ کانتینر و volume قبلی با این نام نیز باید وجود نداشته باشند. پورت‌های **۳۳۰۰، ۸۸۰۰ و ۸۱۹۰** باید آزاد باشند. نصب از ایمیج‌های صادرشده، بدون build و pull انجام می‌شود؛ دیتابیس جدید volume جدا دارد و PostgreSQL آن روی میزبان پورت عمومی ندارد.
+مقصد باید وجود نداشته باشد. نام پروژهٔ پیش‌فرض `kiaradstage20261120` است؛ کانتینر و volume قبلی با این نام نیز باید وجود نداشته باشند. پورت‌های **۳۳۰۰، ۸۸۰۰ و ۸۱۹۰** باید آزاد باشند. نصب از ایمیج‌های صادرشده، بدون build و pull انجام می‌شود؛ دیتابیس جدید volume جدا دارد و PostgreSQL آن روی میزبان پورت عمومی ندارد.
 
 - پنل: `http://127.0.0.1:3300/login`
 - بک‌اند: `http://127.0.0.1:8800/health`
@@ -67,7 +69,7 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\04-Install-Stage.ps1 -
 ## ۵. آزمون فنی و پذیرش شرکت
 
 ```powershell
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\05-Check-Stage.ps1 -Destination "$env:USERPROFILE\kiarad-stage-20261113" -CheckHoloo
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\05-Check-Stage.ps1 -Destination "$env:USERPROFILE\kiarad-stage-20261120" -CheckHoloo
 ```
 
 این اسکریپت سلامت، عبور API از پنل، فروشگاه و ورود هلو را بررسی و `stage-checks.json` تولید می‌کند. سپس موارد زیر را با مدیر و حساب ویزیتور انجام دهید:
@@ -85,7 +87,7 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\05-Check-Stage.ps1 -De
 پس از پذیرش شرکت و اطمینان از خاموش‌بودن همهٔ schedulerهای نصب‌های قدیمی:
 
 ```powershell
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\06-Enable-Sync.ps1 -Destination "$env:USERPROFILE\kiarad-stage-20261113" -CompanyAcceptancePassed -OldSchedulersStopped
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\06-Enable-Sync.ps1 -Destination "$env:USERPROFILE\kiarad-stage-20261120" -CompanyAcceptancePassed -OldSchedulersStopped
 ```
 
 این فرمان فقط همگام‌سازی خودکار هلو را روی مقصد فعال می‌کند. اتوماسیون دستیار به‌صورت پیش‌فرض خاموش می‌ماند؛ برای بازگرداندن برنامه‌های مصوب آن، `-EnableAssistantAutomations` را صریح اضافه کنید. نتیجهٔ نهایی sync و تطبیق داده‌ها را کنترل کنید و بعد ثبت کاربران را روی نسخهٔ جدید باز کنید. زمان‌بندی‌های قدیمی که مسیر یا پورت ثابت دارند باید پیش از استفادهٔ مجدد به نصب تازه منتقل و بررسی شوند؛ صرفاً دوباره روشنشان نکنید.

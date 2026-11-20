@@ -42,7 +42,9 @@ $groups = @(
   @{ File = "test_agent_routines_db.py"; Flag = "KIARAD_TEST_ROUTINES_DB" },
   @{ File = "test_specialist_workflows_db.py"; Flag = "KIARAD_TEST_SPECIALISTS_DB" },
   @{ File = "test_training_workflows_db.py"; Flag = "KIARAD_TEST_TRAINING_DB" },
-  @{ File = "test_site_cms_regressions.py"; Flag = "KIARAD_TEST_CMS_DB" }
+  @{ File = "test_site_cms_regressions.py"; Flag = "KIARAD_TEST_CMS_DB" },
+  @{ File = "test_marketplace_feeds_db.py"; Flag = "KIARAD_TEST_MARKETPLACE_FEEDS_DB" },
+  @{ File = "test_crm_schema.py"; Flag = "KIARAD_TEST_CRM_SCHEMA_DB" }
 )
 
 $originalPgOptions = $env:PGOPTIONS

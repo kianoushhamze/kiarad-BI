@@ -98,7 +98,6 @@ def load_items() -> list[dict]:
     base = site_base_url()
     try:
         with engine.connect() as conn:
-            conn.execute(text("ALTER TABLE cms_product_meta ADD COLUMN IF NOT EXISTS discount_price_irr BIGINT"))
             rows = conn.execute(text("""
                 SELECT p.id, p.code, p.name,
                        COALESCE(NULLIF(m.site_category, ''), p.category) AS category,

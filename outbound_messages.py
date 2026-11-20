@@ -111,7 +111,7 @@ def status(user=Depends(current_user)):
 def add_contact(data:Contact,user=Depends(current_user)):
     chief(user);dest=address(data.channel,data.destination)
     with engine.begin() as c:
-        ensure(c)
+        
         c.execute(text('SELECT pg_advisory_xact_lock(hashtextextended(:key,0))'),{'key':f'outbound-contact:{data.customer_id}:{data.channel}:{dest}:{data.consent_scope}'})
         if not c.execute(text('SELECT 1 FROM customers WHERE id=:id'),{'id':data.customer_id}).scalar():raise HTTPException(404,'مشتری پیدا نشد.')
         existing=c.execute(text('SELECT id,active FROM outbound_contacts WHERE customer_id=:cid AND channel=:ch AND destination=:dest AND consent_scope=:scope FOR UPDATE'),{'cid':data.customer_id,'ch':data.channel,'dest':dest,'scope':data.consent_scope}).mappings().first()
@@ -126,7 +126,7 @@ def add_contact(data:Contact,user=Depends(current_user)):
 def contacts(user=Depends(current_user)):
     chief(user)
     with engine.begin() as c:
-        ensure(c);items=c.execute(text('SELECT o.*,c.name AS customer_name FROM outbound_contacts o JOIN customers c ON c.id=o.customer_id ORDER BY o.created_at DESC LIMIT 500')).mappings().all()
+        items=c.execute(text('SELECT o.*,c.name AS customer_name FROM outbound_contacts o JOIN customers c ON c.id=o.customer_id ORDER BY o.created_at DESC LIMIT 500')).mappings().all()
     return {'items':[dict(i) for i in items]}
 
 
@@ -163,7 +163,7 @@ def preview(data:Message,user=Depends(current_user)):
     chief(user);now=datetime.now(timezone.utc);scheduled=data.scheduled_at or now
     if scheduled<now-timedelta(minutes=5) or scheduled>now+timedelta(days=30):raise HTTPException(422,'زمان ارسال باید در سی روز آینده باشد.')
     with engine.begin() as c:
-        ensure(c);c.execute(text('SELECT pg_advisory_xact_lock(hashtextextended(:key,0))'),{'key':f'outbound-preview:{user["id"]}:{data.submission_key}'});contact=c.execute(text('SELECT * FROM outbound_contacts WHERE id=:id FOR UPDATE'),{'id':str(data.contact_id)}).mappings().first()
+        c.execute(text('SELECT pg_advisory_xact_lock(hashtextextended(:key,0))'),{'key':f'outbound-preview:{user["id"]}:{data.submission_key}'});contact=c.execute(text('SELECT * FROM outbound_contacts WHERE id=:id FOR UPDATE'),{'id':str(data.contact_id)}).mappings().first()
         if not contact or not contact['active']:raise HTTPException(409,'مسیر تماس فعال و رضایت معتبر لازم است.')
         if data.purpose=='marketing' and contact['consent_scope']!='marketing':raise HTTPException(409,'رضایت تماس تراکنشی، مجوز پیام بازاریابی نیست.')
         payload={**data.model_dump(mode='json',exclude={'submission_key','scheduled_at'}),'channel':contact['channel'],'destination':contact['destination'],'customer_id':contact['customer_id'],'scheduled_at':scheduled.isoformat()}
@@ -182,7 +182,7 @@ def preview(data:Message,user=Depends(current_user)):
 def messages(user=Depends(current_user)):
     chief(user)
     with engine.begin() as c:
-        ensure(c);items=c.execute(text('SELECT * FROM outbound_messages WHERE created_by=:uid ORDER BY created_at DESC LIMIT 200'),{'uid':user['id']}).mappings().all()
+        items=c.execute(text('SELECT * FROM outbound_messages WHERE created_by=:uid ORDER BY created_at DESC LIMIT 200'),{'uid':user['id']}).mappings().all()
     return {'items':[dict(i) for i in items]}
 
 
@@ -327,7 +327,6 @@ def loop():
 @router.on_event('startup')
 def startup():
     global _THREAD
-    with engine.begin() as c:ensure(c)
     if enabled() and (_THREAD is None or not _THREAD.is_alive()):_STOP.clear();_THREAD=Thread(target=loop,daemon=True,name='kiarad-outbound');_THREAD.start()
 
 @router.on_event('shutdown')

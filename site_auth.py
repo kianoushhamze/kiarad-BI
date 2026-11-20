@@ -4,14 +4,17 @@
  صادر می‌شود و فقط برای مسیرهای /site-auth/me و آیندهٔ سفارش/قیمت پلکانی
  معتبر است. Google OAuth بعداً با اعتبارنامهٔ Google قابل افزودن است.
 """
+import hashlib
+import hmac
+import ipaddress
 import os
 import re
-import secrets
+from itertools import count
 from datetime import datetime, timedelta, timezone
 from typing import Optional
 
 import jwt
-from fastapi import APIRouter, Depends, Header, HTTPException
+from fastapi import APIRouter, Depends, Header, HTTPException, Request
 from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy import text
 
@@ -27,19 +30,66 @@ _EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
 _PHONE_RE = re.compile(r"^09\d{9}$")
 
 
-def ensure(conn):
-    if conn.execute(text("SELECT to_regclass('site_customers')")).scalar() is not None:
-        return
-    conn.execute(text("SELECT pg_advisory_xact_lock(hashtextextended('kiarad:site-customer-schema',0))"))
-    conn.execute(text("""
-        CREATE TABLE IF NOT EXISTS site_customers(
-            id SERIAL PRIMARY KEY,
-            email TEXT UNIQUE,
-            phone TEXT UNIQUE,
-            name TEXT NOT NULL,
-            password_hash TEXT NOT NULL,
-            created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-        )"""))
+_RATE_LIMITS = {
+    "login": (10, 15 * 60),
+    "register": (10, 60 * 60),
+}
+_RATE_LIMIT_CLEANUP_COUNTER = count(1)
+
+
+def _trusted_proxy_networks():
+    raw = os.getenv("KIARAD_TRUSTED_PROXY_CIDRS", "").strip()
+    if not raw:
+        return ()
+    try:
+        return tuple(
+            ipaddress.ip_network(item.strip(), strict=False)
+            for item in raw.split(",")
+            if item.strip()
+        )
+    except ValueError:
+        raise HTTPException(503, "KIARAD_TRUSTED_PROXY_CIDRS contains an invalid network.")
+
+
+def _parse_ip(value: str):
+    try:
+        return ipaddress.ip_address(value.strip())
+    except (AttributeError, ValueError):
+        return None
+
+
+def _is_trusted_proxy(address, networks) -> bool:
+    return any(address in network for network in networks)
+
+
+def _client_ip(request: Request) -> str:
+    """Use forwarded headers only when the immediate TCP peer is explicitly trusted."""
+    peer = _parse_ip(request.client.host if request.client else None)
+    if peer is None:
+        raise HTTPException(503, "Client address is unavailable; rate limiting cannot be enforced.")
+
+    networks = _trusted_proxy_networks()
+    if not _is_trusted_proxy(peer, networks):
+        return peer.compressed
+
+    cloudflare_ip = request.headers.get("cf-connecting-ip", "").strip()
+    if cloudflare_ip and "," not in cloudflare_ip:
+        parsed = _parse_ip(cloudflare_ip)
+        if parsed is not None:
+            return parsed.compressed
+
+    forwarded_for = request.headers.get("x-forwarded-for", "")
+    if forwarded_for:
+        forwarded = [_parse_ip(item) for item in forwarded_for.split(",")]
+        if all(item is not None for item in forwarded):
+            # Walk from the trusted peer toward the client. The first untrusted
+            # address is the client as observed by the trusted proxy chain.
+            for address in reversed(forwarded + [peer]):
+                if not _is_trusted_proxy(address, networks):
+                    return address.compressed
+
+    return peer.compressed
+
 
 
 def _normalize_contact(contact: str) -> tuple[Optional[str], Optional[str]]:
@@ -67,6 +117,80 @@ def _secret() -> str:
     if len(secret) < 32:
         raise HTTPException(503, "KIARAD_JWT_SECRET must be configured with at least 32 characters.")
     return secret
+
+
+def _consume_rate_limit(request: Request, action: str) -> int:
+    """Atomically consume a shared PostgreSQL IP bucket; return Retry-After seconds."""
+    try:
+        max_attempts, window_seconds = _RATE_LIMITS[action]
+    except KeyError:
+        raise ValueError("Unknown site-auth rate-limit action")
+
+    client_ip = _client_ip(request)
+    bucket_key = hmac.new(
+        _secret().encode("utf-8"),
+        f"site-auth:{action}:{client_ip}".encode("utf-8"),
+        hashlib.sha256,
+    ).hexdigest()
+
+    with engine.begin() as conn:
+        row = conn.execute(text("""
+            INSERT INTO site_auth_rate_limits (
+                bucket_key, window_started_at, attempts, updated_at
+            )
+            VALUES (:bucket_key, NOW(), 1, NOW())
+            ON CONFLICT (bucket_key) DO UPDATE
+            SET
+                window_started_at = CASE
+                    WHEN site_auth_rate_limits.window_started_at
+                         <= NOW() - (:window_seconds * INTERVAL '1 second')
+                    THEN NOW()
+                    ELSE site_auth_rate_limits.window_started_at
+                END,
+                attempts = CASE
+                    WHEN site_auth_rate_limits.window_started_at
+                         <= NOW() - (:window_seconds * INTERVAL '1 second')
+                    THEN 1
+                    ELSE site_auth_rate_limits.attempts + 1
+                END,
+                updated_at = NOW()
+            RETURNING attempts,
+                GREATEST(
+                    1,
+                    CEIL(EXTRACT(EPOCH FROM (
+                        window_started_at
+                        + (:window_seconds * INTERVAL '1 second')
+                        - NOW()
+                    )))
+                )::INTEGER AS retry_after
+        """), {
+            "bucket_key": bucket_key,
+            "window_seconds": window_seconds,
+        }).mappings().one()
+
+        # Opportunistically bound storage growth without adding request-time DDL.
+        if next(_RATE_LIMIT_CLEANUP_COUNTER) % 256 == 0:
+            conn.execute(text("""
+                DELETE FROM site_auth_rate_limits
+                WHERE updated_at < NOW() - INTERVAL '2 days'
+            """))
+
+    return int(row["retry_after"]) if int(row["attempts"]) > max_attempts else 0
+
+
+def _check_rate_limit(request: Request, action: str) -> None:
+    # FastAPI injects Request for HTTP calls. Direct in-process invocations have
+    # no network peer and are used by isolated unit tests/internal helpers.
+    if request is None:
+        return
+    retry_after = _consume_rate_limit(request, action)
+    if retry_after > 0:
+        label = "ورود" if action == "login" else "ثبت‌نام"
+        raise HTTPException(
+            status_code=429,
+            detail=f"تعداد درخواست‌های {label} بیش از حد مجاز است. کمی بعد دوباره تلاش کنید.",
+            headers={"Retry-After": str(retry_after)},
+        )
 
 
 def create_site_token(customer_id: int) -> str:
@@ -116,11 +240,11 @@ class LoginIn(BaseModel):
 
 
 @router.post("/register")
-def register(data: RegisterIn):
+def register(data: RegisterIn, request: Request = None):
     _secret()
+    _check_rate_limit(request, "register")
     email, phone = _normalize_contact(data.contact)
     with engine.begin() as conn:
-        ensure(conn)
         row = conn.execute(text(
             "INSERT INTO site_customers(email, phone, name, password_hash) "
             "VALUES (:e, :p, :n, :h) ON CONFLICT DO NOTHING RETURNING id"
@@ -132,10 +256,11 @@ def register(data: RegisterIn):
 
 
 @router.post("/login")
-def login(data: LoginIn):
+def login(data: LoginIn, request: Request = None):
+    _secret()
+    _check_rate_limit(request, "login")
     email, phone = _normalize_contact(data.contact)
     with engine.begin() as conn:
-        ensure(conn)
         row = conn.execute(text(
             "SELECT id, name, password_hash FROM site_customers "
             "WHERE (:e IS NOT NULL AND email = :e) OR (:p IS NOT NULL AND phone = :p) LIMIT 1"

@@ -39,6 +39,7 @@ def main():
     import requests
     from sqlalchemy import text
     from db import engine
+    from stock_reservations import reservation_totals
     from operations import hash_password
     from iran_time import iran_today
     import jdatetime
@@ -94,7 +95,11 @@ def main():
     assert proxy_user.status_code == 200 and proxy_user.json()['username'] == names['ceo']
     _, probe_code = product('connectivity-probe', 1)
     proxy_catalog = requests.get(args.storefront + '/api/public/catalog', timeout=15)
-    assert proxy_catalog.status_code == 200 and any(p['code'] == probe_code for p in proxy_catalog.json()['products'])
+    assert proxy_catalog.status_code == 200
+    public_products = proxy_catalog.json()['products']
+    assert any(p['code'] == probe_code for p in public_products)
+    assert all('stock' not in p and 'price' not in p and isinstance(p.get('in_stock'), bool)
+               and 'consumer_price_toman' in p for p in public_products)
 
     def parallel_registration():
         def register(n):
@@ -121,7 +126,14 @@ def main():
             'request_id': key or uuid4().hex})
 
     def stock(code):
-        return next(p['stock'] for p in call('GET', '/public/catalog', None)['products'] if p['code'] == code)
+        # Exact inventory is asserted from the disposable DB, never through a public API.
+        with engine.connect() as conn:
+            row = conn.execute(text('SELECT id, stock FROM products WHERE code=:code'),
+                               {'code': code}).mappings().first()
+            if not row:
+                return 0
+            reserved = reservation_totals(conn, [row['id']]).get(row['id'], 0)
+            return max(0, float(row['stock'] or 0) - reserved)
 
     def cold_financial_requests():
         barrier = Barrier(4)
@@ -371,7 +383,7 @@ def main():
             assert digits and int(digits[-1]) == receipt['order_id'], (digits, receipt['order_id'])
             assert stock(code) == 4
             page.wait_for_function('''code => {const button=document.querySelector('[data-add="'+code+'"]');
-                return button && button.closest('.card')?.querySelector('.stock')?.textContent.includes('۴');}''', arg=code, timeout=5000)
+                return button && button.closest('.card')?.querySelector('.stock')?.textContent.includes('موجود');}''', arg=code, timeout=5000)
             page.screenshot(path=str(args.output / 'storefront-real-receipt.png'), full_page=True)
             ctx.close()
         check('browser_registration_checkout_and_same_database_receipt', store_browser)

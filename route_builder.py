@@ -36,7 +36,6 @@ def ensure(conn):
     conn.execute(text("CREATE UNIQUE INDEX IF NOT EXISTS ux_physicians_name_city ON physicians(name, (COALESCE(city, '')))"))
     conn.execute(text('CREATE INDEX IF NOT EXISTS ix_physicians_city ON physicians(city)'))
 
-
 def _manager(user):
     """دسترسی مدیر: مدیرعامل، یا نقشی که روی ماژول manager دسترسی نوشتن دارد."""
     if not user or not user.get('id'):
@@ -173,7 +172,6 @@ def list_physicians(level: str | None = None, city: str | None = None, q: str | 
     query += ' ORDER BY city, name LIMIT :limit'
     params['limit'] = limit
     with engine.connect() as conn:
-        ensure(conn)
         rows = conn.execute(text(query), params).mappings().all()
     return {'items': [_physician_row(r) for r in rows], 'count': len(rows)}
 
@@ -194,7 +192,6 @@ class PhysicianCreate(BaseModel):
 def create_physician(data: PhysicianCreate, user: dict = Depends(current_user)):
     _manager(user)
     with engine.begin() as conn:
-        ensure(conn)
         new_id = conn.execute(text('''INSERT INTO physicians(name, level, specialty, city, area, address, phone, source)
             VALUES(:name, :level, :specialty, :city, :area, :address, :phone, COALESCE(:source, 'manual'))
             RETURNING id'''), data.model_dump()).scalar_one()
@@ -205,7 +202,6 @@ def create_physician(data: PhysicianCreate, user: dict = Depends(current_user)):
 def delete_physician(physician_id: int, user: dict = Depends(current_user)):
     _manager(user)
     with engine.begin() as conn:
-        ensure(conn)
         deleted = conn.execute(text('DELETE FROM physicians WHERE id=:id'), {'id': physician_id}).rowcount
     if not deleted:
         raise HTTPException(404, 'پزشک یافت نشد.')
@@ -220,7 +216,6 @@ def import_physicians_jsonl(user: dict = Depends(current_user)):
         return {'imported': False, 'reason': f'فایل یافت نشد: {PHYSICIANS_JSONL}', 'inserted': 0, 'updated': 0, 'skipped': 0}
     inserted = updated = skipped = 0
     with engine.begin() as conn:
-        ensure(conn)
         with PHYSICIANS_JSONL.open('r', encoding='utf-8') as fh:
             for line_no, line in enumerate(fh, start=1):
                 line = line.strip()
@@ -278,7 +273,6 @@ def suggest_routes(data: SuggestRequest, user: dict = Depends(current_user)):
                 {'city': data.city}).mappings().all()
     else:
         with engine.connect() as conn:
-            ensure(conn)
             rows = conn.execute(text('''SELECT name, city, address, phone FROM physicians
                 WHERE (:city IS NULL OR city = :city) ORDER BY city, name'''),
                 {'city': data.city}).mappings().all()

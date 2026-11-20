@@ -104,7 +104,7 @@ from platform_sync import router as platforms_router
 app.include_router(platforms_router)
 from digikala_router import router as digikala_router
 app.include_router(digikala_router)
-from site_cms import router as site_cms_router, banner_router as site_banner_router
+from site_cms import router as site_cms_router, banner_router as site_banner_router, _safe_public_link
 app.include_router(site_cms_router)
 app.include_router(site_banner_router)
 from site_auth import router as site_auth_router
@@ -140,9 +140,10 @@ import os as _os
 _KIARAD_API_KEY = _os.getenv("KIARAD_API_KEY", "")
 _KIARAD_JWT = _os.getenv("KIARAD_JWT_SECRET", "")
 _OPEN_PATHS = ["/", "/health", "/docs", "/redoc", "/openapi.json", "/auth/login", "/auth/recovery/request", "/auth/recovery/confirm",
-               "/public/catalog", "/public/catalog/prices",
+               "/public/catalog",
                "/public/feeds/torob", "/public/feeds/products.json", "/public/feeds/products.csv",
                "/site-auth/login", "/site-auth/register", "/site-auth/me"]
+_PUBLIC_GET_ONLY_PATHS = {"/public/catalog", "/public/feeds/products.json", "/public/feeds/products.csv"}
 _AUTH_METADATA_PATHS = {"/auth/me", "/auth/permissions", "/auth/password"}
 
 
@@ -160,6 +161,9 @@ def _required_module(path: str) -> Optional[str]:
         return "map" if "/attendance/" in path else "compensation"
     if path.startswith("/api/"):
         path = path[4:]
+
+    if path == "/public/catalog/prices":
+        return "online-sales"
 
     if path.startswith(("/crud/", "/import/excel/", "/import/template/")):
         parts = path.strip("/").split("/")
@@ -309,6 +313,8 @@ async def auth_gate(request, call_next):
         except HTTPException as exc: return JSONResponse(status_code=exc.status_code,content={"detail":exc.detail})
         return await call_next(request)
     if path in _OPEN_PATHS:
+        if path in _PUBLIC_GET_ONLY_PATHS and request.method not in {"GET", "HEAD"}:
+            return JSONResponse(status_code=401, content={"detail": "Authentication required"})
         return await call_next(request)
     if request.method in {"GET", "HEAD"} and (path == "/site-banners" or path.startswith("/site-banners/")):
         # Public, read-only CMS banners for the storefront (no personal data).
@@ -425,10 +431,6 @@ def health():
 def public_catalog():
     try:
         with engine.connect() as conn:
-            conn.execute(text("""CREATE TABLE IF NOT EXISTS cms_product_meta(
-                code VARCHAR(100) PRIMARY KEY, site_category TEXT, image_url TEXT,
-                hidden BOOLEAN NOT NULL DEFAULT FALSE, updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW())"""))
-            conn.execute(text("ALTER TABLE cms_product_meta ADD COLUMN IF NOT EXISTS discount_price_irr BIGINT"))
             rows = conn.execute(text(
                 """
                 SELECT p.id, p.code, p.name,
@@ -445,7 +447,26 @@ def public_catalog():
             for row in rows:
                 item = dict(row)
                 product_id = item.pop('id')
-                item['stock'] = max(0, float(item['stock'] or 0) - totals.get(product_id, 0))
+                available = max(0, float(item.pop('stock') or 0) - totals.get(product_id, 0))
+                raw_price = item.pop('price', None)
+                try:
+                    numeric_price = float(raw_price) if raw_price is not None else None
+                    if numeric_price is None or not math.isfinite(numeric_price) or numeric_price < 0:
+                        item['consumer_price_toman'] = None
+                    else:
+                        base_toman = math.floor(numeric_price / 10 + 0.5)
+                        item['consumer_price_toman'] = math.floor(base_toman * 1.15 + 0.5)
+                except (TypeError, ValueError, OverflowError):
+                    item['consumer_price_toman'] = None
+                discount = item.get('discount_price_irr')
+                try:
+                    if discount is not None and (not math.isfinite(float(discount)) or float(discount) <= 0):
+                        item['discount_price_irr'] = None
+                except (TypeError, ValueError, OverflowError):
+                    item['discount_price_irr'] = None
+                item.pop('generated_at', None)
+                item['image_url'] = _safe_public_link(item.get('image_url'))
+                item['in_stock'] = available > 0
                 products.append(item)
         return {
             "store": {"name": "Ordibeauty", "tagline": "اردی‌بیوتی — زیبایی اورجینال، با قیمت و موجودی زنده"},
@@ -457,7 +478,7 @@ def public_catalog():
 
 
 @app.get("/public/catalog/prices")
-def public_catalog_prices():
+def public_catalog_prices(_: dict = Depends(require_manager)):
     """Live Digikala selling prices for products mapped by holoo code."""
     try:
         with engine.connect() as conn:
@@ -1397,92 +1418,16 @@ _CHAT_ALLOWED_TYPES = {
 }
 
 
-def _ensure_chat_table(conn):
-    conn.execute(text("""
-        CREATE TABLE IF NOT EXISTS chat_messages (
-            id SERIAL PRIMARY KEY,
-            sender VARCHAR(100),
-            message TEXT,
-            room VARCHAR(50) DEFAULT 'general',
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            attachment_key VARCHAR(80),
-            attachment_name VARCHAR(180),
-            attachment_type VARCHAR(120),
-            attachment_size BIGINT
-        )
-    """))
-    for column, definition in (
-        ("attachment_key", "VARCHAR(80)"),
-        ("attachment_name", "VARCHAR(180)"),
-        ("attachment_type", "VARCHAR(120)"),
-        ("attachment_size", "BIGINT"),
-    ):
-        conn.execute(text(f"ALTER TABLE chat_messages ADD COLUMN IF NOT EXISTS {column} {definition}"))
-
-
-def _ensure_crm_table(conn):
-    conn.execute(text("""
-        CREATE TABLE IF NOT EXISTS customer_interactions (
-            id SERIAL PRIMARY KEY,
-            customer_name VARCHAR(200) NOT NULL,
-            visitor_name VARCHAR(100),
-            interaction_type VARCHAR(50),
-            product_discussed VARCHAR(150),
-            notes TEXT,
-            next_followup_date DATE,
-            followup_time VARCHAR(20),
-            status VARCHAR(50) NOT NULL DEFAULT 'در انتظار تماس',
-            created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
-        )
-    """))
-    conn.execute(text(
-        "CREATE INDEX IF NOT EXISTS idx_customer_interactions_followup ON customer_interactions(next_followup_date, status)"
-    ))
-    has_owner = conn.execute(text("""
-        SELECT EXISTS (
-            SELECT 1 FROM pg_attribute
-            WHERE attrelid='customer_interactions'::regclass
-              AND attname='owner_user_id' AND NOT attisdropped
-        )
-    """)).scalar()
-    if not has_owner:
-        conn.execute(text("ALTER TABLE customer_interactions ADD COLUMN owner_user_id INTEGER"))
-        # Resolve legacy labels once. Ambiguous/unmatched labels stay manager-only;
-        # later display-name changes must never transfer ownership of old records.
-        conn.execute(text("""
-            WITH candidates AS (
-                SELECT ci.id, MIN(u.id) AS user_id
-                FROM customer_interactions ci
-                JOIN users u ON (
-                    (ci.visitor_name LIKE '@%' AND ci.visitor_name='@' || u.username)
-                    OR (ci.visitor_name NOT LIKE '@%' AND ci.visitor_name=u.full_name)
-                )
-                GROUP BY ci.id HAVING COUNT(*)=1
-            )
-            UPDATE customer_interactions ci SET owner_user_id=c.user_id
-            FROM candidates c WHERE ci.id=c.id
-        """))
-    conn.execute(text(
-        "CREATE INDEX IF NOT EXISTS idx_customer_interactions_owner ON customer_interactions(owner_user_id)"
-    ))
-
-
 @app.on_event("startup")
-def initialize_chat_storage():
-    with engine.begin() as conn:
-        _ensure_chat_table(conn)
-        _ensure_crm_table(conn)
-    from assistant_automations import ensure as ensure_automations, start_automations_scheduler
-    from morning_brief import ensure as ensure_morning_brief, ensure_and_build_today, start_morning_brief_timer
-    with engine.begin() as conn:
-        ensure_morning_brief(conn)
+def initialize_background_services():
+    # Chat and CRM tables are provisioned by versioned SQL migrations.
+    from assistant_automations import start_automations_scheduler
+    from morning_brief import ensure_and_build_today, start_morning_brief_timer
     try:
         ensure_and_build_today()
     except Exception:
         pass
     start_morning_brief_timer()
-    with engine.begin() as conn:
-        ensure_automations(conn)
     start_automations_scheduler()
     # Holoo auto-refresh must survive restarts, not wait for a manual /holoo/refresh hit.
     try:
@@ -1566,7 +1511,6 @@ async def send_chat_message(request: Request, user: dict = Depends(current_user)
 
     try:
         with engine.begin() as conn:
-            _ensure_chat_table(conn)
             result = conn.execute(text("""
                 INSERT INTO chat_messages
                     (sender, message, room, attachment_key, attachment_name, attachment_type, attachment_size)
@@ -1832,7 +1776,6 @@ import reconciliation_engine as _rec_eng
 def get_plan_reconciliation_4buckets(plan_id: int, up_to_date: Optional[date] = None):
     session = _db_mod.SessionLocal()
     try:
-        _rec_eng.ensure_reconciliation_schema(session)
         return _rec_eng.calculate_monthly_reconciliation(session, plan_id, up_to_date)
     finally:
         session.close()
@@ -1844,7 +1787,6 @@ def record_stop_structured_outcome(
 ):
     session = _db_mod.SessionLocal()
     try:
-        _rec_eng.ensure_reconciliation_schema(session)
         from sqlalchemy import text
         session.execute(
             text("""

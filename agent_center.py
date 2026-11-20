@@ -213,7 +213,6 @@ def create_mission(data:Mission,user=Depends(current_user)):
         elif step.operation not in READ_OPERATIONS:authorize(step.operation,user)
     ident=str(uuid4());plan=data.model_dump(mode='json');sha=digest(plan)
     with engine.begin() as conn:
-        ensure(conn)
         conn.execute(text('''INSERT INTO agent_missions(id,owner_id,title,objective,domains,plan,plan_digest,policy)
             VALUES(:id,:uid,:title,:objective,CAST(:domains AS JSONB),CAST(:plan AS JSONB),:digest,CAST(:policy AS JSONB))'''),
             dict(id=ident,uid=user['id'],title=data.title,objective=data.objective,domains=encode(data.domains),plan=encode(plan),digest=sha,policy=encode(plan['policy'])))
@@ -231,7 +230,6 @@ def plan_objective(data:Objective,user=Depends(current_user)):
     from assistant_commands import catalog
     sources=[]
     with engine.begin() as conn:
-        ensure(conn)
         for sid in data.source_ids:
             row=conn.execute(text('SELECT id,title,kind,content,source_date,url FROM agent_sources WHERE id=:id AND owner_id=:uid'),{'id':str(sid),'uid':user['id']}).mappings().first()
             if not row:raise HTTPException(404,'منبع متعلق به شما پیدا نشد.')
@@ -271,7 +269,6 @@ Prefer measurable outputs and explicit evidence, owner, due date, validation and
 def list_missions(user=Depends(current_user)):
     ceo(user)
     with engine.begin() as conn:
-        ensure(conn)
         rows=conn.execute(text('SELECT id,title,objective,domains,state,plan_digest,created_at,updated_at,last_monitor_at FROM agent_missions WHERE owner_id=:uid ORDER BY created_at DESC LIMIT 100'),{'uid':user['id']}).mappings().all()
     return {'items':[dict(r) for r in rows]}
 
@@ -519,7 +516,6 @@ def feedback(ident:UUID,data:Feedback,user=Depends(current_user)):
 def lessons(user=Depends(current_user)):
     ceo(user)
     with engine.begin() as conn:
-        ensure(conn)
         rows=conn.execute(text('SELECT id,domain,text,feedback_id,active,version,created_at FROM agent_lessons WHERE owner_id=:uid ORDER BY id DESC LIMIT 100'),{'uid':user['id']}).mappings().all()
     return {'items':[dict(r) for r in rows]}
 
@@ -549,7 +545,7 @@ def add_source(data:Source,user=Depends(current_user)):
     ceo(user)
     if data.url and not re.match(r'^https?://[^\s]+$',data.url):raise HTTPException(422,'نشانی منبع معتبر نیست.')
     with engine.begin() as conn:
-        ensure(conn);ident=str(uuid4())
+        ident=str(uuid4())
         conn.execute(text('''INSERT INTO agent_sources(id,owner_id,title,kind,content,source_date,url)
             VALUES(:id,:uid,:title,:kind,:content,:date,:url)'''),dict(id=ident,uid=user['id'],title=data.title,kind=data.kind,content=data.content,date=data.source_date,url=data.url))
     return {'id':ident,'treated_as':'source_data_not_instructions'}
@@ -567,7 +563,6 @@ def source_detail(ident:UUID,user=Depends(current_user)):
 def list_sources(user=Depends(current_user)):
     ceo(user)
     with engine.begin() as conn:
-        ensure(conn)
         return {'items':[dict(r) for r in conn.execute(text('SELECT id,title,kind,source_date,url,created_at FROM agent_sources WHERE owner_id=:uid ORDER BY created_at DESC LIMIT 100'),{'uid':user['id']}).mappings()]}
 
 
@@ -639,7 +634,6 @@ def worker_loop():
 @router.on_event('startup')
 def startup():
     global _THREAD
-    with engine.begin() as conn:ensure(conn)
     if not scheduler_enabled():return
     with _START_LOCK:
         if _THREAD and _THREAD.is_alive():return

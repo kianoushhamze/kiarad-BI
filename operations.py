@@ -754,7 +754,6 @@ def create_task_in_connection(conn, data: TaskCreate, manager: dict):
         raise HTTPException(status_code=422, detail="عنوان کار را وارد کنید")
     if data.priority not in {"low", "normal", "high", "urgent"}:
         raise HTTPException(status_code=422, detail="Invalid priority")
-    _ensure_task_workflow(conn)
     assignee = conn.execute(
         text("SELECT id FROM users WHERE id=:id AND is_active::text IN ('1','true','t')"),
         {"id": data.assigned_to},
@@ -780,18 +779,6 @@ def create_task_in_connection(conn, data: TaskCreate, manager: dict):
     return dict(row)
 
 
-@router.on_event("startup")
-def initialize_task_workflow():
-    with engine.begin() as conn:
-        _ensure_task_workflow(conn)
-
-
-@router.on_event("startup")
-def initialize_person_target_columns():
-    with engine.begin() as conn:
-        ensure_person_target_columns(conn)
-
-
 def _ensure_task_workflow(conn):
     conn.execute(text("""CREATE TABLE IF NOT EXISTS tasks (
         id SERIAL PRIMARY KEY, title VARCHAR(200) NOT NULL, description TEXT,
@@ -811,39 +798,6 @@ def _ensure_task_workflow(conn):
         ADD COLUMN IF NOT EXISTS reviewed_by INTEGER REFERENCES users(id),
         ADD COLUMN IF NOT EXISTS reviewed_at TIMESTAMP,
         ADD COLUMN IF NOT EXISTS review_note TEXT"""))
-
-
-@router.on_event("startup")
-def initialize_campaign_assignments():
-    with engine.begin() as conn:
-        conn.execute(text("""CREATE TABLE IF NOT EXISTS role_permissions (
-            role TEXT NOT NULL, module TEXT NOT NULL,
-            can_read BOOLEAN NOT NULL DEFAULT FALSE,
-            can_write BOOLEAN NOT NULL DEFAULT FALSE,
-            can_delete BOOLEAN NOT NULL DEFAULT FALSE,
-            PRIMARY KEY (role, module)
-        )"""))
-        conn.execute(text("""CREATE TABLE IF NOT EXISTS campaigns (
-            id SERIAL PRIMARY KEY, title TEXT NOT NULL, description TEXT,
-            starts_at DATE NOT NULL, ends_at DATE NOT NULL,
-            target_amount NUMERIC NOT NULL DEFAULT 0,
-            reward_type TEXT NOT NULL DEFAULT 'fixed',
-            reward_value NUMERIC NOT NULL DEFAULT 0, reward_note TEXT,
-            is_active BOOLEAN NOT NULL DEFAULT TRUE
-        )"""))
-        conn.execute(text("""CREATE TABLE IF NOT EXISTS campaign_assignments (
-            campaign_id INTEGER NOT NULL REFERENCES campaigns(id),
-            user_id INTEGER NOT NULL REFERENCES users(id),
-            assigned_by INTEGER NOT NULL REFERENCES users(id),
-            assigned_at TIMESTAMP NOT NULL DEFAULT NOW(),
-            PRIMARY KEY (campaign_id, user_id)
-        )"""))
-        conn.execute(text("""CREATE TABLE IF NOT EXISTS notification_reads (
-            user_id INTEGER NOT NULL REFERENCES users(id),
-            notification_key TEXT NOT NULL,
-            read_at TIMESTAMP NOT NULL DEFAULT NOW(),
-            PRIMARY KEY (user_id, notification_key)
-        )"""))
 
 
 def _table_exists(conn, table_name: str) -> bool:

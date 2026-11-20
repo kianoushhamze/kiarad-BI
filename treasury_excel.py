@@ -221,21 +221,6 @@ def parse_report_rows(headers,values,kind,unit,sheet="دستی",from_date="",to_
     return result
 
 
-def ensure_excel_schema(conn):
-    conn.execute(text("""CREATE TABLE IF NOT EXISTS treasury_excel_batches (
-        id BIGSERIAL PRIMARY KEY, kind VARCHAR(30) NOT NULL, title VARCHAR(200) NOT NULL,
-        source_note TEXT NOT NULL, content_hash VARCHAR(64) NOT NULL, payload JSONB NOT NULL,
-        status VARCHAR(20) NOT NULL DEFAULT 'preview', created_by INTEGER NOT NULL,
-        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), committed_by INTEGER, committed_at TIMESTAMPTZ,
-        UNIQUE(kind,content_hash))"""))
-
-
-@router.on_event("startup")
-def initialize_excel_schema():
-    with engine.begin() as conn:
-        ensure_excel_schema(conn)
-
-
 async def upload(file):
     return await file.read(MAX_FILE+1)
 
@@ -258,14 +243,13 @@ async def preview_report(file: UploadFile = File(...), kind: str = Form(...), un
 def save_report_preview(payload,digest,title,source_note,user):
     kind=payload['kind']
     with engine.begin() as conn:
-        ensure_excel_schema(conn)
         conn.execute(text("SELECT pg_advisory_xact_lock(hashtextextended(:key,0))"), {"key": "treasury-excel:"+kind})
         existing = conn.execute(text("SELECT id,status FROM treasury_excel_batches WHERE kind=:kind AND content_hash=:hash"), {"kind": kind, "hash": digest}).mappings().first()
         if existing:
             raise HTTPException(409, "این فایل و شیت قبلاً پیش‌نمایش یا ثبت شده است؛ از فهرست گزارش‌ها بازش کنید.")
         if kind == "monthly":
-            from treasury_strategy import ensure_schema, _latest
-            ensure_schema(conn)
+            from treasury_strategy import _latest
+
             payload["expected_revisions"] = {f"{r['kind']}:{r['month']}": (old["revision"] if (old := _latest(conn, f"{r['kind']}:{r['month']}")) else 0) for r in payload["normalized"]}
         row = conn.execute(text("""INSERT INTO treasury_excel_batches(kind,title,source_note,content_hash,payload,created_by)
             VALUES(:kind,:title,:note,:hash,CAST(:payload AS JSONB),:user) RETURNING id"""), {"kind": kind, "title": title.strip(), "note": source_note.strip(), "hash": digest, "payload": json.dumps(payload, ensure_ascii=False), "user": user["id"]}).scalar_one()
@@ -324,7 +308,6 @@ class ConfirmImport(BaseModel):
 @router.post("/{batch_id}/commit")
 def commit_report(batch_id: int, data: ConfirmImport, user: dict = Depends(require_treasury_access)):
     with engine.begin() as conn:
-        ensure_excel_schema(conn)
         row = conn.execute(text("SELECT * FROM treasury_excel_batches WHERE id=:id FOR UPDATE"), {"id": batch_id}).mappings().first()
         if not row:
             raise HTTPException(404, "گزارش پیدا نشد.")
@@ -340,8 +323,8 @@ def commit_report(batch_id: int, data: ConfirmImport, user: dict = Depends(requi
                 conn.execute(text("""INSERT INTO financial_documents(document_type,counterparty,amount,due_date,status,reference_number,collection_probability,notes,created_at)
                     VALUES(:document_type,:counterparty,:amount,:due_date,:status,:reference,:collection_probability,:note,NOW())"""), {**value, "note": f"ورود از اکسل؛ گزارش {batch_id}؛ " + row["source_note"]})
         elif row["kind"] == "monthly":
-            from treasury_strategy import _save, ensure_schema
-            ensure_schema(conn)
+            from treasury_strategy import _save
+
             for value in payload["normalized"]:
                 scope = f"{value['kind']}:{value['month']}"
                 _save(conn, scope, payload["expected_revisions"][scope], {**value, "source_note": f"گزارش اکسل {batch_id}؛ "+row["source_note"], "coverage_confirmed": False, "approve": False}, user)
@@ -352,7 +335,6 @@ def commit_report(batch_id: int, data: ConfirmImport, user: dict = Depends(requi
 @router.get("/reports")
 def report_list(_: dict = Depends(require_treasury_access)):
     with engine.begin() as conn:
-        ensure_excel_schema(conn)
         return [dict(r) for r in conn.execute(text("""SELECT id,kind,title,status,created_at,committed_at,payload->>'row_count' AS row_count,
             payload->>'input_unit' AS input_unit FROM treasury_excel_batches ORDER BY id DESC LIMIT 60""")).mappings()]
 
@@ -360,7 +342,6 @@ def report_list(_: dict = Depends(require_treasury_access)):
 @router.get("/reports/{batch_id}")
 def report_detail(batch_id: int, offset: int = Query(0, ge=0), limit: int = Query(100, ge=1, le=500), _: dict = Depends(require_treasury_access)):
     with engine.begin() as conn:
-        ensure_excel_schema(conn)
         row = conn.execute(text("SELECT * FROM treasury_excel_batches WHERE id=:id"), {"id": batch_id}).mappings().first()
         if not row:
             raise HTTPException(404, "گزارش پیدا نشد.")
@@ -395,7 +376,6 @@ def template(_: dict = Depends(require_treasury_access)):
 
 
 def excel_balance_summary(conn):
-    ensure_excel_schema(conn)
     row = conn.execute(text("SELECT * FROM treasury_excel_batches WHERE kind='balances' AND status='committed' ORDER BY id DESC LIMIT 1")).mappings().first()
     if not row:
         return None
@@ -406,7 +386,6 @@ def excel_balance_summary(conn):
 
 
 def excel_invoice_estimate(conn, monthly_expense_irr):
-    ensure_excel_schema(conn)
     rows = conn.execute(text("""SELECT DISTINCT ON(kind) id,kind,title,payload,committed_at FROM treasury_excel_batches
         WHERE status='committed' AND kind IN ('purchases','sales','purchase_returns','sales_returns') ORDER BY kind,id DESC""")).mappings().all()
     if not rows:

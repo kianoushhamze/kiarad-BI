@@ -316,7 +316,6 @@ def create_financial_document(
         raise HTTPException(status_code=422, detail="Invalid document type")
     values = data.model_dump()
     with engine.begin() as conn:
-        conn.execute(text("ALTER TABLE financial_documents ADD COLUMN IF NOT EXISTS fixed_expense_id INTEGER"))
         if data.fixed_expense_id is not None:
             if data.document_type != "payable" or not conn.execute(text("SELECT id FROM fixed_expenses WHERE id=:id AND is_active=1"), {"id": data.fixed_expense_id}).first():
                 raise HTTPException(status_code=422, detail="هزینهٔ مرتبط باید فعال و سند از نوع پرداختنی باشد.")

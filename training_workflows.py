@@ -98,7 +98,7 @@ def check_citations(data,sources):
 def create(data:Programme,user=Depends(current_user)):
     ceo(user);payload=data.model_dump(mode='json',exclude={'submission_key'});sha=hashlib.sha256(encode(payload).encode()).hexdigest()
     with engine.begin() as c:
-        ensure(c);c.execute(text('SELECT pg_advisory_xact_lock(hashtextextended(:key,0))'),{'key':f'training:{user["id"]}:{data.submission_key}'})
+        c.execute(text('SELECT pg_advisory_xact_lock(hashtextextended(:key,0))'),{'key':f'training:{user["id"]}:{data.submission_key}'})
         old=c.execute(text('SELECT id,digest FROM training_programmes WHERE owner_id=:uid AND submission_key=:key'),{'uid':user['id'],'key':str(data.submission_key)}).mappings().first()
         if old:
             if old['digest']!=sha:raise HTTPException(409,'شناسهٔ تکرار برای دورهٔ دیگری استفاده شده است.')
@@ -123,7 +123,7 @@ def generate(data:Generate,user=Depends(current_user)):
 @router.get('/programmes')
 def listing(user=Depends(current_user)):
     with engine.begin() as c:
-        ensure(c);rows=c.execute(text("""SELECT p.id,p.title,p.digest,p.state,p.created_at,p.published_at,e.id AS enrollment_id,e.due_date,e.task_id,
+        rows=c.execute(text("""SELECT p.id,p.title,p.digest,p.state,p.created_at,p.published_at,e.id AS enrollment_id,e.due_date,e.task_id,
         (SELECT MAX(a.score) FROM training_attempts a WHERE a.enrollment_id=e.id) AS best_score,
         EXISTS(SELECT 1 FROM training_attempts a WHERE a.enrollment_id=e.id AND a.passed) AS passed
         FROM training_programmes p LEFT JOIN training_enrollments e ON e.programme_id=p.id AND e.user_id=:uid
@@ -134,7 +134,7 @@ def listing(user=Depends(current_user)):
 @router.get('/programmes/{ident}')
 def detail(ident:UUID,user=Depends(current_user)):
     with engine.begin() as c:
-        ensure(c);p=c.execute(text('SELECT * FROM training_programmes WHERE id=:id'),{'id':str(ident)}).mappings().first()
+        p=c.execute(text('SELECT * FROM training_programmes WHERE id=:id'),{'id':str(ident)}).mappings().first()
         if not p:raise HTTPException(404,'دوره پیدا نشد.')
         owner=user.get('role')=='ceo' and user['id']==p['owner_id']
         e=c.execute(text('SELECT * FROM training_enrollments WHERE programme_id=:id AND user_id=:uid'),{'id':str(ident),'uid':user['id']}).mappings().first()
@@ -150,7 +150,7 @@ def publish(ident:UUID,data:Publish,user=Depends(current_user)):
     ceo(user);now=datetime.now(timezone.utc)
     if not now<data.due_date<=now+timedelta(days=90):raise HTTPException(422,'مهلت دوره باید در نود روز آینده باشد.')
     with engine.begin() as c:
-        ensure(c);p=c.execute(text('SELECT * FROM training_programmes WHERE id=:id AND owner_id=:uid FOR UPDATE'),{'id':str(ident),'uid':user['id']}).mappings().first()
+        p=c.execute(text('SELECT * FROM training_programmes WHERE id=:id AND owner_id=:uid FOR UPDATE'),{'id':str(ident),'uid':user['id']}).mappings().first()
         if not p:raise HTTPException(404,'دوره متعلق به این مدیر پیدا نشد.')
         if p['digest']!=data.expected_digest:raise HTTPException(409,'نسخهٔ محتوای دوره تغییر کرده است.')
         # Revalidate every learner before any task write; one transaction owns all enrollment/task records.
@@ -205,7 +205,3 @@ def progress(ident:UUID,user=Depends(current_user)):
         EXISTS(SELECT 1 FROM training_attempts a WHERE a.enrollment_id=e.id AND a.passed) AS passed
         FROM training_enrollments e JOIN users u ON u.id=e.user_id JOIN tasks t ON t.id=e.task_id WHERE e.programme_id=:id ORDER BY u.full_name'''),{'id':str(ident)}).mappings().all()
     return {'items':[dict(r) for r in rows],'quiz_score_is_not_professional_certification':True,'payroll_changed':False}
-
-@router.on_event('startup')
-def startup():
-    with engine.begin() as c:ensure(c)

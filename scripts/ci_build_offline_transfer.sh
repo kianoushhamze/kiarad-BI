@@ -5,11 +5,11 @@ cd "$(dirname "$0")/.."
 : "${GITHUB_SHA:?Exact source commit required}"
 commit="$(git rev-parse HEAD)"
 [ "$commit" = "$GITHUB_SHA" ] || { echo 'Checkout SHA mismatch' >&2; exit 1; }
-tag="r20261113-${commit:0:12}"
+tag="r20261120-${commit:0:12}"
 backend="kiarad-transfer-backend:$tag"
 frontend="kiarad-transfer-frontend:$tag"
 project="kiarad-smoke-${GITHUB_RUN_ID}"
-kit="$RUNNER_TEMP/Kiarad-Transfer-20261113-Offline"
+kit="$RUNNER_TEMP/Kiarad-Transfer-20261120-Offline"
 [ ! -e .env ] && [ ! -e .transfer-smoke.yml ] || { echo 'CI scratch files already exist' >&2; exit 1; }
 created_env=false
 cleanup() {

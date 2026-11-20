@@ -1,7 +1,7 @@
 param(
     [Parameter(Mandatory=$true)][string]$Destination,
     [string]$PayloadDirectory = (Join-Path $PSScriptRoot 'payload'),
-    [string]$ProjectName = 'kiaradstage20261113',
+    [string]$ProjectName = 'kiaradstage20261120',
     [string]$HolooUrl = 'http://192.168.1.2:8080/TncHoloo/api'
 )
 . (Join-Path $PSScriptRoot 'common.ps1')

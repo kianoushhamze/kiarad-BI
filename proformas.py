@@ -67,11 +67,6 @@ def _ensure_proforma_storage(conn):
     ))
 
 
-@router.on_event("startup")
-def initialize_proforma_queue_storage():
-    with engine.begin() as conn:
-        _ensure_proforma_storage(conn)
-
 class LocationRecord(BaseModel):
     salesperson_id: int
     latitude: float

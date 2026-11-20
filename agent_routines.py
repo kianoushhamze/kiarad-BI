@@ -135,7 +135,7 @@ def owned(c,ident,user,lock=False):
 def create(data:Routine,user=Depends(current_user)):
     ceo(user);spec=data.model_dump(mode='json');sha=hashlib.sha256(encode(spec).encode()).hexdigest()
     with engine.begin() as c:
-        ensure(c);c.execute(text('SELECT pg_advisory_xact_lock(hashtextextended(:key,0))'),{'key':f'routine:{user["id"]}:{data.name}'})
+        c.execute(text('SELECT pg_advisory_xact_lock(hashtextextended(:key,0))'),{'key':f'routine:{user["id"]}:{data.name}'})
         old=c.execute(text('SELECT id,digest FROM agent_routines WHERE owner_id=:uid AND name=:name'),{'uid':user['id'],'name':data.name}).mappings().first()
         if old:
             if old['digest']!=sha:raise HTTPException(409,'این نام برای تنظیمات دیگری ثبت شده؛ نسخهٔ قبلی را متوقف و نام نسخهٔ جدید را مشخص کنید.')
@@ -160,7 +160,7 @@ def create(data:Routine,user=Depends(current_user)):
 @router.get('')
 def listing(user=Depends(current_user)):
     ceo(user)
-    with engine.begin() as c:ensure(c);rows=c.execute(text('SELECT * FROM agent_routines WHERE owner_id=:uid ORDER BY created_at DESC LIMIT 100'),{'uid':user['id']}).mappings().all()
+    with engine.begin() as c:rows=c.execute(text('SELECT * FROM agent_routines WHERE owner_id=:uid ORDER BY created_at DESC LIMIT 100'),{'uid':user['id']}).mappings().all()
     return {'items':[dict(r) for r in rows],'scheduler_enabled':enabled()}
 
 
@@ -333,7 +333,6 @@ def loop():
 @router.on_event('startup')
 def startup():
     global _THREAD
-    with engine.begin() as c:ensure(c)
     if enabled() and (_THREAD is None or not _THREAD.is_alive()):_STOP.clear();_THREAD=Thread(target=loop,daemon=True,name='kiarad-routines');_THREAD.start()
 
 @router.on_event('shutdown')

@@ -5,7 +5,15 @@ import { once } from 'node:events';
 
 const upstream = createServer(async (req, res) => {
   res.setHeader('Content-Type', 'application/json');
-  if (req.url === '/public/catalog') return res.end(JSON.stringify({products: [{code: 'TEST'}]}));
+  if (req.url === '/public/catalog') return res.end(JSON.stringify({products: [{code: 'TEST', in_stock: true}]}));
+  if (req.url === '/site-banners/42/image') {
+    res.setHeader('Content-Type', 'image/png');
+    return res.end(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]));
+  }
+  if (req.url === '/public/feeds/products.csv') {
+    res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+    return res.end('\uFEFFpage_unique,title\nA1,Test product\n');
+  }
   if (req.url !== '/site-orders') {
     res.statusCode = 404;
     return res.end('{}');
@@ -36,7 +44,18 @@ try {
   const base = 'http://127.0.0.1:' + String(data).trim().split(' ').at(-1);
   assert.match(await (await fetch(base)).text(), /href="\/buy\/"/);
   assert.match(await (await fetch(base + '/buy/')).text(), /function submitOrder/);
-  assert.deepEqual(await (await fetch(base + '/api/public/catalog')).json(), {products: [{code: 'TEST'}]});
+  assert.deepEqual(await (await fetch(base + '/api/public/catalog')).json(), {products: [{code: 'TEST', in_stock: true}]});
+  const bannerImage = await fetch(base + '/api/site-banners/42/image');
+  assert.equal(bannerImage.status, 200);
+  assert.equal(bannerImage.headers.get('content-type'), 'image/png');
+  assert.deepEqual([...new Uint8Array(await bannerImage.arrayBuffer())], [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
+  const csv = await fetch(base + '/api/public/feeds/products.csv');
+  assert.equal(csv.status, 200);
+  assert.match(csv.headers.get('content-type') || '', /^text\/csv/i);
+  const csvBytes = Buffer.from(await csv.arrayBuffer());
+  assert.deepEqual([...csvBytes.subarray(0, 3)], [0xef, 0xbb, 0xbf]);
+  assert.equal(csvBytes.subarray(3).toString('utf8'), 'page_unique,title\nA1,Test product\n');
+  assert.equal((await fetch(base + '/api/public/feeds/products.csv', {method: 'POST'})).status, 405);
   assert.equal((await fetch(base + '/api/site-orders/all')).status, 404);
   assert.equal((await fetch(base + '/api/site-orders')).status, 405);
   const body = JSON.stringify({items: [{code: 'TEST', qty: 1}], request_id: 'checkout_test_fixture'});

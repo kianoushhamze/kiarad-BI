@@ -27,6 +27,8 @@ def ensure(conn):
         id BIGSERIAL PRIMARY KEY,plan_id BIGINT NOT NULL REFERENCES monthly_visit_plans(id),
         visit_date DATE NOT NULL,base_source TEXT NOT NULL,base_id INTEGER NOT NULL,
         stop_order INTEGER NOT NULL,objective TEXT NOT NULL,route_id INTEGER REFERENCES visit_route_assignments(id),
+        outcome_status VARCHAR(50),holoo_preinvoice_code VARCHAR(100),order_amount_rial BIGINT DEFAULT 0,
+        outcome_notes TEXT,follow_up_date DATE,
         UNIQUE(plan_id,visit_date,base_source,base_id),UNIQUE(plan_id,visit_date,stop_order))'''))
     conn.execute(text('''CREATE TABLE IF NOT EXISTS monthly_visit_plan_events(
         id BIGSERIAL PRIMARY KEY,plan_id BIGINT NOT NULL REFERENCES monthly_visit_plans(id),
@@ -44,11 +46,6 @@ def ensure(conn):
         conn.execute(text('ALTER TABLE visit_route_assignments ADD COLUMN IF NOT EXISTS start_time TIME'))
         conn.execute(text('ALTER TABLE visit_route_assignments ADD COLUMN IF NOT EXISTS end_time TIME'))
     conn.execute(text("CREATE UNIQUE INDEX IF NOT EXISTS monthly_visit_one_approved ON monthly_visit_plans(user_id,month) WHERE status='approved'"))
-
-
-@router.on_event('startup')
-def startup():
-    with engine.begin() as conn:ensure(conn)
 
 
 class Strict(BaseModel):

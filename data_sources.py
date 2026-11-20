@@ -37,7 +37,6 @@ def save_manual_fields(conn,entity,ident,values,user_id,source='manual'):
             if value not in (0,1):raise HTTPException(422,'وضعیت کالا باید صفر یا یک باشد.')
         elif not isinstance(value,str) or len(value)>(30 if field=='phone' else 150) or (field=='name' and not value.strip()):
             raise HTTPException(422,'متن ویرایش معتبر نیست.')
-    ensure_source_storage(conn)
     old=conn.execute(text(f'SELECT * FROM {entity} WHERE id=:id FOR UPDATE'),{'id':ident}).mappings().first()
     if not old:raise HTTPException(404,'رکورد پیدا نشد.')
     conn.execute(text(f"UPDATE {entity} SET "+', '.join(f'{field}=:{field}' for field in values)+' WHERE id=:id'),{**values,'id':ident})
@@ -62,7 +61,6 @@ def apply_manual_fields(conn,entity,ident,values):
 
 def restore_holoo_fields(conn,entity,ident,user_id):
     if entity not in FIELDS:raise HTTPException(422,'نوع رکورد معتبر نیست.')
-    ensure_source_storage(conn)
     # Same lock order as operational synchronization, then the individual row.
     conn.execute(text("SELECT pg_advisory_xact_lock(hashtextextended('kiarad:operational-sync',0))"))
     row=conn.execute(text(f'SELECT * FROM {entity} WHERE id=:id FOR UPDATE'),{'id':ident}).mappings().first()

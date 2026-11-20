@@ -1,5 +1,6 @@
 """Offline regressions: mocked DB boundaries, no production writes/network."""
 import importlib.util
+import json
 import os
 from contextlib import nullcontext
 from pathlib import Path
@@ -56,6 +57,53 @@ class ReleaseRegressionTests(TestCase):
     def test_anonymous_banner_write_is_rejected(self):
         self.assertEqual(TestClient(api.app).post('/site-banners').status_code, 401)
 
+    def test_public_digikala_price_feed_requires_manager_authentication(self):
+        self.assertNotIn('/public/catalog/prices', api._OPEN_PATHS)
+        self.assertEqual(api._required_module('/public/catalog/prices'), 'online-sales')
+        self.assertEqual(TestClient(api.app).get('/public/catalog/prices').status_code, 401)
+
+    def test_public_catalog_exposes_availability_not_exact_stock(self):
+        from contextlib import nullcontext
+        conn = MagicMock()
+        conn.execute.return_value.mappings.return_value.all.return_value = [{
+            'id': 7, 'code': 'A', 'name': 'Synthetic product', 'category': 'Test',
+            'price': 1000, 'stock': 9, 'image_url': 'javascript:alert(1)', 'discount_price_irr': None,
+            'generated_at': None,
+        }]
+        with patch.object(api.engine, 'connect', return_value=nullcontext(conn)), \
+             patch.object(api, 'reservation_totals', return_value={7: 4}):
+            product = api.public_catalog()['products'][0]
+        self.assertTrue(product['in_stock'])
+        self.assertNotIn('stock', product)
+        self.assertNotIn('price', product)
+        self.assertNotIn('id', product)
+        self.assertEqual(product['consumer_price_toman'], 115)
+        self.assertIsNone(product['image_url'])
+
+    def test_public_catalog_snapshots_do_not_include_internal_price_or_stock(self):
+        for name in ("data.json", "data_demo_backup.json"):
+            payload = json.loads((ROOT / "site" / name).read_text(encoding="utf-8"))
+            for product in payload["products"]:
+                self.assertIn("consumer_price_toman", product)
+                self.assertIsInstance(product.get("in_stock"), bool)
+                self.assertNotIn("price_holoo", product)
+                self.assertNotIn("stock_holoo", product)
+                self.assertNotIn("stock", product)
+                image_url = product.get("image_url")
+                self.assertTrue(image_url is None or image_url.startswith("https://")
+                                or (image_url.startswith("/") and not image_url.startswith("//")))
+
+    def test_storefront_schema_is_migration_managed_not_request_managed(self):
+        paths = (
+            "site_auth.py", "site_orders.py", "site_cms.py", "platform_sync.py",
+            "marketplace_feeds.py", "scripts/build_site_catalog.py",
+            "scripts/derive_site_categories.py", "scripts/platform_stock_task.py",
+        )
+        for relative in paths:
+            source = (ROOT / relative).read_text(encoding="utf-8-sig")
+            with self.subTest(path=relative):
+                self.assertNotRegex(source, r"(?im)^\s*(?:CREATE TABLE|ALTER TABLE)\b")
+
     def test_cors_rejects_unlisted_origin_and_allows_configured_origin(self):
         for origin, expected in [('https://untrusted.invalid', 400), ('http://localhost:3000', 200)]:
             with self.subTest(origin=origin):
@@ -97,8 +145,7 @@ class ReleaseRegressionTests(TestCase):
             self.assertTrue(committed)
             self.assertEqual(codes, ['A', 'B'])
             return [{'ok': True}]
-        with patch.object(platforms.engine, 'begin', return_value=Transaction()), patch.object(platforms, 'ensure'), \
-             patch.object(platforms, '_ensure_platform_proforma_storage'), patch.object(platforms, 'push_stock_many', side_effect=push):
+        with patch.object(platforms.engine, 'begin', return_value=Transaction()), patch.object(platforms, 'push_stock_many', side_effect=push):
             result = platforms.apply_order('digikala', 'test', [], 'cancelled')
         self.assertTrue(result['released'])
         self.assertTrue(result['pushed'])
@@ -106,9 +153,7 @@ class ReleaseRegressionTests(TestCase):
     def test_reinstatement_aggregates_lines_and_pushes_removed_codes(self):
         conn = MagicMock()
         conn.execute.return_value.all.return_value = [('OLD',)]
-        with patch.object(platforms.engine, 'begin', return_value=nullcontext(conn)), patch.object(platforms, 'ensure'), \
-             patch.object(platforms, '_ensure_platform_proforma_storage'), \
-             patch.object(platforms, '_create_platform_order_proforma', return_value=42), \
+        with patch.object(platforms.engine, 'begin', return_value=nullcontext(conn)), patch.object(platforms, '_create_platform_order_proforma', return_value=42), \
              patch.object(platforms, 'push_stock_many', return_value=[]) as push:
             result = platforms.apply_order('digikala', 'test', [{'code': 'A', 'qty': 2}, {'code': 'A', 'qty': 3}], 'active')
         push.assert_called_once_with(['OLD', 'A'])

@@ -359,7 +359,9 @@ body{background:radial-gradient(ellipse at 95% 12%,#e6d8f7 0,transparent 38%),va
   }
 
   function consumerPrice(p) {
-    if (p.price_holoo != null && !isNaN(Number(p.price_holoo))) return Math.round(Number(p.price_holoo) * 1.15);
+    if (p.consumer_price_toman != null && !isNaN(Number(p.consumer_price_toman))) {
+      return Math.round(Number(p.consumer_price_toman));
+    }
     return null;
   }
   function discountPrice(p) {
@@ -418,7 +420,7 @@ body{background:radial-gradient(ellipse at 95% 12%,#e6d8f7 0,transparent 38%),va
       h += '<div class="thumb" aria-hidden="true">' + (img ? '<img src="' + esc(img) + '" alt="" loading="lazy">' : '🖼') + '</div>';
       h += '<h3>' + esc(p.title) + '</h3>';
       h += '<div class="cat">' + esc(p.category || "بدون دسته") + ' · کد: ' + esc(p.code) + '</div>';
-      h += '<div class="stock ' + (p.stock > 0 ? "ok" : "out") + '">' + (p.stock > 0 ? "موجود: " + fa(p.stock) + " عدد" : "ناموجود") + '</div>';
+      h += '<div class="stock ' + (p.in_stock ? "ok" : "out") + '">' + (p.in_stock ? "موجود" : "ناموجود") + '</div>';
       h += '<div class="pricebox">';
       if (off) {
         h += '<span class="badge off">تخفیف ' + fa(off) + '٪</span>';
@@ -426,7 +428,7 @@ body{background:radial-gradient(ellipse at 95% 12%,#e6d8f7 0,transparent 38%),va
       }
       h += '<span class="price">' + (unit ? fa(unit) + ' تومان' : '—') + '</span>';
       h += '</div>';
-      h += '<button type="button" class="addbtn"' + (p.stock > 0 ? '' : ' disabled') + ' data-add="' + esc(p.code) + '">' + (p.stock > 0 ? 'افزودن به سبد' : 'ناموجود') + '</button>';
+      h += '<button type="button" class="addbtn"' + (p.in_stock ? '' : ' disabled') + ' data-add="' + esc(p.code) + '">' + (p.in_stock ? 'افزودن به سبد' : 'ناموجود') + '</button>';
       el.innerHTML = h;
       grid.appendChild(el);
       if (io) io.observe(el);
@@ -491,16 +493,15 @@ body{background:radial-gradient(ellipse at 95% 12%,#e6d8f7 0,transparent 38%),va
         return {
           store: d.store,
           products: (d.products || []).map(function (p) {
-            var irr = Number(p.price);
             var disc = p.discount_price_irr == null ? null : Number(p.discount_price_irr);
             return {
               code: p.code || "—",
               title: p.name || "بدون عنوان",
               category: p.category || "بدون دسته",
               image_url: p.image_url || null,
-              price_holoo: isNaN(irr) ? null : Math.round(irr / 10),
+              consumer_price_toman: p.consumer_price_toman == null ? null : Number(p.consumer_price_toman),
               discount_price_irr: (disc && !isNaN(disc)) ? disc : null,
-              stock: p.stock || 0
+              in_stock: p.in_stock === true
             };
           })
         };
@@ -531,9 +532,9 @@ body{background:radial-gradient(ellipse at 95% 12%,#e6d8f7 0,transparent 38%),va
           title: pick(p, ["title", "fa_title", "name"]) || "بدون عنوان",
           category: p.category || "",
           image_url: p.image_url || null,
-          price_holoo: pick(p, ["price_holoo", "price"]),
+          consumer_price_toman: pick(p, ["consumer_price_toman"]),
           discount_price_irr: p.discount_price_irr || null,
-          stock: pick(p, ["stock_holoo", "stock"]) || 0
+          in_stock: (typeof p.in_stock === "boolean") ? p.in_stock : Number(p.stock_holoo || 0) > 0
         };
       });
       var dot = document.getElementById("liveDot"), txt = document.getElementById("liveTxt");
@@ -597,7 +598,9 @@ body{background:radial-gradient(ellipse at 95% 12%,#e6d8f7 0,transparent 38%),va
       var a = document.createElement(b.link_url ? "a" : "div");
       a.className = "slide";
       if (b.link_url) { a.href = b.link_url; a.target = "_blank"; a.rel = "noopener"; }
-      a.innerHTML = '<img src="' + esc(b.image_url) + '" alt="' + esc(b.title || "بنر") + '" loading="lazy">';
+      var imageUrl = b.image_url || "";
+      if (imageUrl.charAt(0) === "/") imageUrl = API_BASE.replace(/\/$/, "") + imageUrl;
+      a.innerHTML = '<img src="' + esc(imageUrl) + '" alt="' + esc(b.title || "بنر") + '" loading="lazy">';
       slides.appendChild(a);
       var d = document.createElement("button");
       d.type = "button";
