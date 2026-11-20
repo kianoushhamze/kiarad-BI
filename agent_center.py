@@ -213,7 +213,6 @@ def create_mission(data:Mission,user=Depends(current_user)):
         elif step.operation not in READ_OPERATIONS:authorize(step.operation,user)
     ident=str(uuid4());plan=data.model_dump(mode='json');sha=digest(plan)
     with engine.begin() as conn:
-        ensure(conn)
         conn.execute(text('''INSERT INTO agent_missions(id,owner_id,title,objective,domains,plan,plan_digest,policy)
             VALUES(:id,:uid,:title,:objective,CAST(:domains AS JSONB),CAST(:plan AS JSONB),:digest,CAST(:policy AS JSONB))'''),
             dict(id=ident,uid=user['id'],title=data.title,objective=data.objective,domains=encode(data.domains),plan=encode(plan),digest=sha,policy=encode(plan['policy'])))
@@ -549,7 +548,7 @@ def add_source(data:Source,user=Depends(current_user)):
     ceo(user)
     if data.url and not re.match(r'^https?://[^\s]+$',data.url):raise HTTPException(422,'نشانی منبع معتبر نیست.')
     with engine.begin() as conn:
-        ensure(conn);ident=str(uuid4())
+        ident=str(uuid4())
         conn.execute(text('''INSERT INTO agent_sources(id,owner_id,title,kind,content,source_date,url)
             VALUES(:id,:uid,:title,:kind,:content,:date,:url)'''),dict(id=ident,uid=user['id'],title=data.title,kind=data.kind,content=data.content,date=data.source_date,url=data.url))
     return {'id':ident,'treated_as':'source_data_not_instructions'}
