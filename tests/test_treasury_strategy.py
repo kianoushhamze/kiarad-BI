@@ -130,6 +130,10 @@ class TreasuryStrategyDatabaseTests(unittest.TestCase):
             "CREATE TEMP TABLE tasks(id INT PRIMARY KEY,title TEXT,status TEXT)",
         ):
             self.conn.execute(text(statement))
+        migration = Path(__file__).resolve().parents[1] / "migrations" / "0008_visit_treasury_columns.sql"
+        raw = self.conn.connection.driver_connection
+        with raw.cursor() as cursor:
+            cursor.execute(migration.read_text(encoding="utf-8-sig"))
         strategy.ensure_schema(self.conn)
 
         @contextmanager
