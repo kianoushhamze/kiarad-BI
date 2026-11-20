@@ -68,6 +68,11 @@ def ensure_table():
             checked_at TIMESTAMPTZ NOT NULL,checked_by INT NOT NULL)'''))
 
 
+@router.on_event("startup")
+def initialize_integration_storage():
+    ensure_table()
+
+
 def migrate_draft_schema(conn):
     """Preserve existing legacy public identifiers when upgrading a draft table."""
     had_label = conn.execute(text("""SELECT EXISTS (SELECT 1 FROM pg_attribute
@@ -111,7 +116,6 @@ def channel_status(channel: str, draft: Optional[dict], sync: Optional[dict], ma
 
 @router.get("")
 def list_integrations(_: dict = Depends(require_manager)):
-    ensure_table()
     with engine.connect() as conn:
         saved = {r["channel"]: dict(r) for r in conn.execute(select(drafts)).mappings()}
         sync_rows = conn.execute(text("""
@@ -157,7 +161,6 @@ def probe_digikala():
 
 @router.post('/digikala/check')
 def check_digikala(user:dict=Depends(require_manager)):
-    ensure_table()
     result=probe_digikala();checked=datetime.now(timezone.utc)
     with engine.begin() as conn:
         conn.execute(text('''INSERT INTO integration_connection_checks(channel,status,http_status,checked_at,checked_by)
@@ -186,7 +189,6 @@ class ContentReviewInput(BaseModel):
 
 @router.get("/content-calendar")
 def list_content_calendar(user: dict = Depends(current_user)):
-    ensure_table()
     query = select(content_calendar).order_by(content_calendar.c.scheduled_at, content_calendar.c.id)
     if user.get("role") not in {"ceo", "sales_manager"}:
         query = query.where(content_calendar.c.created_by == int(user["id"]))
@@ -197,7 +199,6 @@ def list_content_calendar(user: dict = Depends(current_user)):
 
 @router.post("/content-calendar")
 def create_content_draft(data: ContentDraftInput, user: dict = Depends(current_user)):
-    ensure_table()
     if data.channel not in CONTENT_CHANNELS:
         raise HTTPException(status_code=422, detail="کانال محتوایی پشتیبانی نمی‌شود.")
     if not data.title.strip() or not data.body.strip():
@@ -217,7 +218,6 @@ def create_content_draft(data: ContentDraftInput, user: dict = Depends(current_u
 @router.post("/content-calendar/{item_id}/review")
 def review_content_draft(item_id: int, data: ContentReviewInput,
                          user: dict = Depends(require_manager)):
-    ensure_table()
     now = datetime.now(timezone.utc)
     with engine.begin() as conn:
         row = conn.execute(select(content_calendar.c.status).where(content_calendar.c.id == item_id).with_for_update()).first()
@@ -236,7 +236,6 @@ def review_content_draft(item_id: int, data: ContentReviewInput,
 def save_draft(channel: str, data: DraftInput, _: dict = Depends(require_manager)):
     if channel not in CHANNELS:
         raise HTTPException(status_code=404, detail="Unknown channel")
-    ensure_table()
     now = datetime.now(timezone.utc)
     with engine.begin() as conn:
         existing = conn.execute(select(drafts.c.channel).where(drafts.c.channel == channel)).first()
