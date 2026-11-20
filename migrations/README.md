@@ -39,3 +39,9 @@ Commands:
 - 0008_visit_treasury_columns.sql adds structured visit-outcome fields and the fixed-expense link used by treasury documents.
 - Fresh monthly-visit tables include the same outcome fields in their startup schema definition; existing installations receive them additively from the migration.
 - The reconciliation API and treasury routes no longer execute these schema changes during a request. Apply the migration before deploying this code.
+
+
+## Assistant operations and scheduled automations
+
+- 0009_assistant_operations_storage.sql provisions actor-bound assistant proposals and scheduled automation/run storage, including the due/latest indexes.
+- Assistant proposal and automation request handlers no longer create or alter these tables. Apply the migration before deploying the updated API.
