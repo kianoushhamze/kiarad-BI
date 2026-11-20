@@ -10,6 +10,7 @@ from contextlib import nullcontext
 from datetime import datetime, timezone
 from threading import Barrier
 import unittest
+from pathlib import Path
 from unittest.mock import MagicMock, patch
 from uuid import uuid4
 
@@ -51,7 +52,6 @@ class StorefrontOrderUnitTests(unittest.TestCase):
         conn = MagicMock()
         conn.execute.return_value.mappings.return_value.first.return_value = existing
         with patch.object(orders.engine, 'begin', return_value=nullcontext(conn)), \
-             patch.object(orders, 'ensure'), patch.object(orders, 'ensure_catalog'), patch.object(orders, 'ensure_platforms'), \
              patch.object(orders, '_reserve_items') as reserve:
             result = orders.create_order(data, BackgroundTasks(), {'id': 1})
         self.assertEqual(result['order_id'], 7)
@@ -105,7 +105,7 @@ class StorefrontOrderUnitTests(unittest.TestCase):
         conn = MagicMock()
         conn.execute.return_value.rowcount = 1
         with patch.object(platforms.engine, 'begin', return_value=nullcontext(conn)), \
-             patch.object(platforms, 'ensure'), patch.object(platforms, '_ensure_platform_proforma_storage'):
+             patch.object(platforms, 'push_stock_many', return_value=[]):
             result = platforms.mark_holoo_registered('digikala', 'shared-ref', {'role':'ceo'})
         self.assertEqual(result['platform'], 'digikala')
         statement, params = conn.execute.call_args.args
@@ -139,10 +139,15 @@ class StorefrontOrderDatabaseTests(unittest.TestCase):
             conn.execute(text('CREATE TABLE products(id SERIAL PRIMARY KEY, code TEXT UNIQUE, name TEXT, price BIGINT, stock INT, is_active INT)'))
             conn.execute(text('CREATE TABLE customers(id SERIAL PRIMARY KEY, code TEXT UNIQUE, name TEXT, credit_limit BIGINT)'))
             conn.execute(text('CREATE TABLE salespersons(id SERIAL PRIMARY KEY)'))
-            orders.ensure(conn)
-            orders.ensure_catalog(conn)
-            platforms.ensure(conn)
-            platforms._ensure_platform_proforma_storage(conn)
+            root = Path(__file__).resolve().parents[1]
+            for migration in ("0005_cms_product_meta.sql", "0006_storefront_platform_storage.sql"):
+                conn.exec_driver_sql((root / "migrations" / migration).read_text(encoding="utf-8-sig"))
+            conn.execute(text("""CREATE TABLE proforma_invoices(
+                id SERIAL PRIMARY KEY, customer_id INTEGER NOT NULL REFERENCES customers(id),
+                salesperson_id INTEGER REFERENCES salespersons(id), total_amount NUMERIC(18,2) NOT NULL,
+                status VARCHAR(20) NOT NULL DEFAULT 'pending', credit_grade VARCHAR(20), notes TEXT,
+                items_json JSONB NOT NULL DEFAULT '[]'::jsonb, created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+            )"""))
 
     @classmethod
     def cleanup_schema(cls):
