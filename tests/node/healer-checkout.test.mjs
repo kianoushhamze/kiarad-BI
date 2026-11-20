@@ -5,7 +5,7 @@ import { once } from 'node:events';
 
 const upstream = createServer(async (req, res) => {
   res.setHeader('Content-Type', 'application/json');
-  if (req.url === '/public/catalog') return res.end(JSON.stringify({products: [{code: 'TEST'}]}));
+  if (req.url === '/public/catalog') return res.end(JSON.stringify({products: [{code: 'TEST', in_stock: true}]}));
   if (req.url === '/public/feeds/products.csv') {
     res.setHeader('Content-Type', 'text/csv; charset=utf-8');
     return res.end('\uFEFFpage_unique,title\nA1,Test product\n');
