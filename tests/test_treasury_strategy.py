@@ -1,6 +1,7 @@
 """Role checks and optional rollback-only PostgreSQL persistence checks."""
 from contextlib import contextmanager
 from datetime import date
+from pathlib import Path
 import os
 from types import SimpleNamespace
 import unittest
