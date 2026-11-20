@@ -6,8 +6,9 @@ Rules:
 
 - Use names such as `0002_add_example_column.sql`.
 - Never edit an applied migration. Add a new migration instead.
-- Each file runs in its own transaction.
-- The runner stores a SHA-256 checksum and rejects changed applied files.
+- All pending migration files in one invocation run inside a single database transaction guarded by a PostgreSQL advisory transaction lock. If any migration fails, the invocation is rolled back.
+- The runner stores a SHA-256 checksum and rejects changed applied files or applied versions whose source file is missing.
+- `--dry-run` executes pending migration SQL in that transaction and rolls it back. `--status` creates `schema_migrations` if it does not already exist, so it is not strictly read-only on a fresh database.
 - Do not put credentials or production data in migrations.
 
 Commands:
