@@ -249,22 +249,22 @@ jobs:
         with:
           python-version: '3.12'
       - name: Build kit from exact checked-out Git tree
-        run: python scripts/build_transfer_kit.py --output "$RUNNER_TEMP/Kiarad-Transfer-20261113"
+        run: python scripts/build_transfer_kit.py --output "$RUNNER_TEMP/Kiarad-Transfer-20261120"
       - name: Render same-source manual without Actions storage
         run: |
           pip install playwright==1.58.0
           python -m playwright install --with-deps chromium
           python scripts/build_training_pdf.py --output "$RUNNER_TEMP/release-extras/Kiarad-Training-Manual"
       - name: Attach checksummed training deliverables
-        run: python scripts/attach_release_extras.py --kit "$RUNNER_TEMP/Kiarad-Transfer-20261113" --extras "$RUNNER_TEMP/release-extras"
+        run: python scripts/attach_release_extras.py --kit "$RUNNER_TEMP/Kiarad-Transfer-20261120" --extras "$RUNNER_TEMP/release-extras"
       - name: Verify kit and guards
         shell: pwsh
-        run: ./tests/test_transfer_kit.ps1 -KitRoot (Join-Path $env:RUNNER_TEMP 'Kiarad-Transfer-20261113') -DockerGuards
+        run: ./tests/test_transfer_kit.ps1 -KitRoot (Join-Path $env:RUNNER_TEMP 'Kiarad-Transfer-20261120') -DockerGuards
       - name: Archive verified package in a draft Release
         if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
         env:
           GH_TOKEN: ${{ github.token }}
-        run: python scripts/publish_ci_package.py --kit "$RUNNER_TEMP/Kiarad-Transfer-20261113"
+        run: python scripts/publish_ci_package.py --kit "$RUNNER_TEMP/Kiarad-Transfer-20261120"
 
   offline-images:
     permissions:
@@ -287,12 +287,12 @@ jobs:
           python -m playwright install --with-deps chromium
           python scripts/build_training_pdf.py --output "$RUNNER_TEMP/release-extras/Kiarad-Training-Manual"
       - name: Attach checksummed training deliverables
-        run: python scripts/attach_release_extras.py --kit "$RUNNER_TEMP/Kiarad-Transfer-20261113-Offline" --extras "$RUNNER_TEMP/release-extras"
+        run: python scripts/attach_release_extras.py --kit "$RUNNER_TEMP/Kiarad-Transfer-20261120-Offline" --extras "$RUNNER_TEMP/release-extras"
       - name: Verify offline kit and guards
         shell: pwsh
-        run: ./tests/test_transfer_kit.ps1 -KitRoot (Join-Path $env:RUNNER_TEMP 'Kiarad-Transfer-20261113-Offline') -DockerGuards
+        run: ./tests/test_transfer_kit.ps1 -KitRoot (Join-Path $env:RUNNER_TEMP 'Kiarad-Transfer-20261120-Offline') -DockerGuards
       - name: Archive verified package in a draft Release
         if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
         env:
           GH_TOKEN: ${{ github.token }}
-        run: python scripts/publish_ci_package.py --kit "$RUNNER_TEMP/Kiarad-Transfer-20261113-Offline"
+        run: python scripts/publish_ci_package.py --kit "$RUNNER_TEMP/Kiarad-Transfer-20261120-Offline"
