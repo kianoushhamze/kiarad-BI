@@ -135,7 +135,7 @@ def _row(row):
 def list_automations(user: dict = Depends(current_user)):
     _ceo(user)
     with engine.connect() as conn:
-        ensure(conn)
+
         rows = conn.execute(text('SELECT * FROM assistant_automations WHERE owner_user_id=:o ORDER BY id'),
                             {'o': user['id']}).mappings().all()
         runs = conn.execute(text('''SELECT DISTINCT ON (automation_id) automation_id, status, finished_at
@@ -150,7 +150,7 @@ def create_automation(data: AutomationCreate, user: dict = Depends(current_user)
     _validate_schedule(data)
     next_run = compute_next_run(data)
     with engine.begin() as conn:
-        ensure(conn)
+
         row = conn.execute(text('''INSERT INTO assistant_automations
             (owner_user_id,name,prompt,schedule_type,interval_hours,daily_time,weekdays,next_run_at)
             VALUES(:o,:name,:prompt,:st,:ih,:dt,CAST(:wd AS JSONB),:next) RETURNING *'''),
@@ -164,7 +164,7 @@ def create_automation(data: AutomationCreate, user: dict = Depends(current_user)
 def update_automation(automation_id: int, data: AutomationUpdate, user: dict = Depends(current_user)):
     _ceo(user)
     with engine.begin() as conn:
-        ensure(conn)
+
         existing = conn.execute(text('SELECT * FROM assistant_automations WHERE id=:id AND owner_user_id=:o'),
                                 {'id': automation_id, 'o': user['id']}).mappings().first()
         if existing is None:
@@ -187,7 +187,7 @@ def update_automation(automation_id: int, data: AutomationUpdate, user: dict = D
 def delete_automation(automation_id: int, user: dict = Depends(current_user)):
     _ceo(user)
     with engine.begin() as conn:
-        ensure(conn)
+
         deleted = conn.execute(text('DELETE FROM assistant_automations WHERE id=:id AND owner_user_id=:o RETURNING id'),
                                {'id': automation_id, 'o': user['id']}).scalar()
     if deleted is None:
@@ -199,7 +199,7 @@ def delete_automation(automation_id: int, user: dict = Depends(current_user)):
 def list_runs(automation_id: int, user: dict = Depends(current_user), limit: int = 20):
     _ceo(user)
     with engine.connect() as conn:
-        ensure(conn)
+
         owned = conn.execute(text('SELECT 1 FROM assistant_automations WHERE id=:id AND owner_user_id=:o'),
                              {'id': automation_id, 'o': user['id']}).scalar()
         if owned is None:
@@ -220,7 +220,7 @@ AUTOMATION_FOOTER = (
 def run_automation(automation_id: int, user: dict, trigger: str = 'scheduled') -> dict:
     """Execute one automation as the owner. Writes become proposals, never executions."""
     with engine.connect() as conn:
-        ensure(conn)
+
         row = conn.execute(text('SELECT * FROM assistant_automations WHERE id=:id AND owner_user_id=:o'),
                            {'id': automation_id, 'o': user['id']}).mappings().first()
     if row is None:
@@ -248,7 +248,7 @@ def run_automation(automation_id: int, user: dict, trigger: str = 'scheduled') -
         summary = 'اجرای خودکار خطا داشت؛ نتیجه نامعلوم است و باید دستی بررسی شود.'
     finished = datetime.now(timezone.utc)
     with engine.begin() as conn:
-        ensure(conn)
+
         run_id = conn.execute(text('''INSERT INTO assistant_automation_runs
             (automation_id,status,summary,proposals,started_at,finished_at)
             VALUES(:a,:s,CAST(:sum AS TEXT),CAST(:pr AS JSONB),:st,:fin) RETURNING id'''),
@@ -288,7 +288,7 @@ def _due_and_claim(conn, automation_id):
 
 def _run_due(automation_id: int):
     with engine.begin() as conn:
-        ensure(conn)
+
         row = _due_and_claim(conn, automation_id)
     if row is None:
         return
@@ -317,7 +317,7 @@ def _scheduler_loop():
     while not _STOP.is_set():
         try:
             with engine.connect() as conn:
-                ensure(conn)
+
                 due = [r[0] for r in conn.execute(text(
                     '''SELECT id FROM assistant_automations
                        WHERE enabled AND next_run_at IS NOT NULL AND next_run_at<=NOW() LIMIT 5''')).all()]
