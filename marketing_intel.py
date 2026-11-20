@@ -72,6 +72,11 @@ def ensure(conn):
     conn.execute(text("CREATE INDEX IF NOT EXISTS ix_marketing_leads_city ON marketing_leads(city)"))
 
 
+@router.on_event('startup')
+def startup():
+    with engine.begin() as conn:
+
+
 # ----------------------------------------------------------------- leads (لید مشتری)
 
 PRIVATE_EXPORTS = Path(os.getenv('KIARAD_PRIVATE_EXPORTS',
@@ -240,7 +245,6 @@ def harvest_questions(user: dict = Depends(current_user)):
         candidates.extend(found)
     if candidates:
         with engine.begin() as conn:
-            ensure(conn)
             existing = [r[0] for r in conn.execute(text(
                 "SELECT question FROM market_questions ORDER BY id DESC LIMIT 2000")).all()]
             for q in dedup_questions(candidates, existing):
