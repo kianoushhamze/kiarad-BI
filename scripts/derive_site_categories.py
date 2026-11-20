@@ -66,9 +66,6 @@ def derive(name: str) -> str:
 def main() -> int:
     engine = create_engine(DB_URL)
     with engine.begin() as conn:
-        conn.execute(text("""CREATE TABLE IF NOT EXISTS cms_product_meta(
-            code VARCHAR(100) PRIMARY KEY, site_category TEXT, image_url TEXT,
-            hidden BOOLEAN NOT NULL DEFAULT FALSE, updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW())"""))
         products = conn.execute(text("""
             SELECT p.code, p.name, p.category,
                    (SELECT v.raw->>'image_src' FROM digikala_variants v
