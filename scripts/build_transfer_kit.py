@@ -75,7 +75,7 @@ def build(root, snapshot, output, evidence=None, provisional=False):
         for name in archive.namelist():
             if (name.startswith('transfer/') and len(Path(name).parts) == 2) or name in handoffs:
                 (output / Path(name).name).write_bytes(archive.read(name))
-    release = {'source_commit': commit, 'image_tag': 'r20261113-' + commit[:12], 'prepared_for': '2026-11-13',
+    release = {'source_commit': commit, 'image_tag': 'r20261120-' + commit[:12], 'prepared_for': '2026-11-20',
                'timezone': 'Asia/Tehran', 'architecture': 'linux/amd64', 'source_files': len(records),
                'includes_images': False, 'includes_company_data': False, 'company_acceptance_complete': False,
                'provisional_test_kit': provisional}
