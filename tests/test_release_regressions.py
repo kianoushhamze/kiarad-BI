@@ -89,6 +89,9 @@ class ReleaseRegressionTests(TestCase):
                 self.assertNotIn("price_holoo", product)
                 self.assertNotIn("stock_holoo", product)
                 self.assertNotIn("stock", product)
+                image_url = product.get("image_url")
+                self.assertTrue(image_url is None or image_url.startswith("https://")
+                                or (image_url.startswith("/") and not image_url.startswith("//")))
 
     def test_storefront_schema_is_migration_managed_not_request_managed(self):
         paths = (
