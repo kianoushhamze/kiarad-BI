@@ -44,7 +44,6 @@ class DigikalaCreationGuardTests(unittest.TestCase):
             yield _Connection(row)
 
         with patch.object(platform_sync.engine, "begin", begin), \
-             patch.object(platform_sync, "ensure"), \
              patch.object(platform_sync, "_dk_client") as client:
             with self.assertRaises(HTTPException) as raised:
                 platform_sync.confirm_create_proposal(7, {"role": "ceo"})
