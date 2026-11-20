@@ -3,6 +3,7 @@ from concurrent.futures import ThreadPoolExecutor
 from decimal import Decimal
 import json
 import os
+from pathlib import Path
 from threading import Barrier
 import time
 import unittest
@@ -91,10 +92,10 @@ class DeepCheckoutConcurrencyTests(unittest.TestCase):
                 'CREATE TABLE payments(customer_id INTEGER,amount NUMERIC)',
             ):
                 c.execute(text(sql))
+            root = Path(__file__).resolve().parents[1]
+            for migration in ("0005_cms_product_meta.sql", "0006_storefront_platform_storage.sql"):
+                c.exec_driver_sql((root / "migrations" / migration).read_text(encoding="utf-8-sig"))
             proformas._ensure_proforma_storage(c)
-            platform_sync.ensure(c)
-            site_orders.ensure(c)
-            site_orders.ensure_catalog(c)
 
     @classmethod
     def cleanup_schema(cls):
@@ -202,9 +203,9 @@ class DeepCheckoutConcurrencyTests(unittest.TestCase):
                 self.assertEqual(error.exception.status_code, 422)
         self.assertEqual(self.scalar('SELECT COUNT(*) FROM proforma_invoices'), 0)
 
-    def test_parallel_first_site_registrations_do_not_race_schema_creation(self):
+    def test_parallel_site_registrations_use_migrated_schema(self):
         with self.test_engine.begin() as c:
-            c.execute(text('DROP TABLE IF EXISTS site_customers'))
+            c.execute(text('TRUNCATE site_customers'))
         def register(n):
             return site_auth.register(site_auth.RegisterIn(name='Synthetic user',
                 contact=f'first-{n}@example.test', password='Synthetic-password-0123'))
@@ -214,7 +215,6 @@ class DeepCheckoutConcurrencyTests(unittest.TestCase):
 
     def test_parallel_duplicate_registration_has_one_success_and_one_conflict(self):
         with self.test_engine.begin() as c:
-            site_auth.ensure(c)
             c.execute(text('TRUNCATE site_customers'))
         def register():
             try:
