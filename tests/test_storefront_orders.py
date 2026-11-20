@@ -62,7 +62,6 @@ class StorefrontOrderUnitTests(unittest.TestCase):
         conn = MagicMock()
         conn.execute.return_value.mappings.return_value.first.return_value = {'request_fingerprint': 'different'}
         with patch.object(orders.engine, 'begin', return_value=nullcontext(conn)), \
-             patch.object(orders, 'ensure'), patch.object(orders, 'ensure_catalog'), patch.object(orders, 'ensure_platforms'), \
              self.assertRaises(HTTPException) as error:
             orders.create_order(order_data(), BackgroundTasks(), {'id': 1})
         self.assertEqual(error.exception.status_code, 409)
