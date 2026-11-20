@@ -8,6 +8,7 @@ This review covers the public storefront/catalog, customer authentication and or
 
 - `GET /public/catalog` is intentionally public. It returns product code/title/category, image URL, the final consumer-facing price in Toman, any configured customer discount, and a boolean `in_stock`.
 - It no longer returns exact inventory quantities, internal product IDs, or the raw Holoo base price. The 15% consumer-price factor is applied server-side before serialization.
+- Product image destinations are limited to HTTPS or same-site absolute paths; unsafe schemes are omitted from the public response.
 - Static catalog snapshots in `site/data.json` and `site/data_demo_backup.json` follow the same contract. The catalog builder writes only `consumer_price_toman` and `in_stock`.
 - Torob/Emalls JSON and CSV feeds remain public by design. They publish an availability label (`instock` / `outofstock`), not the exact inventory count.
 - `GET /public/catalog/prices` is no longer an anonymous endpoint. It is mapped to the `online-sales` module and requires a manager account. It returns Digikala variant prices and stock for internal use.
