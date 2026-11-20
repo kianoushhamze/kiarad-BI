@@ -446,11 +446,21 @@ def public_catalog():
                 product_id = item.pop('id')
                 available = max(0, float(item.pop('stock') or 0) - totals.get(product_id, 0))
                 raw_price = item.pop('price', None)
-                if raw_price is None:
+                try:
+                    numeric_price = float(raw_price) if raw_price is not None else None
+                    if numeric_price is None or not math.isfinite(numeric_price) or numeric_price < 0:
+                        item['consumer_price_toman'] = None
+                    else:
+                        base_toman = math.floor(numeric_price / 10 + 0.5)
+                        item['consumer_price_toman'] = math.floor(base_toman * 1.15 + 0.5)
+                except (TypeError, ValueError, OverflowError):
                     item['consumer_price_toman'] = None
-                else:
-                    base_toman = math.floor(float(raw_price) / 10 + 0.5)
-                    item['consumer_price_toman'] = math.floor(base_toman * 1.15 + 0.5)
+                discount = item.get('discount_price_irr')
+                try:
+                    if discount is not None and (not math.isfinite(float(discount)) or float(discount) <= 0):
+                        item['discount_price_irr'] = None
+                except (TypeError, ValueError, OverflowError):
+                    item['discount_price_irr'] = None
                 item.pop('generated_at', None)
                 item['in_stock'] = available > 0
                 products.append(item)
