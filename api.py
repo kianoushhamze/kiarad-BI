@@ -1414,81 +1414,9 @@ _CHAT_ALLOWED_TYPES = {
 }
 
 
-def _ensure_chat_table(conn):
-    conn.execute(text("""
-        CREATE TABLE IF NOT EXISTS chat_messages (
-            id SERIAL PRIMARY KEY,
-            sender VARCHAR(100),
-            message TEXT,
-            room VARCHAR(50) DEFAULT 'general',
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            attachment_key VARCHAR(80),
-            attachment_name VARCHAR(180),
-            attachment_type VARCHAR(120),
-            attachment_size BIGINT
-        )
-    """))
-    for column, definition in (
-        ("attachment_key", "VARCHAR(80)"),
-        ("attachment_name", "VARCHAR(180)"),
-        ("attachment_type", "VARCHAR(120)"),
-        ("attachment_size", "BIGINT"),
-    ):
-        conn.execute(text(f"ALTER TABLE chat_messages ADD COLUMN IF NOT EXISTS {column} {definition}"))
-
-
-def _ensure_crm_table(conn):
-    conn.execute(text("""
-        CREATE TABLE IF NOT EXISTS customer_interactions (
-            id SERIAL PRIMARY KEY,
-            customer_name VARCHAR(200) NOT NULL,
-            visitor_name VARCHAR(100),
-            interaction_type VARCHAR(50),
-            product_discussed VARCHAR(150),
-            notes TEXT,
-            next_followup_date DATE,
-            followup_time VARCHAR(20),
-            status VARCHAR(50) NOT NULL DEFAULT 'در انتظار تماس',
-            created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
-        )
-    """))
-    conn.execute(text(
-        "CREATE INDEX IF NOT EXISTS idx_customer_interactions_followup ON customer_interactions(next_followup_date, status)"
-    ))
-    has_owner = conn.execute(text("""
-        SELECT EXISTS (
-            SELECT 1 FROM pg_attribute
-            WHERE attrelid='customer_interactions'::regclass
-              AND attname='owner_user_id' AND NOT attisdropped
-        )
-    """)).scalar()
-    if not has_owner:
-        conn.execute(text("ALTER TABLE customer_interactions ADD COLUMN owner_user_id INTEGER"))
-        # Resolve legacy labels once. Ambiguous/unmatched labels stay manager-only;
-        # later display-name changes must never transfer ownership of old records.
-        conn.execute(text("""
-            WITH candidates AS (
-                SELECT ci.id, MIN(u.id) AS user_id
-                FROM customer_interactions ci
-                JOIN users u ON (
-                    (ci.visitor_name LIKE '@%' AND ci.visitor_name='@' || u.username)
-                    OR (ci.visitor_name NOT LIKE '@%' AND ci.visitor_name=u.full_name)
-                )
-                GROUP BY ci.id HAVING COUNT(*)=1
-            )
-            UPDATE customer_interactions ci SET owner_user_id=c.user_id
-            FROM candidates c WHERE ci.id=c.id
-        """))
-    conn.execute(text(
-        "CREATE INDEX IF NOT EXISTS idx_customer_interactions_owner ON customer_interactions(owner_user_id)"
-    ))
-
-
 @app.on_event("startup")
-def initialize_chat_storage():
-    with engine.begin() as conn:
-        _ensure_chat_table(conn)
-        _ensure_crm_table(conn)
+def initialize_background_services():
+    # Chat and CRM tables are provisioned by versioned SQL migrations.
     from assistant_automations import ensure as ensure_automations, start_automations_scheduler
     from morning_brief import ensure as ensure_morning_brief, ensure_and_build_today, start_morning_brief_timer
     with engine.begin() as conn:
