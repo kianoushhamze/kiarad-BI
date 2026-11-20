@@ -30,7 +30,7 @@ class Handler(BaseHTTPRequestHandler):
     def do_GET(self):
         if self.path == '/api/public/catalog':
             return self.send_json({'products': [{'code': 'BROWSER-A', 'name': 'محصول آزمایشی',
-                                                'category': 'Test', 'price': 10000, 'in_stock': True}]})
+                                                'category': 'Test', 'consumer_price_toman': 1150, 'in_stock': True}]})
         if self.path == '/api/site-banners':
             return self.send_json({'banners': []})
         if self.path == '/api/site-auth/me':
