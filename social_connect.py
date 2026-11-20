@@ -31,6 +31,10 @@ def ensure(conn):
         status TEXT NOT NULL DEFAULT 'disconnected',
         last_checked_at TIMESTAMPTZ, updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW())"""))
 
+@router.on_event('startup')
+def startup():
+    with engine.begin() as conn:
+
 
 def _require_manager(user):
     if user.get("role") != "ceo" and not role_has_module_permission(str(user.get("role", "")), "online-sales", "can_write"):
