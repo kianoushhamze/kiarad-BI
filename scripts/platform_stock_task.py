@@ -13,7 +13,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
-from platform_sync import apply_order, push_stock_many, _dk_client, ensure  # noqa: E402
+from platform_sync import apply_order, push_stock_many, _dk_client  # noqa: E402
 from sqlalchemy import text  # noqa: E402
 
 from db import engine  # noqa: E402
@@ -52,7 +52,6 @@ def dkp_to_code(conn, dkp: int) -> str | None:
 
 def main() -> int:
     with engine.begin() as conn:
-        ensure(conn)
     try:
         client = _dk_client()
         probe = client.get_profile()
@@ -82,7 +81,6 @@ def main() -> int:
                 if not items:
                     # order detail may carry the lines; store raw anyway
                     with engine.begin() as conn:
-                        ensure(conn)
                         conn.execute(text("""INSERT INTO platform_orders_raw(platform, order_ref, status, raw)
                             VALUES ('digikala',:r,:s,CAST(:raw AS JSONB))
                             ON CONFLICT (platform, order_ref) DO UPDATE SET raw=EXCLUDED.raw, fetched_at=NOW()"""),
