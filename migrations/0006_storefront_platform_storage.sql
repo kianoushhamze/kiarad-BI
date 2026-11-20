@@ -44,6 +44,29 @@ CREATE TABLE IF NOT EXISTS site_banners (
 CREATE INDEX IF NOT EXISTS site_banners_active_sort
     ON site_banners(active, sort, id);
 
+CREATE TABLE IF NOT EXISTS proforma_invoices (
+    id SERIAL PRIMARY KEY,
+    customer_id INTEGER NOT NULL REFERENCES customers(id),
+    salesperson_id INTEGER REFERENCES salespersons(id),
+    total_amount NUMERIC(18, 2) NOT NULL,
+    status VARCHAR(20) NOT NULL DEFAULT 'pending',
+    credit_grade TEXT,
+    notes TEXT,
+    items_json JSONB NOT NULL DEFAULT '[]'::jsonb,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS inventory_reservations (
+    id SERIAL PRIMARY KEY,
+    product_id INTEGER NOT NULL REFERENCES products(id),
+    channel VARCHAR(30) NOT NULL,
+    external_order_id VARCHAR(200) NOT NULL,
+    quantity DOUBLE PRECISION NOT NULL,
+    status VARCHAR(20) NOT NULL DEFAULT 'reserved',
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT uq_inventory_reservation UNIQUE (channel, external_order_id, product_id)
+);
+
 CREATE TABLE IF NOT EXISTS platform_listings (
     id SERIAL PRIMARY KEY,
     platform TEXT NOT NULL,
