@@ -8,7 +8,7 @@ const upstream = createServer(async (req, res) => {
   if (req.url === '/public/catalog') return res.end(JSON.stringify({products: [{code: 'TEST'}]}));
   if (req.url === '/public/feeds/products.csv') {
     res.setHeader('Content-Type', 'text/csv; charset=utf-8');
-    return res.end('\uFEFFpage_unique,title\\nA1,Test product\\n');
+    return res.end('\uFEFFpage_unique,title\nA1,Test product\n');
   }
   if (req.url !== '/site-orders') {
     res.statusCode = 404;
@@ -43,7 +43,7 @@ try {
   assert.deepEqual(await (await fetch(base + '/api/public/catalog')).json(), {products: [{code: 'TEST'}]});
   const csv = await fetch(base + '/api/public/feeds/products.csv');
   assert.equal(csv.status, 200);
-  assert.match(csv.headers.get('content-type') || '', /^text\\/csv/i);
+  assert.match(csv.headers.get('content-type') || '', /^text\/csv/i);
   assert.equal(await csv.text(), '\uFEFFpage_unique,title\\nA1,Test product\\n');
   assert.equal((await fetch(base + '/api/public/feeds/products.csv', {method: 'POST'})).status, 405);
   assert.equal((await fetch(base + '/api/site-orders/all')).status, 404);
