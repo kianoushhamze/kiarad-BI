@@ -69,7 +69,7 @@ class ReleaseRegressionTests(TestCase):
             'price': 1000, 'stock': 9, 'image_url': None, 'discount_price_irr': None,
             'generated_at': None,
         }]
-        with patch.object(api.engine, 'connect', return_value=nullcontext(conn)), \\
+        with patch.object(api.engine, 'connect', return_value=nullcontext(conn)), \
              patch.object(api, 'reservation_totals', return_value={7: 4}):
             product = api.public_catalog()['products'][0]
         self.assertTrue(product['in_stock'])
