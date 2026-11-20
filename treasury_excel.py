@@ -258,7 +258,6 @@ async def preview_report(file: UploadFile = File(...), kind: str = Form(...), un
 def save_report_preview(payload,digest,title,source_note,user):
     kind=payload['kind']
     with engine.begin() as conn:
-        ensure_excel_schema(conn)
         conn.execute(text("SELECT pg_advisory_xact_lock(hashtextextended(:key,0))"), {"key": "treasury-excel:"+kind})
         existing = conn.execute(text("SELECT id,status FROM treasury_excel_batches WHERE kind=:kind AND content_hash=:hash"), {"kind": kind, "hash": digest}).mappings().first()
         if existing:
@@ -324,7 +323,6 @@ class ConfirmImport(BaseModel):
 @router.post("/{batch_id}/commit")
 def commit_report(batch_id: int, data: ConfirmImport, user: dict = Depends(require_treasury_access)):
     with engine.begin() as conn:
-        ensure_excel_schema(conn)
         row = conn.execute(text("SELECT * FROM treasury_excel_batches WHERE id=:id FOR UPDATE"), {"id": batch_id}).mappings().first()
         if not row:
             raise HTTPException(404, "گزارش پیدا نشد.")
@@ -352,7 +350,6 @@ def commit_report(batch_id: int, data: ConfirmImport, user: dict = Depends(requi
 @router.get("/reports")
 def report_list(_: dict = Depends(require_treasury_access)):
     with engine.begin() as conn:
-        ensure_excel_schema(conn)
         return [dict(r) for r in conn.execute(text("""SELECT id,kind,title,status,created_at,committed_at,payload->>'row_count' AS row_count,
             payload->>'input_unit' AS input_unit FROM treasury_excel_batches ORDER BY id DESC LIMIT 60""")).mappings()]
 
@@ -360,7 +357,6 @@ def report_list(_: dict = Depends(require_treasury_access)):
 @router.get("/reports/{batch_id}")
 def report_detail(batch_id: int, offset: int = Query(0, ge=0), limit: int = Query(100, ge=1, le=500), _: dict = Depends(require_treasury_access)):
     with engine.begin() as conn:
-        ensure_excel_schema(conn)
         row = conn.execute(text("SELECT * FROM treasury_excel_batches WHERE id=:id"), {"id": batch_id}).mappings().first()
         if not row:
             raise HTTPException(404, "گزارش پیدا نشد.")
@@ -395,7 +391,6 @@ def template(_: dict = Depends(require_treasury_access)):
 
 
 def excel_balance_summary(conn):
-    ensure_excel_schema(conn)
     row = conn.execute(text("SELECT * FROM treasury_excel_batches WHERE kind='balances' AND status='committed' ORDER BY id DESC LIMIT 1")).mappings().first()
     if not row:
         return None
@@ -406,7 +401,6 @@ def excel_balance_summary(conn):
 
 
 def excel_invoice_estimate(conn, monthly_expense_irr):
-    ensure_excel_schema(conn)
     rows = conn.execute(text("""SELECT DISTINCT ON(kind) id,kind,title,payload,committed_at FROM treasury_excel_batches
         WHERE status='committed' AND kind IN ('purchases','sales','purchase_returns','sales_returns') ORDER BY kind,id DESC""")).mappings().all()
     if not rows:
