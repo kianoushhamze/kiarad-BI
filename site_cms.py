@@ -221,7 +221,11 @@ def _clean_link_url(value: str | None) -> str | None:
         raise HTTPException(400, "پیوند بنر معتبر نیست.")
     if value.startswith("/") and not value.startswith("//"):
         return value
-    parsed = urlsplit(value)
+    try:
+        parsed = urlsplit(value)
+        _ = parsed.port
+    except ValueError:
+        raise HTTPException(400, "پیوند بنر معتبر نیست.")
     if (parsed.scheme.lower() != "https" or not parsed.netloc or not parsed.hostname
             or parsed.username is not None or parsed.password is not None):
         raise HTTPException(400, "پیوند بنر باید مسیر داخلی یا نشانی HTTPS معتبر باشد.")
