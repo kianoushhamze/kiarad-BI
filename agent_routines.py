@@ -333,7 +333,6 @@ def loop():
 @router.on_event('startup')
 def startup():
     global _THREAD
-    with engine.begin() as c:
     if enabled() and (_THREAD is None or not _THREAD.is_alive()):_STOP.clear();_THREAD=Thread(target=loop,daemon=True,name='kiarad-routines');_THREAD.start()
 
 @router.on_event('shutdown')
