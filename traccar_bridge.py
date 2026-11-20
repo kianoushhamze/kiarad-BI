@@ -66,7 +66,7 @@ def devices(user=Depends(current_user)):
     require_map_permission(user, 'can_read')
     manager=user.get('role') in MANAGER_ROLES
     with engine.begin() as c:
-        ensure(c);rows=c.execute(text('''SELECT d.*,u.full_name,s.id AS session_id,s.device_id AS session_device_id,s.expires_at,s.started_at
+        rows=c.execute(text('''SELECT d.*,u.full_name,s.id AS session_id,s.device_id AS session_device_id,s.expires_at,s.started_at
         FROM traccar_devices d JOIN users u ON u.id=d.user_id
         LEFT JOIN LATERAL(SELECT ts.* FROM tracking_sessions ts JOIN traccar_shifts x ON x.session_id=ts.id
         WHERE x.device_id=d.id AND ts.ended_at IS NULL AND ts.expires_at>NOW() ORDER BY ts.started_at DESC LIMIT 1) s ON TRUE
@@ -83,7 +83,7 @@ def people(user=Depends(require_manager)):
 def bind(data:Binding,user=Depends(require_manager)):
     require_map_permission(user, 'can_write')
     with engine.begin() as c:
-        ensure(c);c.execute(text('SELECT pg_advisory_xact_lock(819731,:uid)'),{'uid':data.user_id})
+        c.execute(text('SELECT pg_advisory_xact_lock(819731,:uid)'),{'uid':data.user_id})
         if not c.execute(text("SELECT id FROM users WHERE id=:uid AND is_active::text IN ('1','true','t') AND salesperson_id IS NOT NULL"),{'uid':data.user_id}).scalar():raise HTTPException(422,'حساب فعال متصل به پرسنل لازم است.')
         if c.execute(text('SELECT id FROM traccar_devices WHERE user_id=:uid AND revoked_at IS NULL'),{'uid':data.user_id}).scalar():raise HTTPException(409,'این فرد دستگاه فعال دارد؛ ابتدا همان اتصال را لغو کنید.')
         ident=uuid4();identifier=secrets.token_hex(16)
