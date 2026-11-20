@@ -22,6 +22,6 @@ Commands:
 ## Marketplace feeds and public catalog
 
 - 0005_cms_product_meta.sql creates the shared CMS product metadata table when absent and adds the optional discount_price_irr column to legacy installations.
-- 0006_storefront_platform_storage.sql creates the site-customer, storefront-order, banner and platform reservation/listing/proposal tables, and adds the order idempotency/reservation columns to existing installations. Existing rows are preserved.
+- 0006_storefront_platform_storage.sql creates the site-customer, storefront-order, banner, platform reservation/listing/proposal, platform-order/proforma, and stock-reservation tables, and adds the order idempotency/reservation columns to existing installations. Existing rows are preserved.
 - Apply migrations 0005 and 0006 before deploying the storefront/CMS/platform code. HTTP requests and the storefront catalog rebuild no longer create or alter these tables.
 - Verify first with python scripts/run_migrations.py --status and python scripts/run_migrations.py --dry-run against the intended environment. The migration is additive and must not be run against the company database without the normal backup and acceptance procedure.
