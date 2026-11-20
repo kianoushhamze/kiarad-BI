@@ -367,7 +367,6 @@ def notification_items(conn, user) -> list:
     items = []
     try:
         with engine.connect() as own:
-            ensure(own)
             rows = own.execute(text('''SELECT a.id, a.name,
                     (SELECT status FROM assistant_automation_runs r WHERE r.automation_id=a.id
                      ORDER BY started_at DESC LIMIT 1) AS last_status,
