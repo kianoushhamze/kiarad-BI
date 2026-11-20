@@ -1,7 +1,7 @@
 """Rebuild site/data.json from the live products table with clean UTF-8.
 
 Replaces the PowerShell pipeline whose cp1252 round-trip corrupted Persian
-titles/categories. Prices are stored in Toman (Rial / 10) as the site expects.
+titles/categories. Only the final consumer price in Toman and a boolean stock flag are published.
 """
 import json
 import math
@@ -9,6 +9,7 @@ import sys
 from datetime import datetime
 from pathlib import Path
 from uuid import uuid4
+from urllib.parse import urlsplit
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
@@ -17,6 +18,25 @@ from sqlalchemy import text  # noqa: E402
 
 from db import engine  # noqa: E402
 OUT = ROOT / "site" / "data.json"
+
+
+def public_image_url(value):
+    if not isinstance(value, str):
+        return None
+    value = value.strip()
+    if not value or "\\\\" in value or any(ord(ch) < 32 or ch.isspace() for ch in value):
+        return None
+    if value.startswith("/") and not value.startswith("//"):
+        return value
+    try:
+        parsed = urlsplit(value)
+        _ = parsed.port
+    except ValueError:
+        return None
+    if (parsed.scheme.lower() == "https" and parsed.hostname
+            and parsed.username is None and parsed.password is None):
+        return value
+    return None
 
 
 def main() -> int:
@@ -48,7 +68,7 @@ def main() -> int:
             "holoo_code": row["code"],
             "title": row["name"],
             "category": row["category"] or "بدون دسته",
-            "image_url": row["image_url"],
+            "image_url": public_image_url(row["image_url"]),
             "consumer_price_toman": consumer_price,
             "in_stock": float(row["stock"] or 0) > 0,
         })
