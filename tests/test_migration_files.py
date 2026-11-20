@@ -19,4 +19,5 @@ class MigrationFilesTests(unittest.TestCase):
     def test_release_contains_ordered_migration_payload(self):
         files = runner.migration_files()
         self.assertIn("0001_baseline.sql", [p.name for p in files])
+        self.assertIn("0006_storefront_platform_storage.sql", [p.name for p in files])
         self.assertEqual(files, sorted(files))
