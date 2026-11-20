@@ -80,7 +80,7 @@ python scripts/run_offline_review_tests.py
 
 آزمون‌های پایگاه‌داده فقط با DB/schema ایزوله و opt-in اجرا می‌شوند؛ `scripts/run_database_review_tests.py` به `KIARAD_REVIEW_DISPOSABLE_DB=1` نیاز دارد. آن را به DB شرکت متصل نکنید. تعداد pass/fail/skip را از لاگ همان SHA بخوانید؛ skip معادل pass نیست.
 
-Workflow شامل هشت بررسی است: backend آفلاین؛ PostgreSQL/CMS/فروشگاه و Traccar واقعی و بازیابی پشتیبان؛ lint/typecheck/build پنل؛ مرورگر فروشگاه؛ PDF فارسی؛ سازگاری Windows PowerShell5.1؛ کیت انتقال؛ و تصاویر Linux همراه آزمون کل مجموعه. مرحلهٔ Windows، parser و guardها را بررسی می‌کند و جایگزین پذیرش Docker Desktop شرکت نیست.
+Workflow شامل نه بررسی مستقل است: backend آفلاین؛ PostgreSQL/CMS/فروشگاه، Traccar و بازیابی پشتیبان؛ سناریوهای واقعی API و مرورگر (ورود، نقش، موجودی، ویزیت، وظیفه و خرید)؛ lint/typecheck/build پنل؛ مرورگر فروشگاه؛ PDF فارسی؛ سازگاری Windows PowerShell5.1؛ کیت انتقال؛ و ساخت تصاویر Linux همراه آزمون Stack آفلاین. مرحلهٔ Windows، parser و guardها را بررسی می‌کند و جایگزین پذیرش Docker Desktop شرکت نیست.
 
 آزمون واقعی گوشی، قفل صفحه، پس‌زمینه، آفلاین و باتری، تنظیمHTTPS شرکت، تطبیق هلو/سکوها و cutover همچنان پذیرش عملیاتی جدا می‌خواهند.
 
