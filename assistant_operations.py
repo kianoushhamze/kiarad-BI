@@ -33,6 +33,11 @@ def ensure(conn):
         created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),expires_at TIMESTAMPTZ NOT NULL DEFAULT NOW()+INTERVAL '20 minutes')'''))
 
 
+@router.on_event('startup')
+def startup():
+    with engine.begin() as conn:
+
+
 def authorize(operation,user):
     from assistant_commands import COMMANDS,authorize as command_authorize
     if operation in COMMANDS:
@@ -143,7 +148,7 @@ def read_proposal(ident: str,user=Depends(current_user)):
     try:UUID(ident)
     except ValueError:raise HTTPException(422,'شناسهٔ پیشنهاد معتبر نیست.') from None
     with engine.begin() as conn:
-        ensure(conn);row=proposal(conn,ident,user)
+        row=proposal(conn,ident,user)
     return {**{k:row[k] for k in ('id','operation','payload','status','receipt','expires_at')},
             'display':(row.get('baseline') or {}).get('display',{}),
             'before':(row.get('baseline') or {}).get('before'),
