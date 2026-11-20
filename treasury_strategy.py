@@ -145,13 +145,13 @@ def ensure_schema(conn):
         id BIGSERIAL PRIMARY KEY, scope VARCHAR(50) NOT NULL, revision INTEGER NOT NULL,
         payload JSONB NOT NULL, created_by INTEGER NOT NULL, approved_by INTEGER,
         created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), UNIQUE(scope, revision))"""))
-    if not conn.execute(text("SELECT 1 FROM pg_attribute WHERE attrelid=to_regclass('financial_documents') AND attname='fixed_expense_id' AND NOT attisdropped")).first():
-        conn.execute(text("ALTER TABLE financial_documents ADD COLUMN IF NOT EXISTS fixed_expense_id INTEGER"))
+
 
 
 @router.on_event("startup")
 def initialize_strategy_schema():
     with engine.begin() as conn:
+        ensure_schema(conn)
     start_automatic_refresh()
 
 
