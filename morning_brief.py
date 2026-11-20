@@ -245,7 +245,6 @@ def get_or_build_today(*, force: bool = False) -> dict[str, Any]:
     payload: dict[str, Any] | None = None
     stale = False
     with engine.begin() as conn:
-        ensure(conn)
         row = conn.execute(text('SELECT payload,is_stale FROM morning_briefs WHERE biz_date=:d'), {'d': biz}).mappings().first()
         if row:
             payload = row['payload']
@@ -254,7 +253,6 @@ def get_or_build_today(*, force: bool = False) -> dict[str, Any]:
         payload = build_payload()
         stale = bool(payload.get('warnings')) or not (payload.get('sections', {}).get('holoo_sync', {}) or {}).get('healthy', False)
         with engine.begin() as conn:
-            ensure(conn)
             if force:
                 conn.execute(text(
                     '''INSERT INTO morning_briefs(biz_date,payload,is_stale) VALUES(:d,CAST(:p AS JSONB),:s)
@@ -315,7 +313,6 @@ def brief_history(days: int = 14, user: dict = Depends(current_user)):
     _ceo(user)
     days = max(1, min(days, 60))
     with engine.connect() as conn:
-        ensure(conn)
         rows = conn.execute(text(
             '''SELECT biz_date,is_stale,created_at,
                       payload->'sections'->'sales_yesterday'->>'net_sales_irr' AS net_sales_irr,
@@ -337,7 +334,6 @@ def mark_viewed(user: dict = Depends(current_user)):
         raise HTTPException(422, 'کاربر بدون شناسه.')
     biz = iran_today()
     with engine.begin() as conn:
-        ensure(conn)
         exists = conn.execute(text(
             'SELECT 1 FROM morning_brief_views WHERE biz_date=:d AND viewed_by=:u'),
             {'d': biz, 'u': user['id']}).first()
@@ -354,7 +350,6 @@ def set_note(payload: BriefNote, user: dict = Depends(current_user)):
     _ceo(user)
     biz = iran_today()
     with engine.begin() as conn:
-        ensure(conn)
         row = conn.execute(text('SELECT payload FROM morning_briefs WHERE biz_date=:d'), {'d': biz}).mappings().first()
         if not row:
             raise HTTPException(404, 'گزارش امروز هنوز ساخته نشده است.')

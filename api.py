@@ -1422,9 +1422,7 @@ _CHAT_ALLOWED_TYPES = {
 def initialize_background_services():
     # Chat and CRM tables are provisioned by versioned SQL migrations.
     from assistant_automations import start_automations_scheduler
-    from morning_brief import ensure as ensure_morning_brief, ensure_and_build_today, start_morning_brief_timer
-    with engine.begin() as conn:
-        ensure_morning_brief(conn)
+    from morning_brief import ensure_and_build_today, start_morning_brief_timer
     try:
         ensure_and_build_today()
     except Exception:

@@ -150,8 +150,7 @@ def ensure_schema(conn):
 
 @router.on_event("startup")
 def initialize_strategy_schema():
-    with engine.begin() as conn:
-        ensure_schema(conn)
+    # Schema is provisioned by migration 0012; startup only starts the refresh worker.
     start_automatic_refresh()
 
 

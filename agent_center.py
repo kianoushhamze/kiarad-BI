@@ -634,7 +634,6 @@ def worker_loop():
 @router.on_event('startup')
 def startup():
     global _THREAD
-    with engine.begin() as conn:ensure(conn)
     if not scheduler_enabled():return
     with _START_LOCK:
         if _THREAD and _THREAD.is_alive():return

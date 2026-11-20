@@ -24,12 +24,6 @@ def ensure_suggestion_storage(conn):
     )"""))
 
 
-@router.on_event("startup")
-def initialize_suggestion_storage():
-    with engine.begin() as conn:
-        ensure_suggestion_storage(conn)
-
-
 def suggestion_payload(value):
     if isinstance(value, str):
         try:

@@ -189,7 +189,3 @@ async def receive(request:Request):
     try:data=Forward.model_validate(json.loads(body))
     except (ValueError,ValidationError,UnicodeDecodeError):raise HTTPException(422,'Invalid Traccar position format') from None
     with engine.begin() as c:return ingest(c,data)
-
-@router.on_event('startup')
-def startup():
-    with engine.begin() as c:ensure(c)

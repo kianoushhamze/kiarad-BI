@@ -35,12 +35,6 @@ def ensure(conn):
     conn.execute(text('CREATE INDEX IF NOT EXISTS tracking_points_session_time ON tracking_points(session_id,recorded_at DESC)'))
 
 
-@router.on_event('startup')
-def startup():
-    with engine.begin() as conn:
-        ensure(conn)
-
-
 class Strict(BaseModel):
     model_config = ConfigDict(extra='forbid', allow_inf_nan=False)
 
