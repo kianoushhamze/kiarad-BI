@@ -23,6 +23,8 @@ def main():
         raise RuntimeError('database_test_groups_missing')
     if not any(name == 'test_site_cms_regressions.py' for name, _ in groups):
         groups.append(('test_site_cms_regressions.py', 'KIARAD_TEST_CMS_DB'))
+    if not any(name == 'test_marketplace_feeds_db.py' for name, _ in groups):
+        groups.append(('test_marketplace_feeds_db.py', 'KIARAD_TEST_MARKETPLACE_FEEDS_DB'))
     results = []
     for filename, flag in groups:
         env = {k: v for k, v in os.environ.items() if not (k.startswith('KIARAD_TEST_') and k.endswith('_DB'))}
