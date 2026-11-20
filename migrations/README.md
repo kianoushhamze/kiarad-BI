@@ -32,3 +32,10 @@ Commands:
 - 0007_chat_crm_storage.sql provisions the shared employee chat and CRM interaction tables and their indexes.
 - Existing CRM rows are assigned to an employee only when the legacy visitor label maps unambiguously to exactly one user. Ambiguous or unmatched rows remain unassigned and manager-visible only.
 - API startup no longer creates or alters chat/CRM tables. Apply the migration through the normal backup, dry-run and release process before deploying this code.
+
+
+## Visit outcomes and treasury linkage
+
+- 0008_visit_treasury_columns.sql adds structured visit-outcome fields and the fixed-expense link used by treasury documents.
+- Fresh monthly-visit tables include the same outcome fields in their startup schema definition; existing installations receive them additively from the migration.
+- The reconciliation API and treasury routes no longer execute these schema changes during a request. Apply the migration before deploying this code.
