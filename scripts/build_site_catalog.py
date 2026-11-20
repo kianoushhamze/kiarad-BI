@@ -36,7 +36,13 @@ def main() -> int:
     products = []
     for row in rows:
         price = row["price"]
-        base_toman = math.floor(float(price) / 10 + 0.5) if price is not None else None
+        try:
+            numeric_price = float(price) if price is not None else None
+            base_toman = (math.floor(numeric_price / 10 + 0.5)
+                          if numeric_price is not None and math.isfinite(numeric_price) and numeric_price >= 0
+                          else None)
+        except (TypeError, ValueError, OverflowError):
+            base_toman = None
         consumer_price = math.floor(base_toman * 1.15 + 0.5) if base_toman is not None else None
         products.append({
             "holoo_code": row["code"],
