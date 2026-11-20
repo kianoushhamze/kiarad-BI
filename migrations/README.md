@@ -45,3 +45,9 @@ Commands:
 
 - 0009_assistant_operations_storage.sql provisions actor-bound assistant proposals and scheduled automation/run storage, including the due/latest indexes.
 - Assistant proposal and automation request handlers no longer create or alter these tables. Apply the migration before deploying the updated API.
+
+
+## Remaining startup-provisioned module schemas
+
+- Traccar storage is provisioned by migration 0004; request handlers no longer create or alter device/shift tables.
+- Treasury Excel batch storage is initialized once at application startup; preview, commit, list, export, and forecasting requests do not run schema DDL.
