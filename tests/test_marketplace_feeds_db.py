@@ -137,8 +137,10 @@ class MarketplaceFeedDatabaseTests(unittest.TestCase):
         products = {item["code"]: item for item in result["products"]}
         self.assertEqual(set(products), {"A1", "B2"})
         self.assertEqual(products["A1"]["discount_price_irr"], 8000)
-        self.assertEqual(products["A1"]["stock"], 3.0)
-        self.assertEqual(products["B2"]["stock"], 0.0)
+        self.assertTrue(products["A1"]["in_stock"])
+        self.assertFalse(products["B2"]["in_stock"])
+        self.assertNotIn("stock", products["A1"])
+        self.assertNotIn("stock", products["B2"])
         self.assertEqual(statements, [], "Public catalog requests must not execute schema DDL.")
 
 
