@@ -224,7 +224,7 @@ $ComposeArgs = @('compose','--env-file',(Join-Path $Destination '.env'),'-p','ki
 
 ### الزام امنیتی پیش از Public Exposure
 
-محدودسازی نرخ در خود برنامه برای احراز هویت مشتری پیاده‌سازی شده و به جدول PostgreSQL ایجادشده توسط Migration شمارهٔ 0011 متکی است: `POST /site-auth/login` حداکثر ۱۰ تلاش در ۱۵ دقیقه و `POST /site-auth/register` حداکثر ۵ تلاش در ساعت، به‌ازای هر IP. درخواست بیش از حد پاسخ 429 و هدر `Retry-After` می‌گیرد. کلیدهای ذخیره‌شده HMAC هستند و IP خام ذخیره نمی‌شود.
+محدودسازی نرخ در خود برنامه برای احراز هویت مشتری پیاده‌سازی شده و به جدول PostgreSQL ایجادشده توسط Migration شمارهٔ 0011 متکی است: `POST /site-auth/login` حداکثر ۱۰ تلاش در ۱۵ دقیقه و `POST /site-auth/register` حداکثر ۱۰ تلاش در ساعت، به‌ازای هر IP. درخواست بیش از حد پاسخ 429 و هدر `Retry-After` می‌گیرد. کلیدهای ذخیره‌شده HMAC هستند و IP خام ذخیره نمی‌شود.
 
 پیش از Deploy، Migration شمارهٔ 0011 باید از مسیر Backup/Review عادی اعمال شود. برای استخراج IP واقعی، فقط در صورت تطبیق IP اتصال مستقیم با CIDRهای صریح در `KIARAD_TRUSTED_PROXY_CIDRS`، هدرهای `CF-Connecting-IP` یا `X-Forwarded-For` پذیرفته می‌شوند؛ در غیر این صورت فقط IP اتصال TCP استفاده می‌شود. CIDR را دقیقاً مطابق آدرس یا subnet پراکسیِ متصل به برنامه تنظیم کنید؛ به هدرهای ارسالی مستقیم از اینترنت اعتماد نکنید. علاوه بر Rate Limit برنامه، Rate Limit مکمل در Cloudflare یا Reverse Proxy مورد اعتماد نیز توصیه می‌شود.
 

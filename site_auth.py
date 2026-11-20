@@ -32,7 +32,7 @@ _PHONE_RE = re.compile(r"^09\d{9}$")
 
 _RATE_LIMITS = {
     "login": (10, 15 * 60),
-    "register": (5, 60 * 60),
+    "register": (10, 60 * 60),
 }
 _RATE_LIMIT_CLEANUP_COUNTER = count(1)
 

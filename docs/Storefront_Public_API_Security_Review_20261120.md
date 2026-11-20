@@ -48,7 +48,7 @@ Apply migrations 0005 and 0006 through the normal backup/review process before d
 Application-level rate limiting is implemented for public customer authentication and is backed by the shared PostgreSQL table provisioned by migration `0011_site_auth_rate_limits.sql`:
 
 - `POST /site-auth/login`: 10 attempts per 15 minutes per client IP.
-- `POST /site-auth/register`: 5 attempts per hour per client IP.
+- `POST /site-auth/register`: 10 attempts per hour per client IP.
 - Exceeded requests return HTTP 429 with a `Retry-After` header. Bucket keys are HMAC-SHA256 values; raw IP addresses are not stored.
 - Forwarded client-IP headers are accepted only when the immediate TCP peer belongs to an explicit CIDR configured in `KIARAD_TRUSTED_PROXY_CIDRS`. Otherwise the TCP peer address is used and forwarded headers are ignored.
 
