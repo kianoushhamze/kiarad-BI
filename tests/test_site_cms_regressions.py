@@ -92,7 +92,7 @@ class BannerInputSecurityTests(unittest.TestCase):
         fake = base64.b64encode(b"not-an-image" * 8).decode("ascii")
         with self.assertRaises(HTTPException):
             cms._clean_image(fake)
-        png = b"\\x89PNG\\r\\n\\x1a\\n" + b"0" * 64
+        png = b"\x89PNG\r\n\x1a\n" + b"0" * 64
         encoded = base64.b64encode(png).decode("ascii")
         self.assertEqual(cms._image_media(cms._clean_image(encoded)), "image/png")
         with self.assertRaises(HTTPException):
