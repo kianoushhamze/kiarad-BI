@@ -359,7 +359,9 @@ body{background:radial-gradient(ellipse at 95% 12%,#e6d8f7 0,transparent 38%),va
   }
 
   function consumerPrice(p) {
-    if (p.price_holoo != null && !isNaN(Number(p.price_holoo))) return Math.round(Number(p.price_holoo) * 1.15);
+    if (p.consumer_price_toman != null && !isNaN(Number(p.consumer_price_toman))) {
+      return Math.round(Number(p.consumer_price_toman));
+    }
     return null;
   }
   function discountPrice(p) {
@@ -491,14 +493,13 @@ body{background:radial-gradient(ellipse at 95% 12%,#e6d8f7 0,transparent 38%),va
         return {
           store: d.store,
           products: (d.products || []).map(function (p) {
-            var irr = Number(p.price);
             var disc = p.discount_price_irr == null ? null : Number(p.discount_price_irr);
             return {
               code: p.code || "—",
               title: p.name || "بدون عنوان",
               category: p.category || "بدون دسته",
               image_url: p.image_url || null,
-              price_holoo: isNaN(irr) ? null : Math.round(irr / 10),
+              consumer_price_toman: p.consumer_price_toman == null ? null : Number(p.consumer_price_toman),
               discount_price_irr: (disc && !isNaN(disc)) ? disc : null,
               in_stock: p.in_stock === true
             };
@@ -531,7 +532,7 @@ body{background:radial-gradient(ellipse at 95% 12%,#e6d8f7 0,transparent 38%),va
           title: pick(p, ["title", "fa_title", "name"]) || "بدون عنوان",
           category: p.category || "",
           image_url: p.image_url || null,
-          price_holoo: pick(p, ["price_holoo", "price"]),
+          consumer_price_toman: pick(p, ["consumer_price_toman"]),
           discount_price_irr: p.discount_price_irr || null,
           in_stock: (typeof p.in_stock === "boolean") ? p.in_stock : Number(p.stock_holoo || 0) > 0
         };
