@@ -3,22 +3,6 @@ from typing import Dict, Any, List, Optional
 from sqlalchemy.orm import Session
 from sqlalchemy import text
 
-def ensure_reconciliation_schema(db: Session) -> None:
-    """افزودن ایمن ستون‌های نتیجه ویزیت، کد پیش‌فاکتور و ثبت خودکار مختصات بدون حذف داده‌های قبلی"""
-    statements = [
-        "ALTER TABLE monthly_visit_plan_stops ADD COLUMN IF NOT EXISTS outcome_status VARCHAR(50);",
-        "ALTER TABLE monthly_visit_plan_stops ADD COLUMN IF NOT EXISTS holoo_preinvoice_code VARCHAR(100);",
-        "ALTER TABLE monthly_visit_plan_stops ADD COLUMN IF NOT EXISTS order_amount_rial BIGINT DEFAULT 0;",
-        "ALTER TABLE monthly_visit_plan_stops ADD COLUMN IF NOT EXISTS outcome_notes TEXT;",
-        "ALTER TABLE monthly_visit_plan_stops ADD COLUMN IF NOT EXISTS follow_up_date DATE;"
-    ]
-    for stmt in statements:
-        try:
-            db.execute(text(stmt))
-        except Exception:
-            pass
-    db.commit()
-
 def auto_pin_center_coordinates(db: Session, center_id: int, lat: float, lng: float) -> bool:
     """ثبت خودکار مختصات برای ۴۴۹ پایگاه فاقد لوکیشن در اولین حضور معتبر ویزیتور"""
     if not lat or not lng:
