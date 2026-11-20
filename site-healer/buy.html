@@ -598,7 +598,9 @@ body{background:radial-gradient(ellipse at 95% 12%,#e6d8f7 0,transparent 38%),va
       var a = document.createElement(b.link_url ? "a" : "div");
       a.className = "slide";
       if (b.link_url) { a.href = b.link_url; a.target = "_blank"; a.rel = "noopener"; }
-      a.innerHTML = '<img src="' + esc(b.image_url) + '" alt="' + esc(b.title || "بنر") + '" loading="lazy">';
+      var imageUrl = b.image_url || "";
+      if (imageUrl.charAt(0) === "/") imageUrl = API_BASE.replace(/\\/$/, "") + imageUrl;
+      a.innerHTML = '<img src="' + esc(imageUrl) + '" alt="' + esc(b.title || "بنر") + '" loading="lazy">';
       slides.appendChild(a);
       var d = document.createElement("button");
       d.type = "button";
