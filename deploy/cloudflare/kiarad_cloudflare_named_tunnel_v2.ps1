@@ -1,128 +1,153 @@
-﻿# ============================================================
-#  KIARAD x Cloudflare Named Tunnel - v2 (stage 20261114)
-#  panel.DOMAIN -> 127.0.0.1:3300   shop.DOMAIN -> 127.0.0.1:8190
-#  gps.DOMAIN   -> 127.0.0.1:5055   (optional, Traccar)
-#  The current Quick Tunnel is NOT touched; stop it yourself
-#  only after the permanent addresses are verified.
-#  Run (Windows PowerShell 5.1):
-#   powershell -NoProfile -ExecutionPolicy Bypass -File .\kiarad_cloudflare_named_tunnel_v2.ps1
+# ============================================================
+# KIARAD Cloudflare Named Tunnel - hardened installer
+# Windows PowerShell 5.1; run as Administrator.
+# No automatic "latest" download, tunnel deletion or service deletion.
 # ============================================================
 $ErrorActionPreference = 'Stop'
 [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
 $ProgressPreference = 'SilentlyContinue'
-function Step($m) { Write-Host "`n== $m ==" -ForegroundColor Cyan }
-function Ok($m)   { Write-Host "[OK] $m" -ForegroundColor Green }
-function Warn($m) { Write-Host "[!] $m" -ForegroundColor Yellow }
-function Fail($m) { Write-Host "[FAIL] $m" -ForegroundColor Red; Read-Host 'Enter to close'; exit 1 }
 
-$id = [Security.Principal.WindowsIdentity]::GetCurrent()
-$pr = New-Object Security.Principal.WindowsPrincipal($id)
-if (-not $pr.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) {
-    Warn 'Admin (UAC) is required - a new window will open.'
-    Start-Process powershell -Verb RunAs -ArgumentList "-NoProfile -ExecutionPolicy Bypass -File `"$PSCommandPath`""
+function Step($m) { Write-Host "`n== $m ==" -ForegroundColor Cyan }
+function Ok($m) { Write-Host "[OK] $m" -ForegroundColor Green }
+function Warn($m) { Write-Host "[!] $m" -ForegroundColor Yellow }
+function Fail($m) { throw $m }
+
+function Protect-Path([string]$Path, [switch]$Directory) {
+    if (-not (Test-Path -LiteralPath $Path)) { Fail "Security path missing: $Path" }
+    if ($Directory) {
+        & icacls.exe $Path /inheritance:r /grant:r "*S-1-5-18:(OI)(CI)F" "*S-1-5-32-544:(OI)(CI)F" /T /C | Out-Null
+    } else {
+        & icacls.exe $Path /inheritance:r /grant:r "*S-1-5-18:F" "*S-1-5-32-544:F" /C | Out-Null
+    }
+    if ($LASTEXITCODE -ne 0) { Fail "Could not restrict ACL: $Path" }
+}
+
+$identity = [Security.Principal.WindowsIdentity]::GetCurrent()
+$principal = New-Object Security.Principal.WindowsPrincipal($identity)
+if (-not $principal.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) {
+    $arguments = '-NoProfile -ExecutionPolicy Bypass -File "' + $PSCommandPath + '"'
+    Start-Process -FilePath powershell.exe -Verb RunAs -ArgumentList $arguments
     exit
 }
 
 $TunnelName = 'kiarad-stage'
-$Home2 = "$env:USERPROFILE\.cloudflared"
-$SvcDir = "$env:ProgramData\cloudflared"
-$LogDir = "$SvcDir\logs"
+$Home2 = Join-Path $env:USERPROFILE '.cloudflared'
+$SvcDir = Join-Path $env:ProgramData 'cloudflared'
+$LogDir = Join-Path $SvcDir 'logs'
 
-Step '1. Domain'
-Write-Host 'Prerequisite: domain added to Cloudflare and status = Active (nameservers changed at the registrar).'
+Step '1. Domain and optional GPS'
 $DOMAIN = (Read-Host 'Domain [default: kiaradhealer.ir]').Trim().ToLower() -replace '^https?://','' -replace '/$',''
 if (-not $DOMAIN) { $DOMAIN = 'kiaradhealer.ir' }
-if ($DOMAIN -notmatch '^[a-z0-9-]+(\.[a-z0-9-]+)+$') { Fail "Invalid domain: '$DOMAIN'" }
+if ($DOMAIN -notmatch '^[a-z0-9-]+(\.[a-z0-9-]+)+$') { Fail "Invalid domain: $DOMAIN" }
 $wantGps = (Read-Host 'Publish gps.DOMAIN for Traccar too? (y/N)').Trim().ToLower() -eq 'y'
-Ok "Domain: $DOMAIN"
 
-Step '2. Local services must answer (nothing is changed)'
-foreach ($t in @(@('panel',3300),@('shop',8190))) {
-    $up = Test-NetConnection -ComputerName 127.0.0.1 -Port $t[1] -InformationLevel Quiet -WarningAction SilentlyContinue
-    if ($up) { Ok "$($t[0]) listens on $($t[1])" } else { Warn "$($t[0]) does NOT listen on $($t[1]) - check: docker compose ps" }
+Step '2. Check local services without changing them'
+foreach ($target in @(@('panel',3300),@('shop',8190))) {
+    $up = Test-NetConnection 127.0.0.1 -Port $target[1] -InformationLevel Quiet -WarningAction SilentlyContinue
+    if ($up) { Ok "$($target[0]) listens on $($target[1])" } else { Warn "$($target[0]) is not listening on $($target[1])" }
 }
 
-Step '3. cloudflared binary'
-New-Item -ItemType Directory -Force -Path $SvcDir, $LogDir | Out-Null
-$exe = "$SvcDir\cloudflared.exe"
-if (-not (Test-Path $exe)) {
-    $src = 'D:\Kiarad-New\cloudflared.exe'
-    if (Test-Path $src) { Copy-Item $src $exe -Force; Ok "Copied from $src" }
-    else {
-        Invoke-WebRequest -UseBasicParsing -Uri 'https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-windows-amd64.exe' -OutFile $exe
-        Ok 'Downloaded cloudflared'
-    }
+Step '3. Verify cloudflared binary'
+New-Item -ItemType Directory -Force -Path $SvcDir,$LogDir | Out-Null
+Protect-Path $SvcDir -Directory
+Protect-Path $LogDir -Directory
+$exe = Join-Path $SvcDir 'cloudflared.exe'
+if (-not (Test-Path -LiteralPath $exe)) {
+    $candidates = @('D:\Kiarad-New\cloudflared.exe',(Join-Path $env:ProgramFiles 'cloudflared\cloudflared.exe'))
+    $source = $candidates | Where-Object { Test-Path -LiteralPath $_ -PathType Leaf } | Select-Object -First 1
+    if (-not $source) { Fail "Place an official signed cloudflared.exe at $exe. Unverified automatic downloads are disabled." }
+    Copy-Item -LiteralPath $source -Destination $exe
 }
-& $exe --version
-if ($LASTEXITCODE -ne 0) { Fail 'cloudflared does not run.' }
+$signature = Get-AuthenticodeSignature -FilePath $exe
+if ($signature.Status -ne 'Valid' -or -not $signature.SignerCertificate -or $signature.SignerCertificate.Subject -notmatch '(?i)Cloudflare') {
+    Fail 'cloudflared Authenticode signature is invalid or publisher is not Cloudflare.'
+}
+Protect-Path $exe
+$version = (& $exe --version 2>&1 | Out-String).Trim()
+if ($LASTEXITCODE -ne 0) { Fail 'cloudflared execution failed.' }
+Ok "Signed binary verified: $version"
 
-Step '4. Cloudflare login (browser opens; choose the domain)'
-if (-not (Test-Path "$Home2\cert.pem")) {
+Step '4. Cloudflare login'
+New-Item -ItemType Directory -Force -Path $Home2 | Out-Null
+if (-not (Test-Path -LiteralPath (Join-Path $Home2 'cert.pem'))) {
     & $exe tunnel login
-    if (-not (Test-Path "$Home2\cert.pem")) { Fail 'Login incomplete (cert.pem missing).' }
+    if ($LASTEXITCODE -ne 0 -or -not (Test-Path -LiteralPath (Join-Path $Home2 'cert.pem'))) { Fail 'Cloudflare login did not complete.' }
 }
-Ok 'Logged in.'
 
-Step "5. Tunnel $TunnelName"
-$list = (& $exe tunnel list --output json 2>$null | Out-String | ConvertFrom-Json)
-$t = $list | Where-Object { $_.name -eq $TunnelName } | Select-Object -First 1
-if (-not $t) {
+Step '5. Reuse existing tunnel; do not delete or recreate it'
+$list = (& $exe tunnel list --output json 2>$null | Out-String)
+if ($LASTEXITCODE -ne 0) { Fail 'Could not list tunnels; no tunnel changed.' }
+try { $tunnels = @($list | ConvertFrom-Json) } catch { Fail 'Invalid tunnel-list JSON.' }
+$tunnel = $tunnels | Where-Object { $_.name -eq $TunnelName } | Select-Object -First 1
+if (-not $tunnel) {
     & $exe tunnel create $TunnelName
-    $list = (& $exe tunnel list --output json | Out-String | ConvertFrom-Json)
-    $t = $list | Where-Object { $_.name -eq $TunnelName } | Select-Object -First 1
-} else { Warn 'Tunnel already exists - reusing.' }
-if (-not $t) { Fail 'Tunnel id not found.' }
-$tid = $t.id
-$credSrc = "$Home2\$tid.json"
-if (-not (Test-Path $credSrc)) { Fail "Credentials file missing: $credSrc (if the tunnel pre-existed, delete it in Cloudflare and rerun)" }
-Copy-Item $credSrc "$SvcDir\$tid.json" -Force
-Ok "Tunnel ID: $tid"
+    if ($LASTEXITCODE -ne 0) { Fail 'Tunnel creation failed.' }
+    $list = (& $exe tunnel list --output json 2>$null | Out-String)
+    if ($LASTEXITCODE -ne 0) { Fail 'Tunnel created but listing failed; do not create another.' }
+    try { $tunnels = @($list | ConvertFrom-Json) } catch { Fail 'Invalid tunnel-list JSON after create.' }
+    $tunnel = $tunnels | Where-Object { $_.name -eq $TunnelName } | Select-Object -First 1
+} else { Warn 'Reusing existing named tunnel.' }
+if (-not $tunnel) { Fail 'Tunnel ID not found.' }
+$tid = [string]$tunnel.id
+$credSource = Join-Path $Home2 ($tid + '.json')
+if (-not (Test-Path -LiteralPath $credSource -PathType Leaf)) {
+    Fail "Credentials missing for existing tunnel $tid. Retrieve this tunnel's credential securely; do not delete/recreate it."
+}
+$credDestination = Join-Path $SvcDir ($tid + '.json')
+Copy-Item -LiteralPath $credSource -Destination $credDestination -Force
+Protect-Path $credDestination
 
-Step '6. config.yml'
-$gpsBlock = ''
-if ($wantGps) { $gpsBlock = "  - hostname: gps.$DOMAIN`r`n    service: http://127.0.0.1:5055`r`n" }
-$cfg = "tunnel: $tid`r`ncredentials-file: $SvcDir\$tid.json`r`nprotocol: http2`r`ningress:`r`n" +
-       "  - hostname: panel.$DOMAIN`r`n    service: http://127.0.0.1:3300`r`n" +
-       "  - hostname: shop.$DOMAIN`r`n    service: http://127.0.0.1:8190`r`n" +
-       $gpsBlock + "  - service: http_status:404`r`n"
-$cfgPath = "$SvcDir\config.yml"
-[System.IO.File]::WriteAllText($cfgPath, $cfg, (New-Object System.Text.UTF8Encoding($false)))
-& $exe tunnel --config $cfgPath ingress validate
-if ($LASTEXITCODE -ne 0) { Fail 'config.yml is invalid.' }
-Ok "Config written: $cfgPath"
+Step '6. Write and validate config'
+$newLine = [Environment]::NewLine
+$gps = ''
+if ($wantGps) { $gps = "  - hostname: gps.$DOMAIN" + $newLine + "    service: http://127.0.0.1:5055" + $newLine }
+$config = "tunnel: $tid" + $newLine + "credentials-file: $credDestination" + $newLine +
+          "protocol: http2" + $newLine + "ingress:" + $newLine +
+          "  - hostname: panel.$DOMAIN" + $newLine + "    service: http://127.0.0.1:3300" + $newLine +
+          "  - hostname: shop.$DOMAIN" + $newLine + "    service: http://127.0.0.1:8190" + $newLine +
+          $gps + "  - service: http_status:404" + $newLine
+$configPath = Join-Path $SvcDir 'config.yml'
+[IO.File]::WriteAllText($configPath,$config,(New-Object System.Text.UTF8Encoding($false)))
+Protect-Path $configPath
+& $exe tunnel --config $configPath ingress validate
+if ($LASTEXITCODE -ne 0) { Fail 'Ingress validation failed; service not changed.' }
 
-Step '7. DNS records'
-$hosts = @("panel.$DOMAIN","shop.$DOMAIN"); if ($wantGps) { $hosts += "gps.$DOMAIN" }
-foreach ($h in $hosts) {
-    $o = (& $exe tunnel route dns $TunnelName $h 2>&1 | Out-String).Trim()
-    if ($o -match 'already') { Warn "$h exists (verify in Cloudflare DNS that it points to this tunnel)" } else { Ok $o }
+Step '7. DNS routes'
+$hosts = @("panel.$DOMAIN","shop.$DOMAIN")
+if ($wantGps) { $hosts += "gps.$DOMAIN" }
+foreach ($hostName in $hosts) {
+    $output = (& $exe tunnel route dns $TunnelName $hostName 2>&1 | Out-String).Trim()
+    $exitCode = $LASTEXITCODE
+    if ($exitCode -ne 0 -and $output -notmatch '(?i)already exists|already routed') { Fail "DNS route failed for $hostName : $output" }
+    if ($output -match '(?i)already exists|already routed') { Warn "Existing DNS route for $hostName; verify it targets $tid." } else { Ok $output }
 }
 
-Step '8. Windows service (auto start after reboot)'
-$svc = Get-Service -Name 'KiaradCloudflared' -ErrorAction SilentlyContinue
-if ($svc) { Stop-Service KiaradCloudflared -Force -ErrorAction SilentlyContinue; & sc.exe delete KiaradCloudflared | Out-Null; Start-Sleep 2 }
-$bin = "`"$exe`" tunnel --config `"$cfgPath`" --logfile `"$LogDir\cloudflared.log`" run $tid"
-New-Service -Name 'KiaradCloudflared' -BinaryPathName $bin -DisplayName 'Kiarad Cloudflare Tunnel' -StartupType Automatic | Out-Null
+Step '8. Preserve and reconfigure Windows service'
+$log = Join-Path $LogDir 'cloudflared.log'
+$binaryPath = '"' + $exe + '" tunnel --config "' + $configPath + '" --logfile "' + $log + '" run ' + $tid
+$service = Get-CimInstance Win32_Service -Filter "Name='KiaradCloudflared'" -ErrorAction SilentlyContinue
+if ($service) {
+    if ($service.State -eq 'Running') { Stop-Service KiaradCloudflared -Force }
+    & sc.exe config KiaradCloudflared binPath= $binaryPath start= auto | Out-Null
+    if ($LASTEXITCODE -ne 0) { Fail 'Could not reconfigure existing Windows service.' }
+    Set-Service KiaradCloudflared -StartupType Automatic
+    Warn 'Existing service preserved and reconfigured; it was not deleted.'
+} else {
+    New-Service KiaradCloudflared -BinaryPathName $binaryPath -DisplayName 'Kiarad Cloudflare Tunnel' -StartupType Automatic | Out-Null
+}
 & sc.exe failure KiaradCloudflared reset= 86400 actions= restart/5000/restart/5000/restart/30000 | Out-Null
 Start-Service KiaradCloudflared
-Start-Sleep 6
-if ((Get-Service KiaradCloudflared).Status -ne 'Running') { Fail "Service not running. See $LogDir\cloudflared.log" }
-Ok 'Service KiaradCloudflared is running.'
-
-Step '9. Verification from this machine'
-Start-Sleep 5
-foreach ($h in @("https://panel.$DOMAIN/login","https://shop.$DOMAIN/buy/")) {
-    try { $r = Invoke-WebRequest -UseBasicParsing -Uri $h -TimeoutSec 25; Ok "$h -> HTTP $($r.StatusCode)" }
-    catch { Warn "$h -> $($_.Exception.Message)  (DNS may need a few minutes; also test from mobile data)" }
+$running = $false
+for ($i=0; $i -lt 12; $i++) {
+    if ((Get-Service KiaradCloudflared).Status -eq 'Running') { $running = $true; break }
+    Start-Sleep 1
 }
+if (-not $running) { Fail "Service not running. Inspect $log" }
 
-Write-Host @"
-
-Done. Next:
- 1) Test https://panel.$DOMAIN from mobile data (not office wifi); VPN may interfere.
- 2) Keep the old Quick Tunnel until step 1 passes.
- 3) Reboot test: restart the server, then check Get-Service KiaradCloudflared
- 4) Optional: Cloudflare Zero Trust > Access to put email login in front of the panel.
- Log: $LogDir\cloudflared.log
-"@ -ForegroundColor White
+Step '9. Verify public endpoints'
+foreach ($url in @("https://panel.$DOMAIN/login","https://shop.$DOMAIN/buy/")) {
+    try { $r = Invoke-WebRequest -UseBasicParsing -Uri $url -TimeoutSec 25; Ok "$url -> HTTP $($r.StatusCode)" }
+    catch { Warn "$url -> $($_.Exception.Message); test again from mobile data after DNS propagation." }
+}
+Write-Host "Quick Tunnel was not stopped. Log: $log" -ForegroundColor White
 Read-Host 'Enter to close'
