@@ -153,10 +153,6 @@ def contract_history(user=Depends(current_user)):
     with engine.begin() as c:rows=c.execute(text('SELECT r.*,s.title AS source_title FROM specialist_contract_reviews r JOIN agent_sources s ON s.id=r.source_id WHERE r.owner_id=:uid ORDER BY r.created_at DESC LIMIT 50'),{'uid':user['id']}).mappings().all()
     return {'items':[dict(r) for r in rows]}
 
-@router.on_event('startup')
-def startup():
-    with engine.begin() as c:
-
 @router.get('/programmes')
 def professional_programmes(user=Depends(current_user)):
     ceo(user)

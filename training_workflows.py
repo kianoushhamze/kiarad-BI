@@ -205,7 +205,3 @@ def progress(ident:UUID,user=Depends(current_user)):
         EXISTS(SELECT 1 FROM training_attempts a WHERE a.enrollment_id=e.id AND a.passed) AS passed
         FROM training_enrollments e JOIN users u ON u.id=e.user_id JOIN tasks t ON t.id=e.task_id WHERE e.programme_id=:id ORDER BY u.full_name'''),{'id':str(ident)}).mappings().all()
     return {'items':[dict(r) for r in rows],'quiz_score_is_not_professional_certification':True,'payroll_changed':False}
-
-@router.on_event('startup')
-def startup():
-    with engine.begin() as c:
