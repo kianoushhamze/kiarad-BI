@@ -67,7 +67,7 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\04-Install-Stage.ps1 -
 ## ۵. آزمون فنی و پذیرش شرکت
 
 ```powershell
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\05-Check-Stage.ps1 -Destination "$env:USERPROFILE\kiarad-stage-20261113" -CheckHoloo
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\05-Check-Stage.ps1 -Destination "$env:USERPROFILE\kiarad-stage-20261120" -CheckHoloo
 ```
 
 این اسکریپت سلامت، عبور API از پنل، فروشگاه و ورود هلو را بررسی و `stage-checks.json` تولید می‌کند. سپس موارد زیر را با مدیر و حساب ویزیتور انجام دهید:
@@ -85,7 +85,7 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\05-Check-Stage.ps1 -De
 پس از پذیرش شرکت و اطمینان از خاموش‌بودن همهٔ schedulerهای نصب‌های قدیمی:
 
 ```powershell
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\06-Enable-Sync.ps1 -Destination "$env:USERPROFILE\kiarad-stage-20261113" -CompanyAcceptancePassed -OldSchedulersStopped
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\06-Enable-Sync.ps1 -Destination "$env:USERPROFILE\kiarad-stage-20261120" -CompanyAcceptancePassed -OldSchedulersStopped
 ```
 
 این فرمان فقط همگام‌سازی خودکار هلو را روی مقصد فعال می‌کند. اتوماسیون دستیار به‌صورت پیش‌فرض خاموش می‌ماند؛ برای بازگرداندن برنامه‌های مصوب آن، `-EnableAssistantAutomations` را صریح اضافه کنید. نتیجهٔ نهایی sync و تطبیق داده‌ها را کنترل کنید و بعد ثبت کاربران را روی نسخهٔ جدید باز کنید. زمان‌بندی‌های قدیمی که مسیر یا پورت ثابت دارند باید پیش از استفادهٔ مجدد به نصب تازه منتقل و بررسی شوند؛ صرفاً دوباره روشنشان نکنید.
