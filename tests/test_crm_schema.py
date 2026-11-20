@@ -12,6 +12,12 @@ class CrmSchemaTests(unittest.TestCase):
             self.assertIn(field, sql)
         self.assertNotIn("INSERT INTO", sql.upper())
 
+    def test_legacy_ownership_transfer_requires_one_exact_username_match(self):
+        sql = (ROOT / "migrations" / "0007_chat_crm_storage.sql").read_text(encoding="utf-8-sig")
+        self.assertIn("ci.visitor_name IN (u.username, '@' || u.username)", sql)
+        self.assertIn("HAVING COUNT(DISTINCT u.id) = 1", sql)
+        self.assertNotIn("u.full_name", sql)
+
 
 if __name__ == "__main__":
     unittest.main()
