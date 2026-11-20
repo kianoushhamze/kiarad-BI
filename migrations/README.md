@@ -25,3 +25,10 @@ Commands:
 - 0006_storefront_platform_storage.sql creates the site-customer, storefront-order, banner, platform reservation/listing/proposal, platform-order/proforma, and stock-reservation tables, and adds the order idempotency/reservation columns to existing installations. Existing rows are preserved.
 - Apply migrations 0005 and 0006 before deploying the storefront/CMS/platform code. HTTP requests and the storefront catalog rebuild no longer create or alter these tables.
 - Verify first with python scripts/run_migrations.py --status and python scripts/run_migrations.py --dry-run against the intended environment. The migration is additive and must not be run against the company database without the normal backup and acceptance procedure.
+
+
+## Employee chat and CRM storage
+
+- 0007_chat_crm_storage.sql provisions the shared employee chat and CRM interaction tables and their indexes.
+- Existing CRM rows are assigned to an employee only when the legacy visitor label maps unambiguously to exactly one user. Ambiguous or unmatched rows remain unassigned and manager-visible only.
+- API startup no longer creates or alters chat/CRM tables. Apply the migration through the normal backup, dry-run and release process before deploying this code.
