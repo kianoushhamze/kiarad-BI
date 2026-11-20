@@ -67,7 +67,7 @@ class ReleaseRegressionTests(TestCase):
         conn = MagicMock()
         conn.execute.return_value.mappings.return_value.all.return_value = [{
             'id': 7, 'code': 'A', 'name': 'Synthetic product', 'category': 'Test',
-            'price': 1000, 'stock': 9, 'image_url': None, 'discount_price_irr': None,
+            'price': 1000, 'stock': 9, 'image_url': 'javascript:alert(1)', 'discount_price_irr': None,
             'generated_at': None,
         }]
         with patch.object(api.engine, 'connect', return_value=nullcontext(conn)), \
@@ -78,6 +78,7 @@ class ReleaseRegressionTests(TestCase):
         self.assertNotIn('price', product)
         self.assertNotIn('id', product)
         self.assertEqual(product['consumer_price_toman'], 115)
+        self.assertIsNone(product['image_url'])
 
     def test_public_catalog_snapshots_do_not_include_internal_price_or_stock(self):
         for name in ("data.json", "data_demo_backup.json"):
