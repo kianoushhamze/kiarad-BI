@@ -36,8 +36,10 @@ class CMSDatabaseTests(unittest.TestCase):
         schema = "cms_test_" + uuid4().hex
         self.conn.execute(text(f"CREATE SCHEMA {schema}"))
         self.conn.execute(text(f"SET LOCAL search_path TO {schema}"))
-        self.conn.execute(text("CREATE TABLE products(code TEXT PRIMARY KEY, name TEXT, price BIGINT)"))
-        self.conn.execute(text("INSERT INTO products VALUES ('A','Synthetic product',10000)"))
+        self.conn.execute(text("CREATE TABLE products(id SERIAL PRIMARY KEY, code TEXT UNIQUE, name TEXT, price BIGINT)"))
+        self.conn.execute(text("CREATE TABLE customers(id SERIAL PRIMARY KEY, code TEXT UNIQUE, name TEXT, credit_limit NUMERIC)"))
+        self.conn.execute(text("CREATE TABLE salespersons(id SERIAL PRIMARY KEY)"))
+        self.conn.execute(text("INSERT INTO products(code,name,price) VALUES ('A','Synthetic product',10000)"))
         root = Path(__file__).resolve().parents[1]
         for migration in ("0005_cms_product_meta.sql", "0006_storefront_platform_storage.sql"):
             self.conn.exec_driver_sql((root / "migrations" / migration).read_text(encoding="utf-8-sig"))
