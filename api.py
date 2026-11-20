@@ -1421,7 +1421,7 @@ _CHAT_ALLOWED_TYPES = {
 @app.on_event("startup")
 def initialize_background_services():
     # Chat and CRM tables are provisioned by versioned SQL migrations.
-    from assistant_automations import ensure as ensure_automations, start_automations_scheduler
+    from assistant_automations import start_automations_scheduler
     from morning_brief import ensure as ensure_morning_brief, ensure_and_build_today, start_morning_brief_timer
     with engine.begin() as conn:
         ensure_morning_brief(conn)
@@ -1430,8 +1430,6 @@ def initialize_background_services():
     except Exception:
         pass
     start_morning_brief_timer()
-    with engine.begin() as conn:
-        ensure_automations(conn)
     start_automations_scheduler()
     # Holoo auto-refresh must survive restarts, not wait for a manual /holoo/refresh hit.
     try:
@@ -1791,7 +1789,6 @@ def record_stop_structured_outcome(
 ):
     session = _db_mod.SessionLocal()
     try:
-        _rec_eng.ensure_reconciliation_schema(session)
         from sqlalchemy import text
         session.execute(
             text("""
