@@ -17,3 +17,10 @@ Commands:
 .\.venv\Scripts\python.exe scripts\run_migrations.py --dry-run
 .\.venv\Scripts\python.exe scripts\run_migrations.py
 ```
+
+
+## Marketplace feeds and public catalog
+
+- 0005_cms_product_meta.sql creates the shared CMS product metadata table when absent and adds the optional discount_price_irr column to legacy installations.
+- Apply the migration before deploying code that reads the public catalog or Torob/Emalls feeds. Public GET requests no longer attempt schema changes.
+- Verify first with python scripts/run_migrations.py --status and python scripts/run_migrations.py --dry-run against the intended environment. The migration is additive and must not be run against the company database without the normal backup and acceptance procedure.
