@@ -23,6 +23,12 @@ import operations as ops
 
 @unittest.skipUnless(os.getenv("KIARAD_TEST_PERSONNEL_E2E_DB") == "1", "Opt-in temporary database test")
 class PersonnelAccessE2ETests(unittest.TestCase):
+    def apply_migration(self, name):
+        migration = Path(__file__).resolve().parents[1] / "migrations" / name
+        raw = self.conn.connection.driver_connection
+        with raw.cursor() as cursor:
+            cursor.execute(migration.read_text(encoding="utf-8-sig"))
+
     def setUp(self):
         self.conn = ops.engine.connect()
         self.addCleanup(self.conn.close)
@@ -68,8 +74,8 @@ class PersonnelAccessE2ETests(unittest.TestCase):
                    ('bob','نام مشترک','salesperson',11,1,:hash),
                    ('charlie','@alice','salesperson',12,1,:hash)
         """), {"hash": password_hash})
-        migration = Path(__file__).resolve().parents[1] / "migrations" / "0007_chat_crm_storage.sql"
-        self.conn.exec_driver_sql(migration.read_text(encoding="utf-8-sig"))
+        self.apply_migration("0007_chat_crm_storage.sql")
+        self.apply_migration("0009_assistant_operations_storage.sql")
 
         @contextmanager
         def begin():
@@ -206,12 +212,11 @@ class PersonnelAccessE2ETests(unittest.TestCase):
         self.conn.execute(text("ALTER TABLE customer_interactions DROP COLUMN owner_user_id"))
         self.conn.execute(text("""INSERT INTO customer_interactions(customer_name,visitor_name)
             VALUES ('موقت اول','@alice'),('موقت دوم','نام مشترک'),('موقت سوم','ناشناخته')"""))
-        migration = Path(__file__).resolve().parents[1] / "migrations" / "0007_chat_crm_storage.sql"
-        self.conn.exec_driver_sql(migration.read_text(encoding="utf-8-sig"))
+        self.apply_migration("0007_chat_crm_storage.sql")
         owners = self.conn.execute(text("SELECT owner_user_id FROM customer_interactions ORDER BY id")).scalars().all()
         self.assertEqual(owners, [2, None, None])
         self.conn.execute(text("UPDATE users SET full_name='ناشناخته' WHERE id=3"))
-        self.conn.exec_driver_sql(migration.read_text(encoding="utf-8-sig"))
+        self.apply_migration("0007_chat_crm_storage.sql")
         self.assertEqual(self.conn.execute(text("SELECT owner_user_id FROM customer_interactions ORDER BY id")).scalars().all(), owners)
         self.assertEqual(len(self.client.get("/crm/interactions", headers=self.login()).json()), 1)
         self.assertEqual(self.client.get("/crm/interactions", headers=self.login("bob")).json(), [])
