@@ -476,7 +476,6 @@ def to_calendar(item_id: int, user: dict = Depends(current_user)):
             raise HTTPException(404, "پیش‌نویس مارکتینگ پیدا نشد.")
         if row["kind"] != "post":
             raise HTTPException(422, "فقط پست اینستاگرام مستقیم به تقویم محتوا می‌رود؛ استوری و سئو ابتدا باید بازبینی شوند.")
-    ensure_table()
     from datetime import datetime, timedelta, timezone
     from integrations import content_calendar
     with engine.begin() as conn:
