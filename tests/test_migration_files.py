@@ -27,6 +27,16 @@ class MigrationFilesTests(unittest.TestCase):
         ):
             self.assertIn(f"CREATE TABLE IF NOT EXISTS {table}", sql)
 
+    def test_catalog_voice_and_proforma_migration_provisions_expected_tables(self):
+        migration = runner.MIGRATIONS / "0013_catalog_data_entry_voice_proforma.sql"
+        sql = migration.read_text(encoding="utf-8")
+        for table in (
+            "inventory_batches", "data_field_overrides", "data_change_audit",
+            "data_entry_batches", "product_media", "holoo_entity_mappings",
+            "proforma_holoo_queue", "voice_report_entries",
+        ):
+            self.assertIn(f"CREATE TABLE IF NOT EXISTS {table}", sql)
+
     def test_release_contains_ordered_migration_payload(self):
         files = runner.migration_files()
         self.assertIn("0001_baseline.sql", [p.name for p in files])
@@ -37,4 +47,5 @@ class MigrationFilesTests(unittest.TestCase):
         self.assertIn("0010_treasury_excel_storage.sql", [p.name for p in files])
         self.assertIn("0011_site_auth_rate_limits.sql", [p.name for p in files])
         self.assertIn("0012_operational_module_storage.sql", [p.name for p in files])
+        self.assertIn("0013_catalog_data_entry_voice_proforma.sql", [p.name for p in files])
         self.assertEqual(files, sorted(files))

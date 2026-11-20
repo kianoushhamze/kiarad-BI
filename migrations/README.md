@@ -55,9 +55,14 @@ Commands:
 - The corresponding production startup hooks and request-time `ensure(...)` calls have been removed. Startup now starts workers only; schema changes run through the versioned migration runner.
 - Apply migration 0012 before deploying the updated operational modules. Migration 0012 is additive and retains existing rows.
 
+## Catalog, data-entry, voice and proforma storage
+
+- `0013_catalog_data_entry_voice_proforma.sql` provisions inventory batches, manual-field overrides and audit history, data-entry batches, product media, base provenance columns, second-level product prices, Holoo entity mappings, proforma Holoo queue, and voice-report entries.
+- The catalog, data-entry, data-source, product-media, proforma and voice-report startup/request-time schema hooks have been removed. Apply migration 0013 before deploying these modules.
+
 ## Remaining startup DDL audit
 
-Migration 0012 does not claim to eliminate every DDL statement in the repository. Follow-up migration work is still required for the legacy payroll/compensation schema, catalog and data-entry storage, product-media/source metadata, proforma/Holoo queue storage, and voice-report tables. Do not remove those modules' schema hooks until their exact schemas and upgrade paths have independent migrations and tests.
+The legacy payroll/compensation module still has startup schema creation for attendance, location check-ins, review/submission evidence and payroll approvals. Its exact schemas and upgrade path remain for a separate migration; do not remove those hooks until that migration and its database tests are complete.
 
 
 ## Public customer authentication rate limits
