@@ -38,7 +38,7 @@ Commands:
 ## Visit outcomes and treasury linkage
 
 - 0008_visit_treasury_columns.sql adds structured visit-outcome fields and the fixed-expense link used by treasury documents.
-- Fresh monthly-visit tables include the same outcome fields in their startup schema definition; existing installations receive them additively from the migration.
+- Migration 0012 now provisions the monthly-visit plan/stop tables and their outcome/time fields. Migration 0008 remains the additive upgrade for installations where those tables already existed.
 - The reconciliation API and treasury routes no longer execute these schema changes during a request. Apply the migration before deploying this code.
 
 
@@ -48,12 +48,16 @@ Commands:
 - Assistant proposal and automation request handlers no longer create or alter these tables. Apply the migration before deploying the updated API.
 
 
-## Remaining startup-provisioned module schemas
+## Operational module storage
 
-- Traccar storage is provisioned by migration 0004; request handlers no longer create or alter device/shift tables.
-- 0010_treasury_excel_storage.sql provisions Treasury Excel batch storage. Preview, commit, list, export, and forecasting requests do not run schema DDL.
+- `0012_operational_module_storage.sql` provisions task/review and campaign tables, route assignments, base portfolios/proposals, monthly visit plans, physicians, social channels, marketing intelligence, integration drafts/calendar/checks, treasury strategy revisions, morning briefs, AI campaign suggestions, and optional target columns.
+- Migrations 0002, 0003, 0004 and 0009 already provision agent tracking, specialist/training/outbound workflows, Traccar, and assistant automation/proposal storage.
+- The corresponding production startup hooks and request-time `ensure(...)` calls have been removed. Startup now starts workers only; schema changes run through the versioned migration runner.
+- Apply migration 0012 before deploying the updated operational modules. Migration 0012 is additive and retains existing rows.
 
-- Apply migration 0010 before deploying Treasury Excel import and forecasting changes.
+## Remaining startup DDL audit
+
+Migration 0012 does not claim to eliminate every DDL statement in the repository. Follow-up migration work is still required for the legacy payroll/compensation schema, catalog and data-entry storage, product-media/source metadata, proforma/Holoo queue storage, and voice-report tables. Do not remove those modules' schema hooks until their exact schemas and upgrade paths have independent migrations and tests.
 
 
 ## Public customer authentication rate limits

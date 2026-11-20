@@ -16,6 +16,17 @@ class MigrationFilesTests(unittest.TestCase):
                 runner.main()
             connect.assert_not_called()
 
+    def test_operational_storage_migration_provisions_expected_tables(self):
+        migration = runner.MIGRATIONS / "0012_operational_module_storage.sql"
+        sql = migration.read_text(encoding="utf-8")
+        for table in (
+            "tasks", "role_permissions", "campaigns", "visit_route_assignments",
+            "base_portfolio_assignments", "base_proposals", "monthly_visit_plans",
+            "physicians", "social_channels", "market_questions", "integration_drafts",
+            "treasury_strategy_revisions", "morning_briefs", "ai_suggestions",
+        ):
+            self.assertIn(f"CREATE TABLE IF NOT EXISTS {table}", sql)
+
     def test_release_contains_ordered_migration_payload(self):
         files = runner.migration_files()
         self.assertIn("0001_baseline.sql", [p.name for p in files])
@@ -25,4 +36,5 @@ class MigrationFilesTests(unittest.TestCase):
         self.assertIn("0009_assistant_operations_storage.sql", [p.name for p in files])
         self.assertIn("0010_treasury_excel_storage.sql", [p.name for p in files])
         self.assertIn("0011_site_auth_rate_limits.sql", [p.name for p in files])
+        self.assertIn("0012_operational_module_storage.sql", [p.name for p in files])
         self.assertEqual(files, sorted(files))
