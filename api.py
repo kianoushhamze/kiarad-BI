@@ -425,10 +425,6 @@ def health():
 def public_catalog():
     try:
         with engine.connect() as conn:
-            conn.execute(text("""CREATE TABLE IF NOT EXISTS cms_product_meta(
-                code VARCHAR(100) PRIMARY KEY, site_category TEXT, image_url TEXT,
-                hidden BOOLEAN NOT NULL DEFAULT FALSE, updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW())"""))
-            conn.execute(text("ALTER TABLE cms_product_meta ADD COLUMN IF NOT EXISTS discount_price_irr BIGINT"))
             rows = conn.execute(text(
                 """
                 SELECT p.id, p.code, p.name,
