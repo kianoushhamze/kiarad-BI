@@ -140,7 +140,7 @@ import os as _os
 _KIARAD_API_KEY = _os.getenv("KIARAD_API_KEY", "")
 _KIARAD_JWT = _os.getenv("KIARAD_JWT_SECRET", "")
 _OPEN_PATHS = ["/", "/health", "/docs", "/redoc", "/openapi.json", "/auth/login", "/auth/recovery/request", "/auth/recovery/confirm",
-               "/public/catalog", "/public/catalog/prices",
+               "/public/catalog",
                "/public/feeds/torob", "/public/feeds/products.json", "/public/feeds/products.csv",
                "/site-auth/login", "/site-auth/register", "/site-auth/me"]
 _AUTH_METADATA_PATHS = {"/auth/me", "/auth/permissions", "/auth/password"}
@@ -160,6 +160,9 @@ def _required_module(path: str) -> Optional[str]:
         return "map" if "/attendance/" in path else "compensation"
     if path.startswith("/api/"):
         path = path[4:]
+
+    if path == "/public/catalog/prices":
+        return "online-sales"
 
     if path.startswith(("/crud/", "/import/excel/", "/import/template/")):
         parts = path.strip("/").split("/")
@@ -441,7 +444,9 @@ def public_catalog():
             for row in rows:
                 item = dict(row)
                 product_id = item.pop('id')
-                item['stock'] = max(0, float(item['stock'] or 0) - totals.get(product_id, 0))
+                available = max(0, float(item.pop('stock') or 0) - totals.get(product_id, 0))
+                item.pop('generated_at', None)
+                item['in_stock'] = available > 0
                 products.append(item)
         return {
             "store": {"name": "Ordibeauty", "tagline": "اردی‌بیوتی — زیبایی اورجینال، با قیمت و موجودی زنده"},
@@ -453,7 +458,7 @@ def public_catalog():
 
 
 @app.get("/public/catalog/prices")
-def public_catalog_prices():
+def public_catalog_prices(_: dict = Depends(require_manager)):
     """Live Digikala selling prices for products mapped by holoo code."""
     try:
         with engine.connect() as conn:
