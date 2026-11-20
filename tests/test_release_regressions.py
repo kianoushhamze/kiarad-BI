@@ -1,5 +1,6 @@
 """Offline regressions: mocked DB boundaries, no production writes/network."""
 import importlib.util
+import json
 import os
 from contextlib import nullcontext
 from pathlib import Path
@@ -77,6 +78,27 @@ class ReleaseRegressionTests(TestCase):
         self.assertNotIn('price', product)
         self.assertNotIn('id', product)
         self.assertEqual(product['consumer_price_toman'], 115)
+
+    def test_public_catalog_snapshots_do_not_include_internal_price_or_stock(self):
+        for name in ("data.json", "data_demo_backup.json"):
+            payload = json.loads((ROOT / "site" / name).read_text(encoding="utf-8"))
+            for product in payload["products"]:
+                self.assertIn("consumer_price_toman", product)
+                self.assertIsInstance(product.get("in_stock"), bool)
+                self.assertNotIn("price_holoo", product)
+                self.assertNotIn("stock_holoo", product)
+                self.assertNotIn("stock", product)
+
+    def test_storefront_schema_is_migration_managed_not_request_managed(self):
+        paths = (
+            "site_auth.py", "site_orders.py", "site_cms.py", "platform_sync.py",
+            "marketplace_feeds.py", "scripts/build_site_catalog.py",
+            "scripts/derive_site_categories.py", "scripts/platform_stock_task.py",
+        )
+        for relative in paths:
+            source = (ROOT / relative).read_text(encoding="utf-8-sig")
+            with self.subTest(path=relative):
+                self.assertNotRegex(source, r"(?im)^\\s*(?:CREATE TABLE|ALTER TABLE)\\b")
 
     def test_cors_rejects_unlisted_origin_and_allows_configured_origin(self):
         for origin, expected in [('https://untrusted.invalid', 400), ('http://localhost:3000', 200)]:
