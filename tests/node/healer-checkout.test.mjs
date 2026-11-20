@@ -44,7 +44,7 @@ try {
   const csv = await fetch(base + '/api/public/feeds/products.csv');
   assert.equal(csv.status, 200);
   assert.match(csv.headers.get('content-type') || '', /^text\/csv/i);
-  assert.equal(await csv.text(), '\uFEFFpage_unique,title\\nA1,Test product\\n');
+  assert.equal(await csv.text(), '\uFEFFpage_unique,title\nA1,Test product\n');
   assert.equal((await fetch(base + '/api/public/feeds/products.csv', {method: 'POST'})).status, 405);
   assert.equal((await fetch(base + '/api/site-orders/all')).status, 404);
   assert.equal((await fetch(base + '/api/site-orders')).status, 405);
