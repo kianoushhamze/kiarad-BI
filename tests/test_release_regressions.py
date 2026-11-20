@@ -74,7 +74,9 @@ class ReleaseRegressionTests(TestCase):
             product = api.public_catalog()['products'][0]
         self.assertTrue(product['in_stock'])
         self.assertNotIn('stock', product)
+        self.assertNotIn('price', product)
         self.assertNotIn('id', product)
+        self.assertEqual(product['consumer_price_toman'], 115)
 
     def test_cors_rejects_unlisted_origin_and_allows_configured_origin(self):
         for origin, expected in [('https://untrusted.invalid', 400), ('http://localhost:3000', 200)]:
