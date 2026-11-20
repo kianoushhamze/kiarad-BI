@@ -98,7 +98,7 @@ class ReleaseRegressionTests(TestCase):
         for relative in paths:
             source = (ROOT / relative).read_text(encoding="utf-8-sig")
             with self.subTest(path=relative):
-                self.assertNotRegex(source, r"(?im)^\\s*(?:CREATE TABLE|ALTER TABLE)\\b")
+                self.assertNotRegex(source, r"(?im)^\s*(?:CREATE TABLE|ALTER TABLE)\b")
 
     def test_cors_rejects_unlisted_origin_and_allows_configured_origin(self):
         for origin, expected in [('https://untrusted.invalid', 400), ('http://localhost:3000', 200)]:
