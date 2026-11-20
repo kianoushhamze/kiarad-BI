@@ -34,6 +34,7 @@ def ensure(conn):
 @router.on_event('startup')
 def startup():
     with engine.begin() as conn:
+        ensure(conn)
 
 
 def _require_manager(user):
@@ -66,7 +67,6 @@ class CredentialsPayload(BaseModel):
 def list_channels(user: dict = Depends(current_user)):
     _require_manager(user)
     with engine.connect() as conn:
-        ensure(conn)
         rows = conn.execute(text("SELECT * FROM social_channels ORDER BY platform")).mappings().all()
     by_platform = {r["platform"]: r for r in rows}
     channels = []
@@ -87,7 +87,6 @@ def list_channels(user: dict = Depends(current_user)):
 def save_credentials(platform: str, data: CredentialsPayload, user: dict = Depends(current_user)):
     _require_manager(user)
     with engine.begin() as conn:
-        ensure(conn)
         _load_channel(conn, platform)
         conn.execute(text("""
             INSERT INTO social_channels(platform, credentials, status, updated_at)
@@ -123,7 +122,6 @@ def _test_telegram(credentials: dict) -> dict:
 def test_channel(platform: str, user: dict = Depends(current_user)):
     _require_manager(user)
     with engine.begin() as conn:
-        ensure(conn)
         row = _load_channel(conn, platform)
         credentials = (row.get("credentials") or {}) if row else {}
         if not credentials:
@@ -146,7 +144,6 @@ def publish(platform: str, body: dict, user: dict = Depends(current_user)):
     if not draft_id:
         raise HTTPException(400, "شناسهٔ پیش‌نویس محتوا (draft_id) لازم است.")
     with engine.connect() as conn:
-        ensure(conn)
         row = _load_channel(conn, platform)
         status = row["status"] if row else "disconnected"
         if status != "connected":
