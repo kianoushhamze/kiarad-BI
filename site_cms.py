@@ -273,8 +273,9 @@ def banner_image(banner_id: int):
         ), {"id": banner_id}).first()
     if not row:
         raise HTTPException(404, "بنر پیدا نشد.")
+    media_type = _image_media(row[0])
     raw = base64.b64decode(row[0], validate=True)
-    return Response(content=raw, media_type=_image_media(row[0]),
+    return Response(content=raw, media_type=media_type,
                     headers={"Cache-Control": "public, max-age=86400", "X-Content-Type-Options": "nosniff"})
 
 
@@ -319,7 +320,7 @@ def patch_banner(banner_id: int, data: BannerPatch, user: dict = Depends(current
             "title = COALESCE(:t, title), image_base64 = COALESCE(:img, image_base64), "
             "link_url = COALESCE(:url, link_url), sort = COALESCE(:s, sort), "
             "active = COALESCE(:a, active) WHERE id = :id RETURNING id"
-        ), {"t": data.title, "img": b64, "url": data.link_url,
+        ), {"t": data.title, "img": b64, "url": link_url,
             "s": data.sort, "a": data.active, "id": banner_id}).mappings().first()
     if not row:
         raise HTTPException(404, "بنری با این شناسه پیدا نشد.")
