@@ -36,8 +36,7 @@ $expected = @("kiarad-transfer-backend:$($release.image_tag)","kiarad-transfer-f
 foreach ($name in $expected) {
     $record = @($images.images | Where-Object name -eq $name)
     if ($record.Count -ne 1) { throw ('Image missing in export manifest: ' + $name) }
-    $info = Invoke-Docker image inspect $name | ConvertFrom-Json
-    if ($info[0].Id -ne $record[0].id -or $info[0].Os -ne 'linux' -or $info[0].Architecture -ne 'amd64') { throw ('Loaded image mismatch: ' + $name) }
+    Assert-LoadedImage $name $record[0].id
 }
 Expand-Archive -LiteralPath (Join-Path $PSScriptRoot 'source.zip') -DestinationPath $Destination
 $dest = (Resolve-Path -LiteralPath $Destination).Path

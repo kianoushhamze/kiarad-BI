@@ -42,3 +42,34 @@ function Write-JsonFile {
     param($Value, [string]$Path)
     [IO.File]::WriteAllText($Path, ($Value | ConvertTo-Json -Depth 12), [Text.UTF8Encoding]::new($false))
 }
+
+function Get-ArchiveConfigDigest {
+    param([string]$Archive, [string]$ImageName, [string]$Directory)
+    # Read only files from docker image save. Hash the unmodified config bytes.
+    & tar -xf $Archive -C $Directory manifest.json
+    if ($LASTEXITCODE -ne 0) { throw 'Cannot read saved image manifest.' }
+    $manifest = Get-Content -Raw -Encoding UTF8 -LiteralPath (Join-Path $Directory 'manifest.json') | ConvertFrom-Json
+    $rows = @($manifest | Where-Object { $_.RepoTags -ccontains $ImageName })
+    if ($rows.Count -ne 1 -or $rows[0].Config -cnotmatch '^(?:blobs/sha256/[0-9a-f]{64}|[0-9a-f]{64}\.json)$') {
+        throw ('Missing or ambiguous saved image config: ' + $ImageName)
+    }
+    $config = $rows[0].Config
+    & tar -xf $Archive -C $Directory $config
+    if ($LASTEXITCODE -ne 0) { throw ('Cannot read saved image config: ' + $ImageName) }
+    return 'sha256:' + (Get-FileHash -Algorithm SHA256 -LiteralPath (Join-Path $Directory $config)).Hash.ToLowerInvariant()
+}
+
+function Assert-LoadedImage {
+    param([string]$ImageName, [string]$ExpectedId)
+    $info = @(Invoke-Docker image inspect $ImageName | ConvertFrom-Json)
+    if ($ExpectedId -cnotmatch '^sha256:[0-9a-f]{64}$' -or $info.Count -ne 1 -or
+        $info[0].Os -ne 'linux' -or $info[0].Architecture -ne 'amd64') { throw ('Loaded image mismatch: ' + $ImageName) }
+    if ($info[0].Id -ceq $ExpectedId) { return }
+    $temp = Join-Path ([IO.Path]::GetTempPath()) ('kiarad-image-check-' + [guid]::NewGuid().ToString('N'))
+    New-Item -ItemType Directory -Path $temp | Out-Null
+    try {
+        $archive = Join-Path $temp 'loaded.tar'
+        Invoke-Docker image save -o $archive $ImageName | Out-Null
+        if ((Get-ArchiveConfigDigest $archive $ImageName $temp) -cne $ExpectedId) { throw ('Loaded image mismatch: ' + $ImageName) }
+    } finally { Remove-Item -LiteralPath $temp -Recurse -Force }
+}

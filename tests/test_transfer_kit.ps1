@@ -6,6 +6,28 @@ $temp = Join-Path ([IO.Path]::GetTempPath()) ('kiarad-kit-test-' + [guid]::NewGu
 New-Item -ItemType Directory -Path $temp | Out-Null
 $checks = @('valid_kit')
 try {
+
+    # Exercise the config fallback with the two docker-save config path formats.
+    $fixture = Join-Path $temp 'image-fixture'
+    New-Item -ItemType Directory -Path (Join-Path $fixture 'blobs/sha256') -Force | Out-Null
+    $sample = Join-Path $fixture 'sample'
+    [IO.File]::WriteAllBytes($sample, [Text.Encoding]::UTF8.GetBytes('{"architecture":"amd64","os":"linux"}'))
+    $hash = (Get-FileHash -LiteralPath $sample -Algorithm SHA256).Hash.ToLowerInvariant()
+    foreach ($key in @(($hash + '.json'), ('blobs/sha256/' + $hash))) {
+        $readDir = Join-Path $temp ([guid]::NewGuid().ToString('N'))
+        New-Item -ItemType Directory -Path $readDir | Out-Null
+        Copy-Item -LiteralPath $sample -Destination (Join-Path $fixture $key)
+        $json = '[{"RepoTags":["test:stage"],"Config":"' + $key + '"}]'
+        [IO.File]::WriteAllText((Join-Path $fixture 'manifest.json'), $json)
+        $archive = Join-Path $temp 'fixture.tar'
+        & tar -cf $archive -C $fixture manifest.json $key
+        if ($LASTEXITCODE -ne 0) { throw 'Cannot create image fixture.' }
+        if ((Get-ArchiveConfigDigest $archive 'test:stage' $readDir) -cne ('sha256:' + $hash)) { throw 'Config digest mismatch.' }
+        $blocked = $false
+        try { Get-ArchiveConfigDigest $archive 'test:other' $readDir } catch { $blocked = $_.Exception.Message -like '*saved image config*' }
+        if (-not $blocked) { throw 'Wrong image tag accepted.' }
+    }
+    $checks += 'saved_image_config_digest'
     $copy = Join-Path $temp 'copy'
     Copy-Item -LiteralPath $KitRoot -Destination $copy -Recurse
     Add-Content -LiteralPath (Join-Path $copy 'README-fa.md') -Value 'tampered'
