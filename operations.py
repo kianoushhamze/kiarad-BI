@@ -215,7 +215,7 @@ def login(data: LoginRequest):
                        salesperson_id, is_active, password_version
                 FROM users WHERE username = :username
             """),
-            {"username": data.username.strip().lower()},
+            {"username": username},
         ).mappings().first()
     if not row or not row["is_active"] or not verify_password(data.password, row["password_hash"]):
         raise HTTPException(status_code=401, detail="Invalid username or password")
@@ -558,6 +558,10 @@ def create_user(data: UserCreate, manager: dict = Depends(require_manager)):
             ).first()
             if not exists:
                 raise HTTPException(status_code=404, detail="Salesperson not found")
+        username = data.username.strip().lower()
+        if not 3 <= len(username) <= 100:
+            raise HTTPException(422, 'نام کاربری باید بین ۳ و ۱۰۰ نویسه باشد.')
+        conn.execute(text("SELECT pg_advisory_xact_lock(hashtextextended(:key, 0))"), {'key': 'user-name:' + username})
         duplicate = conn.execute(
             text("SELECT id FROM users WHERE username=:username"),
             {"username": data.username.strip().lower()},
@@ -571,7 +575,7 @@ def create_user(data: UserCreate, manager: dict = Depends(require_manager)):
                 (:username, :password_hash, :full_name, :role, :salesperson_id, 1, NOW())
             RETURNING id, username, full_name, role, salesperson_id, is_active
         """), {
-            "username": data.username.strip().lower(),
+            "username": username,
             "password_hash": hash_password(data.password),
             "full_name": data.full_name.strip(),
             "role": data.role,
@@ -587,7 +591,7 @@ def update_user(user_id: int, data: dict, manager: dict = Depends(require_manage
         raise HTTPException(status_code=403, detail="cannot demote or deactivate main CEO")
     fields = []
     params = {"id": user_id}
-    allowed = {"full_name", "role", "salesperson_id", "is_active"}
+    allowed = {"full_name", "role", "salesperson_id", "is_active", "username"}
     for k in allowed:
         if k in data:
             fields.append(k + " = :" + k)
@@ -607,6 +611,18 @@ def update_user(user_id: int, data: dict, manager: dict = Depends(require_manage
             raise HTTPException(status_code=404, detail="User not found")
         if manager['role'] != 'ceo' and existing['role'] in {'ceo', 'sales_manager', 'finance'}:
             raise HTTPException(status_code=403, detail="فقط مدیرعامل می‌تواند حساب دارای دسترسی مدیریتی را تغییر دهد")
+        if 'username' in data:
+            if existing['role'] not in {'salesperson', 'visitor'}:
+                raise HTTPException(403, 'تغییر نام کاربری فقط برای حساب ویزیتور مجاز است.')
+            value = data['username']
+            if not isinstance(value, str) or not 3 <= len(value.strip()) <= 100:
+                raise HTTPException(422, 'نام کاربری باید بین ۳ و ۱۰۰ نویسه باشد.')
+            username = value.strip().lower()
+            conn.execute(text("SELECT pg_advisory_xact_lock(hashtextextended(:key, 0))"), {'key': 'user-name:' + username})
+            if conn.execute(text("SELECT id FROM users WHERE username=:name AND id<>:id"),
+                            {'name': username, 'id': user_id}).first():
+                raise HTTPException(409, 'نام کاربری از قبل ثبت شده است.')
+            params['username'] = username
         target_role = data.get('role', existing['role'])
         target_sp = data.get('salesperson_id', existing['salesperson_id'])
         if target_role in {'salesperson', 'visitor'} and not target_sp:
@@ -618,7 +634,7 @@ def update_user(user_id: int, data: dict, manager: dict = Depends(require_manage
         if 'is_active' in data and (type(data['is_active']) not in (bool, int) or data['is_active'] not in (0, 1)):
             raise HTTPException(status_code=422, detail="وضعیت فعال معتبر نیست")
         # Reassignment and role changes must not leave old sessions usable.
-        if {'role', 'salesperson_id', 'is_active'} & data.keys():
+        if {'role', 'salesperson_id', 'is_active', 'username'} & data.keys():
             sql = sql.replace(' WHERE id = :id', ', password_version=COALESCE(password_version,0)+1 WHERE id = :id')
         row = conn.execute(text(sql), params).mappings().first()
     if not row:

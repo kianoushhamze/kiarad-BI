@@ -2,7 +2,7 @@
 import argparse,hashlib,json,shutil
 from pathlib import Path
 p=argparse.ArgumentParser();p.add_argument('--kit',type=Path,required=True);p.add_argument('--extras',type=Path,required=True);a=p.parse_args()
-expected={'Kiarad-Training-Manual/Kiarad-Comprehensive-Manual-FA.pdf'}
+expected={f'Kiarad-Training-Manual/Kiarad-{name}-Manual-FA.pdf' for name in ('Comprehensive','Manager','Visitor')}
 if any(p.name != 'Kiarad-Training-Manual' for p in a.extras.iterdir()):raise RuntimeError('Only the training manual belongs in the web/Traccar release.')
 for path in expected:
  if not (a.extras/path).is_file():raise RuntimeError('Missing release deliverable: '+path)

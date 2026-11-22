@@ -163,6 +163,18 @@ class PersonnelSafetyTests(unittest.TestCase):
         self.assertEqual(error.exception.status_code, 503)
         self.assertEqual(self.conn.execute(text('SELECT password_version FROM users WHERE id=2')).scalar(), 0)
 
+    def test_visitor_username_change_is_normalized_and_invalidates_sessions(self):
+        updated = ops.update_user(2, {'username': '  New.Field  '}, self.ceo)
+        self.assertEqual(updated['username'], 'new.field')
+        row = self.conn.execute(text("SELECT salesperson_id,password_hash,password_version FROM users WHERE id=2")).one()
+        self.assertEqual(tuple(row), (10, 'old', 1))
+
+    def test_username_that_already_exists_is_rejected(self):
+        with self.assertRaises(HTTPException) as error:
+            ops.update_user(2, {'username': ' CHIEF '}, self.ceo)
+        self.assertEqual(error.exception.status_code, 409)
+        self.assertEqual(self.conn.execute(text("SELECT username FROM users WHERE id=2")).scalar(), 'field')
+
 
 if __name__ == '__main__':
     unittest.main()

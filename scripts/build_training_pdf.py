@@ -11,6 +11,13 @@ ROOT=Path(__file__).resolve().parents[1]
 class Quiet(SimpleHTTPRequestHandler):
  def log_message(self,*args):pass
 
+ROLE_HANDBOOKS = (
+ ('Manager', 'راهنمای مدیر کیاراد', 'برای مدیرعامل، مدیر فروش و مسئولان بخش‌ها',
+  (1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 17, 18, 19, 20, 21, 22, 24, 25, 27, 28, 29, 30, 31, 32, 33, 34)),
+ ('Visitor', 'راهنمای ویزیتور کیاراد', 'برای ویزیتورها و پرسنل میدانی',
+  (1, 2, 3, 5, 13, 14, 15, 16, 21, 22, 26, 35, 36)),
+)
+
 def build(output):
  output.mkdir(parents=True,exist_ok=True)
  server=ThreadingHTTPServer(('127.0.0.1',0),partial(Quiet,directory=str(ROOT)))
@@ -21,7 +28,25 @@ def build(output):
    page=browser.new_page();page.goto(f'http://127.0.0.1:{server.server_port}/docs/training/manual-fa.html',wait_until='networkidle');page.evaluate('document.fonts.ready')
    if page.locator('section').count()!=37:raise RuntimeError('Handbook chapter inventory changed unexpectedly')
    if not page.evaluate('document.fonts.check("13px Vazir")'):raise RuntimeError('Persian font failed to load')
-   page.pdf(path=str(output/'Kiarad-Comprehensive-Manual-FA.pdf'),format='A4',print_background=True,display_header_footer=True,header_template='<span></span>',footer_template='<div style="width:100%;font-size:9px;text-align:center;color:#78688a">Kiarad · 2026-11-14 &nbsp; | &nbsp; <span class="pageNumber"></span> / <span class="totalPages"></span></div>',prefer_css_page_size=True)
+   pdf_options = dict(format='A4', print_background=True, display_header_footer=True,
+    header_template='<span></span>',
+    footer_template='<div style="width:100%;font-size:9px;text-align:center;color:#78688a">Kiarad &nbsp; | &nbsp; <span class="pageNumber"></span> / <span class="totalPages"></span></div>',
+    prefer_css_page_size=True)
+   page.pdf(path=str(output/'Kiarad-Comprehensive-Manual-FA.pdf'), **pdf_options)
+   for name, title, audience, chapters in ROLE_HANDBOOKS:
+    page.reload(wait_until='networkidle')
+    page.evaluate("""({title, audience, chapters}) => {
+      document.title = title;
+      document.querySelector('.cover h1').textContent = title;
+      document.querySelector('.cover p').textContent = audience;
+      document.querySelectorAll('section.page').forEach((section, index) => {
+        if (!chapters.includes(index + 1)) section.remove();
+      });
+    }""", {'title': title, 'audience': audience, 'chapters': chapters})
+    if page.locator('section.page').count() != len(chapters):
+     raise RuntimeError('Role handbook chapter inventory changed unexpectedly')
+    page.evaluate('document.fonts.ready')
+    page.pdf(path=str(output/f'Kiarad-{name}-Manual-FA.pdf'), **pdf_options)
    browser.close()
   html=(ROOT/'docs/training/manual-fa.html').read_text()
   for name in ['Vazirmatn-Regular.ttf','Vazirmatn-Bold.ttf']:

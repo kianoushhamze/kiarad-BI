@@ -99,9 +99,10 @@ function PersonnelPageInner() {
     try {
       const payload = {
         full_name: editFull,
-        role: editRole,
+        ...((editUser.role === "salesperson" || editUser.role === "visitor") && editUser2.trim() !== editUser.username ? { username: editUser2.trim() } : {}),
+        ...(editRole !== editUser.role ? { role: editRole } : {}),
         is_active: editActive,
-        salesperson_id: editRole === "salesperson" && editSp ? Number(editSp) : null,
+        salesperson_id: (editRole === "salesperson" || editRole === "visitor") && editSp ? Number(editSp) : null,
       };
       await secureApi("/users/" + editUser.id, { method: "PATCH", body: JSON.stringify(payload) });
       flash("\u2713 \u0648\u06cc\u0631\u0627\u06cc\u0634 \u0630\u062e\u06cc\u0631\u0647 \u0634\u062f.");
@@ -239,13 +240,14 @@ function PersonnelPageInner() {
             <h3 style={{ margin: "0 0 16px 0", color: "#38BDF8", fontSize: "15px" }}>ویرایش کاربر</h3>
             <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
               <div><label style={ls}>نام کامل:</label><input value={editFull} onChange={function(e){setEditFull(e.target.value);}} style={is} /></div>
-              <div><label style={ls}>نام کاربری (غیرقابل تغییر):</label><input value={editUser2} disabled style={{...is, opacity: 0.5}} /></div>
+              <div><label style={ls}>نام کاربری:</label><input value={editUser2} onChange={(e)=>setEditUser2(e.target.value)} disabled={editUser.role !== "salesperson" && editUser.role !== "visitor"} minLength={3} maxLength={100} style={is} /></div>
               <div><label style={ls}>نقش:</label>
                 <select value={editRole} onChange={function(e){setEditRole(e.target.value);}} style={is}>
                   <option value="salesperson">ویزیتور</option>
+                  {editUser.role === "visitor" && <option value="visitor">ویزیتور (حساب قدیمی)</option>}
                   <option value="ceo">مدیرعامل</option>
                 </select></div>
-              {editRole === "salesperson" ? (
+              {editRole === "salesperson" || editRole === "visitor" ? (
                 <div><label style={ls}>پروفایل ویزیتور:</label>
                   <select value={editSp} onChange={function(e){setEditSp(e.target.value);}} style={is}>
                     <option value="">— انتخاب کنید —</option>

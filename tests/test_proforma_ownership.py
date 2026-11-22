@@ -203,10 +203,10 @@ class ProformaOwnershipTests(unittest.TestCase):
         response = self.client.get("/operations/customers/40/credit", params={"proforma_amount": 5000})
         self.assertEqual(response.json()["grade"], "green")  # 4999 + 5000 = 9999
 
-        # مشتری بدون سقف اعتباری همیشه سبز است.
+        # مشتری بدون سقف اعتباری رتبه ندارد.
         self.conn.execute(text("UPDATE customers SET credit_limit = NULL WHERE id = 40"))
         response = self.client.get("/operations/customers/40/credit", params={"proforma_amount": 999999})
-        self.assertEqual(response.json()["grade"], "green")
+        self.assertEqual(response.json()["grade"], "unrated")
 
 
 if __name__ == "__main__":
