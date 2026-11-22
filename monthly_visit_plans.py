@@ -40,6 +40,12 @@ def ensure(conn):
         UNIQUE(plan_id,work_date))'''))
     conn.execute(text('ALTER TABLE monthly_visit_plan_stops ADD COLUMN IF NOT EXISTS start_time TIME'))
     conn.execute(text('ALTER TABLE monthly_visit_plan_stops ADD COLUMN IF NOT EXISTS end_time TIME'))
+    conn.execute(text("""ALTER TABLE monthly_visit_plan_stops
+        ADD COLUMN IF NOT EXISTS outcome_status VARCHAR(50),
+        ADD COLUMN IF NOT EXISTS holoo_preinvoice_code VARCHAR(100),
+        ADD COLUMN IF NOT EXISTS order_amount_rial BIGINT DEFAULT 0,
+        ADD COLUMN IF NOT EXISTS outcome_notes TEXT,
+        ADD COLUMN IF NOT EXISTS follow_up_date DATE"""))
     if conn.execute(text("SELECT to_regclass('visit_route_assignments') IS NOT NULL")).scalar():
         conn.execute(text('ALTER TABLE visit_route_assignments ADD COLUMN IF NOT EXISTS start_time TIME'))
         conn.execute(text('ALTER TABLE visit_route_assignments ADD COLUMN IF NOT EXISTS end_time TIME'))

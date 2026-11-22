@@ -8,7 +8,7 @@ from uuid import uuid4
 
 import jwt
 import math
-from fastapi import Depends, FastAPI, HTTPException, Header, Request, UploadFile
+from fastapi import Body, Depends, FastAPI, HTTPException, Header, Request, UploadFile
 from fastapi.encoders import jsonable_encoder
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
@@ -121,7 +121,7 @@ from visit_coverage import router as visit_coverage_router
 app.include_router(visit_coverage_router)
 from base_proposals import router as base_proposals_router
 app.include_router(base_proposals_router)
-from monthly_visit_plans import router as monthly_visit_plans_router
+from monthly_visit_plans import plan as authorize_monthly_plan, router as monthly_visit_plans_router
 app.include_router(monthly_visit_plans_router)
 from route_builder import router as route_builder_router
 app.include_router(route_builder_router)
@@ -1822,17 +1822,18 @@ def set_company_target(data: dict, _: dict = Depends(require_manager)):
 
 
 # --- RECONCILIATION_4BUCKET_ENDPOINTS ---
-from fastapi import HTTPException, Body
-from typing import Optional
-from datetime import date
 import db as _db_mod
 import reconciliation_engine as _rec_eng
 
 @app.get("/monthly-visit-plans/{plan_id}/reconciliation")
-def get_plan_reconciliation_4buckets(plan_id: int, up_to_date: Optional[date] = None):
+def get_plan_reconciliation_4buckets(
+    plan_id: int,
+    up_to_date: Optional[date] = None,
+    user: dict = Depends(current_user),
+):
     session = _db_mod.SessionLocal()
     try:
-        _rec_eng.ensure_reconciliation_schema(session)
+        authorize_monthly_plan(session, plan_id, user)
         return _rec_eng.calculate_monthly_reconciliation(session, plan_id, up_to_date)
     finally:
         session.close()
@@ -1840,13 +1841,19 @@ def get_plan_reconciliation_4buckets(plan_id: int, up_to_date: Optional[date] = 
 @app.post("/monthly-visit-plans/stops/{stop_id}/outcome")
 def record_stop_structured_outcome(
     stop_id: int,
-    payload: dict = Body(...)
+    payload: dict = Body(...),
+    user: dict = Depends(current_user),
 ):
     session = _db_mod.SessionLocal()
     try:
-        _rec_eng.ensure_reconciliation_schema(session)
-        from sqlalchemy import text
-        session.execute(
+        plan_id = session.execute(
+            text("SELECT plan_id FROM monthly_visit_plan_stops WHERE id = :id"),
+            {"id": stop_id},
+        ).scalar_one_or_none()
+        if plan_id is None:
+            raise HTTPException(404, "توقف پیدا نشد.")
+        authorize_monthly_plan(session, plan_id, user)
+        result = session.execute(
             text("""
                 UPDATE monthly_visit_plan_stops
                 SET outcome_status = :status,
@@ -1863,10 +1870,11 @@ def record_stop_structured_outcome(
                 "sid": stop_id
             }
         )
+        if result.rowcount != 1:
+            raise HTTPException(404, "توقف پیدا نشد.")
         session.commit()
         return {"ok": True, "stop_id": stop_id}
-    except Exception as e:
-        session.rollback()
-        raise HTTPException(status_code=400, detail=str(e))
+    except (TypeError, ValueError, OverflowError) as exc:
+        raise HTTPException(422, "مبلغ سفارش معتبر نیست.") from exc
     finally:
         session.close()

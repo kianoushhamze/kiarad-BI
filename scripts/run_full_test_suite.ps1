@@ -32,6 +32,7 @@ $groups = @(
   @{ File = "test_treasury_excel.py"; Flag = "KIARAD_TEST_TREASURY_DB" },
   @{ File = "test_treasury_strategy.py"; Flag = "KIARAD_TEST_TREASURY_DB" },
   @{ File = "test_visit_checkin_workflow.py"; Flag = "KIARAD_TEST_VISIT_WORKFLOW_DB" },
+  @{ File = "test_monthly_reconciliation_db.py"; Flag = "KIARAD_TEST_MONTHLY_RECONCILIATION_DB" },
   @{ File = "test_visit_coverage.py"; Flag = "KIARAD_TEST_VISIT_COVERAGE_DB" },
   @{ File = "test_voice_report_workflow.py"; Flag = "KIARAD_TEST_VOICE_WORKFLOW_DB" },
   @{ File = "test_storefront_orders.py"; Flag = "KIARAD_TEST_STOREFRONT_DB" },

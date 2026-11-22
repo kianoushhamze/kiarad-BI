@@ -3,6 +3,7 @@
 import {useEffect,useMemo,useState} from "react";
 import {PortalShell,Surface,fieldClass,primaryButton} from "../../components/portal-shell";
 import {secureApi} from "../../lib/secure-api";
+import ReconciliationPanel, {type ReconciliationData} from "../../components/ReconciliationPanel";
 import {IranDateInput} from "../../components/IranDateInput";
 import {formatIranDate,jalaliDateInputToIso,iranTodayIso} from "../../lib/iran-date";
 
@@ -23,6 +24,16 @@ export default function MonthlyPlans(){
  useEffect(()=>{let active=true;secureApi<{users:{id:number;full_name:string}[];bases:Base[];can_approve:boolean}>("/monthly-visit-plans/options").then(r=>{if(active){setUsers(r.users);setPerson(String(r.users[0]?.id||""));setBases(r.bases);setCanApprove(r.can_approve);}}).catch(e=>{if(active)setMessage(e.message);});return()=>{active=false;};},[]);
  useEffect(()=>{let active=true;secureApi<{items:Plan[]}>(`/monthly-visit-plans?month=${encodeURIComponent(month)}`).then(r=>{if(active){setPlans(r.items);setDetail(null);}}).catch(e=>{if(active)setMessage(e.message);});return()=>{active=false;};},[month]);
  async function refresh(){const r=await secureApi<{items:Plan[]}>(`/monthly-visit-plans?month=${encodeURIComponent(month)}`);setPlans(r.items);}
+ const approvedPlanId=detail?.plan.status==="approved"?detail.plan.id:null;
+ const [reconciliation,setReconciliation]=useState<{planId:number;data?:ReconciliationData;error?:string}|null>(null);
+ useEffect(()=>{
+  if(approvedPlanId===null)return;
+  let active=true;
+  secureApi<ReconciliationData>(`/monthly-visit-plans/${approvedPlanId}/reconciliation`)
+   .then(data=>{if(active)setReconciliation({planId:approvedPlanId,data});})
+   .catch(()=>{if(active)setReconciliation({planId:approvedPlanId,error:"گزارش تطبیق دریافت نشد."});});
+  return()=>{active=false;};
+ },[approvedPlanId]);
  async function open(id:number){setMessage("");setAllowShared(false);try{setDetail(await secureApi<Detail>(`/monthly-visit-plans/${id}`));}catch(e){setMessage(e instanceof Error?e.message:"برنامه دریافت نشد.");}}
  function itemsOf(day:string){return stops.filter(s=>s.visit_date===day).sort((a,b)=>a.stop_order-b.stop_order);}
  function replaceDay(day:string,next:Stop[]){
@@ -89,6 +100,9 @@ export default function MonthlyPlans(){
     <button disabled={busy||(detail.summary.conflicts>0?reviewNote.trim().length<8:reviewNote.trim().length<3)||(detail.summary.conflicts>0&&!allowShared)} className={primaryButton} onClick={()=>void act('review',{decision:'approved',note:reviewNote,allow_shared:allowShared})}>تأیید و فعال‌سازی برنامه</button><button disabled={busy||reviewNote.trim().length<3} className="mr-4 text-amber-200" onClick={()=>void act('review',{decision:'returned',note:reviewNote})}>برگشت برای اصلاح</button></>}
    {['returned','approved'].includes(detail.plan.status)&&<button onClick={()=>{setPerson(String(detail.plan.user_id));setStops(detail.stops.filter(s=>detail.plan.status!=='approved'||(!s.locked_for_revision&&s.visit_date>iranTodayIso())));setNote(detail.plan.note);setMessage("روزهای آیندهٔ قابل اصلاح به فرم کپی شدند. روزهای گذشته، امروز و دارای شواهد یا کارکرد حفظ می‌شوند؛ اصلاحیه فقط با تأیید مجدد مدیرعامل اجرا می‌شود.");}} className={primaryButton}>کپی برای تهیهٔ نسخهٔ اصلاح‌شده</button>}
    {canApprove&&detail.plan.status==='approved'&&<details><summary>بازبینی کارکرد روز برای فیش حقوقی</summary><div className="mt-4 space-y-3"><IranDateInput value={workDate} onChange={setWorkDate} className={fieldClass}/><label className="block">روز کارکرد تأییدشده؛ از صفر تا یک<input className={fieldClass} type="number" min="0" max="1" step="0.001" value={credit} onChange={e=>setCredit(e.target.value)}/></label><textarea aria-label="دلیل تأیید کارکرد" className={fieldClass} value={reviewNote} onChange={e=>setReviewNote(e.target.value)} placeholder="دلیل مستند تأیید یا کارکرد جزئی"/><button disabled={busy||!workDate||reviewNote.trim().length<8} className={primaryButton} onClick={()=>void act('workday-review',{work_date:workDate,credited_days:Number(credit),note:reviewNote})}>ثبت کارکرد مستند برای بازبینی حقوق</button><p className="text-sm text-amber-200">این کار فیش را تصویب یا پرداخت نمی‌کند. منبع کارکرد ماه باید جداگانه تطبیق و تأیید شود؛ کارکرد ثبت‌شدهٔ قبلی دوباره شمرده نمی‌شود.</p></div></details>}
+   {approvedPlanId!==null&&reconciliation?.planId===approvedPlanId&&(
+    reconciliation.error?<p role="alert">{reconciliation.error}</p>:<ReconciliationPanel data={reconciliation.data??null}/>
+   )}
    <details><summary>تاریخچهٔ برنامه</summary>{detail.history.map((h,i)=><p className="mt-2 text-sm" key={i}>{states[h.event]||"رویداد ثبت‌شده"} · {h.note}</p>)}</details>
   </Surface>}
  </div></PortalShell>;
