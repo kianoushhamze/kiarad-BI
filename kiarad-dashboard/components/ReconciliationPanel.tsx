@@ -7,7 +7,7 @@ type ReconciliationItem = {
   center_name?: string; center_id?: number; visit_date?: string; planned_date?: string;
   outcome_status?: string; order_amount_rial?: number; outcome_notes?: string; visit_goal?: string;
 };
-type ReconciliationData = {
+export type ReconciliationData = {
   summary: Partial<Record<`${BucketKey}_count` | "strict_compliance_percent" | "effective_coverage_percent", number>>;
   buckets: Partial<Record<BucketKey, ReconciliationItem[]>>;
 };
@@ -38,7 +38,7 @@ export default function ReconciliationPanel({ data }: { data: ReconciliationData
             <span className="font-bold text-emerald-400">{summary.strict_compliance_percent}٪</span>
           </div>
           <div className="rounded-xl bg-slate-800/80 px-4 py-2">
-            <span className="text-slate-400">پوشش مؤثر کل ماه: </span>
+            <span className="text-slate-400">پوشش مؤثر تا تاریخ گزارش: </span>
             <span className="font-bold text-purple-400">{summary.effective_coverage_percent}٪</span>
           </div>
         </div>
@@ -90,7 +90,7 @@ export default function ReconciliationPanel({ data }: { data: ReconciliationData
                     {item.outcome_status === "order_placed" ? (
                       <span className="text-emerald-400">ثبت سفارش ({Number(item.order_amount_rial || 0).toLocaleString("fa-IR")} ریال)</span>
                     ) : (
-                      <span className="text-slate-300">{item.outcome_status || "در انتظار بررسی"}</span>
+                      <span className="text-slate-300">{item.outcome_status === "verified" ? "ویزیت معتبر" : item.outcome_status || "در انتظار بررسی"}</span>
                     )}
                   </td>
                   <td className="p-3 text-slate-400">{item.outcome_notes || item.visit_goal || "—"}</td>
