@@ -1,8 +1,13 @@
 """All panel domains through fixed, authenticated, read-only API resources."""
+from datetime import date
+from typing import Literal
+
+import jdatetime
 import requests
 from pydantic import BaseModel, ConfigDict, Field
 from fastapi import HTTPException
 from operations import role_has_module_permission, create_token
+from iran_time import iran_today
 
 RESOURCES={
  'monthly_visit_plans':('map','/monthly-visit-plans'),
@@ -107,13 +112,19 @@ RESOURCES={
 }
 
 
+MONTH_REQUIRED = {'monthly_visit_plans', 'payroll_detail'}
+DASHBOARD_PERIOD_RESOURCES = {'dashboard_full', 'live_ai_insights'}
+
+
 class PanelReadArgs(BaseModel):
     model_config=ConfigDict(extra='forbid')
     resource:str=Field(max_length=60)
     query:str=Field(default='',max_length=100)
     salesperson_id:int|None=Field(default=None,gt=0)
     days:int=Field(default=30,ge=1,le=365)
-    month:str|None=Field(default=None,max_length=7)
+    month: str | None = Field(default=None, pattern=r'^14\d{2}-(0[1-9]|1[0-2])$')
+    period: Literal['month', '30d', '90d'] | None = None
+    up_to_date: date | None = None
     plan_id:int|None=Field(default=None,gt=0)
     customer_id:int|None=Field(default=None,gt=0)
     product_id:int|None=Field(default=None,gt=0)
@@ -140,11 +151,23 @@ def read_panel(args,user):
         path=path.replace('{'+name+'}',str(value));consumed.add(name)
     if user.get('role')!='ceo' and (module=='site-cms' or not role_has_module_permission(user.get('role',''),module,'can_read')):
         raise HTTPException(403,'این ماژول در دسترسی شما نیست.')
+    params = {'q': a.query, 'days': a.days}
+    if a.month:
+        params['month'] = a.month
+    elif a.resource in MONTH_REQUIRED:
+        month = jdatetime.date.fromgregorian(date=iran_today())
+        params['month'] = f'{month.year:04d}-{month.month:02d}'
+    if a.period and a.resource in DASHBOARD_PERIOD_RESOURCES:
+        params['range'] = a.period
+    if a.up_to_date and a.resource == 'plan_reconciliation':
+        params['up_to_date'] = a.up_to_date.isoformat()
+    if a.salesperson_id and 'salesperson_id' not in consumed:
+        params['salesperson_id'] = a.salesperson_id
+
     session=requests.Session();session.trust_env=False
     response=session.get('http://127.0.0.1:8000'+path,
         headers={'Authorization':'Bearer '+create_token(user)},
-        params={'q':a.query,'days':a.days,**({'month':a.month} if a.month else {}),
-                **({} if 'salesperson_id' in consumed else ({'salesperson_id':a.salesperson_id} if a.salesperson_id else {}))},timeout=35)
+        params=params,timeout=35)
     if response.status_code!=200:
         return {'status':'access_denied' if response.status_code in {401,403} else 'source_unavailable',
                 'http_status':response.status_code,'resource':a.resource,'message':'منبع خوانده نشد؛ نتیجه صفر یا موفق نیست.'}
