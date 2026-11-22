@@ -341,6 +341,7 @@ export default function ProformaPage() {
   };
 
   const getGradeColor = (grade: string) => {
+    if (grade === "unrated") return "#94A3B8";
     if (grade === "green") return "#10B981";
     if (grade === "yellow") return "#F59E0B";
     return "#EF4444";
@@ -386,7 +387,7 @@ export default function ProformaPage() {
               <div style={{ display: "flex", gap: "24px", marginBottom: "8px", flexWrap: "wrap" }}>
                 <span>مانده بدهی فعلی: <strong>{formatPrice(creditStatus.current_balance)} ریال</strong></span>
                 <span>سقف اعتبار: <strong>{formatPrice(creditStatus.credit_limit)} ریال</strong></span>
-                <span>رده اعتباری: <strong style={{ color: getGradeColor(creditStatus.grade) }}>{creditStatus.grade === "green" ? "سبز (معتبر)" : creditStatus.grade === "yellow" ? "زرد (مشروط)" : "قرمز (مسدود)"}</strong></span>
+                <span>رده اعتباری: <strong style={{ color: getGradeColor(creditStatus.grade) }}>{creditStatus.grade === "unrated" ? "بدون رتبه (سقف ثبت نشده)" : creditStatus.grade === "green" ? "سبز (در محدودهٔ سقف)" : creditStatus.grade === "yellow" ? "زرد (مشروط)" : "قرمز (مسدود)"}</strong></span>
               </div>
               <div style={{ fontSize: "14px", color: "#CBD5E1" }}>{creditStatus.message}</div>
             </div>

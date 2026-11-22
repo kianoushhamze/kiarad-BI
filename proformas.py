@@ -237,7 +237,7 @@ def get_customer_credit(customer_id: int, proforma_amount: float = 0):
     credit_limit = float(customer["credit_limit"] or 0)
     projected_balance = current_balance + proforma_amount
     if credit_limit <= 0:
-        grade = "green"
+        grade = "unrated"
         message = "برای این مشتری سقف اعتباری ثبت نشده است."
     elif projected_balance > credit_limit:
         grade = "red"

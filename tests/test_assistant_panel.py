@@ -59,3 +59,32 @@ class SitePanelScope(unittest.TestCase):
             self.assertEqual(factory.return_value.get.call_args.args, ('http://127.0.0.1:8000/site-orders/all',))
             self.assertEqual(factory.return_value.get.call_args.kwargs['headers']['Authorization'], 'Bearer synthetic-ceo-token')
             factory.return_value.post.assert_not_called()
+
+
+class ReportFilters(unittest.TestCase):
+    def test_model_schema_exposes_filters(self):
+        from assistant_reports import REPORT_TOOLS
+        tool = next(t for t in REPORT_TOOLS if t['function']['name'] == 'read_panel_module')
+        properties = tool['function']['parameters']['properties']
+        self.assertTrue({'month', 'period', 'up_to_date'} <= properties.keys())
+
+    def test_authorized_reports_receive_requested_periods(self):
+        from datetime import date
+
+        with patch('assistant_panel.create_token', return_value='test'), \
+             patch('assistant_panel.iran_today', return_value=date(2026, 11, 22)), \
+             patch('assistant_panel.requests.Session') as factory:
+            get = factory.return_value.get
+            get.return_value.status_code = 200
+            get.return_value.content = b'{}'
+            get.return_value.json.return_value = {}
+            actor = {'id': 1, 'role': 'ceo'}
+            for args, key, expected in (
+                ({'resource': 'monthly_visit_plans'}, 'month', '1405-09'),
+                ({'resource': 'payroll_detail', 'salesperson_id': 2, 'month': '1405-07'}, 'month', '1405-07'),
+                ({'resource': 'dashboard_full', 'period': '30d'}, 'range', '30d'),
+                ({'resource': 'plan_reconciliation', 'plan_id': 2, 'up_to_date': '2026-11-22'}, 'up_to_date', '2026-11-22'),
+            ):
+                with self.subTest(resource=args['resource']):
+                    read_panel(args, actor)
+                    self.assertEqual(get.call_args.kwargs['params'][key], expected)
