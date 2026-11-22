@@ -215,7 +215,7 @@ def login(data: LoginRequest):
                        salesperson_id, is_active, password_version
                 FROM users WHERE username = :username
             """),
-            {"username": username},
+            {"username": data.username.strip().lower()},
         ).mappings().first()
     if not row or not row["is_active"] or not verify_password(data.password, row["password_hash"]):
         raise HTTPException(status_code=401, detail="Invalid username or password")
@@ -564,7 +564,7 @@ def create_user(data: UserCreate, manager: dict = Depends(require_manager)):
         conn.execute(text("SELECT pg_advisory_xact_lock(hashtextextended(:key, 0))"), {'key': 'user-name:' + username})
         duplicate = conn.execute(
             text("SELECT id FROM users WHERE username=:username"),
-            {"username": data.username.strip().lower()},
+            {"username": username},
         ).first()
         if duplicate:
             raise HTTPException(status_code=409, detail="Username already exists")
