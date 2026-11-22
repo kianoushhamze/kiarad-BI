@@ -354,6 +354,13 @@ def _chat_completion(payload, headers):
     return res.json()
 
 
+def is_general_learning(question):
+    normalized = normalize(question)
+    return any(term in normalized for term in ('یاد بگیر', 'آموزش', 'تمرین', 'یادگیری')) and not re.search(
+        r'(?:شرکت|خودم|ما|من)', normalized
+    )
+
+
 def call_gpt(msg, ctx, history, role, full_name):
     api_key = get_env_live("LLM_API_KEY")
     model = get_env_live("LLM_MODEL", "openai/gpt-4o-mini")
@@ -406,15 +413,16 @@ def call_gpt(msg, ctx, history, role, full_name):
     finance_analysis=any(w in msg for w in ('تحلیل','پیشنهاد','پیش‌بینی','پیش بینی')) and any(w in msg for w in ('خزانه','چک','نقدینگی'))
     finance_evidence_added=False
     payload = dict(model=model, messages=messages, tools=REPORT_TOOLS, temperature=0.1, max_tokens=2400)
-    general_learning = any(w in normalize(msg) for w in ('یاد بگیر','آموزش','تمرین','یادگیری','تعریف کن')) and not any(w in normalize(msg) for w in ('شرکت','خودم','ما','من'))
-    data_question = any(word in normalize(msg) for word in (
+    normalized = normalize(msg)
+    general_learning = is_general_learning(msg)
+    data_question = any(word in normalized for word in (
         'شرکت','فروش','مشتری','ویزیتور','پرسنل','تارگت','تسویه','چک','خزانه','حقوق','فاکتور','مسیر','موجودی','کالا','برند',
         'وظیفه','تسک','سود','کمپین','محتوا','گزارش','پیگیری','چقدر','چند','آمار','مانده','بدهی','طلب','سفارش','ویزیت','برنامه',
         'هلو','دیجی','آنلاین','نقشه','انبار','هزینه','نقدینگی','کارکرد','پورسانت','داشبورد','درآمد','پیش‌فاکتور','پیشفاکتور',
         'سررسید','وصول','هدف','عملکرد','مقایسه','روند','امروز','دیروز','این هفته','این ماه','باگت','بازدید','پایگاه','کمبود'))
     if not general_learning and data_question:
         payload['tool_choice'] = 'required'
-    if history and any(w in normalize(msg) for w in ('چرا','چیکار','همون','همان','ادامه','جزئیات','مقایسه','پیشنهاد')):
+    if not general_learning and history and any(w in normalized for w in ('چرا','چیکار','همون','همان','ادامه','جزئیات','مقایسه','پیشنهاد')):
         payload['tool_choice'] = 'required'
     try:
         used = 0
@@ -480,7 +488,7 @@ def load_history(user_id, limit=8, role="ceo"):
     try:
         with engine.connect() as conn:
             rows = conn.execute(text(
-                "SELECT role, content FROM (SELECT role, content FROM assistant_messages "
+                "SELECT role, content FROM (SELECT id, role, content FROM assistant_messages "
                 "WHERE user_id = :u AND intent = :intent ORDER BY id DESC LIMIT :l) h ORDER BY id"
             ), dict(u=user_id, l=limit, intent="chat:" + str(role))).mappings().all()
             return list(dict(r) for r in rows)
@@ -522,8 +530,11 @@ def chat(req: ChatRequest, user: dict = Depends(require_user)):
                     mode="access_limited", user_role=user.get("role", "unknown"))
     uid = user.get("id", 0)
     role = str(user.get('role', 'unknown'))
-    previous = [h['content'] for h in load_history(uid, limit=12, role=role) if h.get('role') == 'user']
     question = req.message.strip().replace("ي", "ی").replace("ك", "ک").rstrip("؟?!. ")
+    if question in {"سلام", "درود", "سلام دستیار"}:
+        answer = "سلام! می‌توانم به سؤال‌های عمومی و آموزشی پاسخ بدهم و دربارهٔ اطلاعات کاریِ مجاز شما هم از دادهٔ ثبت‌شدهٔ سامانه کمک بگیرم."
+        save_turn(uid, req.message, answer, user.get("role", "unknown"))
+        return dict(answer=answer, mode="verified_greeting", user_role=user.get("role", "unknown"))
     execution_request=any(term in question for term in ('ثبت کن','تعریف کن','تغییر بده','اصلاح کن','حذف کن','اضافه کن','ایجاد کن','رزرو کن','تأیید کن','تایید کن','لغو کن','ببند','بساز','تنظیم کن'))
     if not execution_request and 'قرارداد' in question and len(question)<160 and any(term in question for term in ('میتونی','می‌تونی','میشه','بگم','منظورم','ماژول')):
         from compensation import COMPENSATION_ADMIN_ROLES
@@ -547,12 +558,12 @@ def chat(req: ChatRequest, user: dict = Depends(require_user)):
         module = 'catalog' if summary_kind == 'inventory_value' else 'debtors'
         if role not in MANAGER_ROLES or (role != 'ceo' and not role_has_module_permission(role, module, 'can_read')):
             return {'answer':'جمع کل شرکت در محدودهٔ دسترسی این حساب نیست؛ گزارش‌های شخصی از مسیر مشتریان مرتبط قابل بررسی‌اند.','mode':'access_limited','user_role':role}
-    with engine.connect() as conn:
-        # Resolve catalog entities before loading company totals. The model cannot
-        # substitute an unrelated aggregate for the requested brand or SKU.
-        if not execution_request and not summary_kind and catalog_intent(question):
-            if role not in {'ceo','finance','sales_manager'} and not role_has_module_permission(role,'catalog','can_read'):
-                return {'answer':'گزارش کالا در محدودهٔ دسترسی شما نیست.','mode':'access_limited','user_role':role}
+    # Resolve a requested brand or SKU before loading company totals.
+    if not execution_request and not summary_kind and not is_general_learning(question) and catalog_intent(question):
+        if role not in {'ceo','finance','sales_manager'} and not role_has_module_permission(role,'catalog','can_read'):
+            return {'answer':'گزارش کالا در محدودهٔ دسترسی شما نیست.','mode':'access_limited','user_role':role}
+        previous = [h['content'] for h in load_history(uid, limit=12, role=role) if h.get('role') == 'user']
+        with engine.connect() as conn:
             try:
                 products = [dict(r) for r in conn.execute(text('''SELECT p.id,p.code,p.name,p.stock,p.price,m.holoo_erp_code FROM products p
                     LEFT JOIN holoo_entity_mappings m ON m.local_id=p.id AND m.entity_type='product' ORDER BY p.id LIMIT 5000''')).mappings()]
@@ -581,17 +592,21 @@ def chat(req: ChatRequest, user: dict = Depends(require_user)):
                     answer += ' نزدیک‌ترین نام‌ها برای تأیید شما: ' + '، '.join(selection['candidates']) + '.'
                 save_turn(uid,req.message,answer,role)
                 return {'answer':answer,'mode':'catalog_clarification','user_role':role}
-        ctx = build_live_context(conn, user)
-        relevant_ctx = context_for_question(conn, user, req.message, ctx) if not summary_kind else {}
+    sales_summary = question in {"فروش این ماه چقدر بود", "فروش این ماه چقدر است", "فروش ماه جاری چقدر است", "فروش این ماه چقدره"}
+    debt_ranking = question in {"بدهکارترین مشتری‌ها کی‌اند", "بدهکارترین مشتری‌ها چه کسانی هستند", "بدهکارترین مشتریان"}
+    tasks_summary = question in {"تسک‌های عقب‌افتاده چند تا است", "تسک‌های عقب‌افتاده چند تا هستند", "چند تسک عقب‌افتاده داریم", "چند کار عقب افتاده دارم"}
+    stock_summary = question in {"وضعیت انبار چطور است", "وضعیت انبار", "انبار چطوره", "موجودی انبار چقدره"}
+    ctx = {}
+    if summary_kind or sales_summary or debt_ranking or tasks_summary or stock_summary:
+        with engine.connect() as conn:
+            ctx = build_live_context(conn, user)
     if summary_kind:
         result = aggregate_answer(summary_kind, ctx)
         save_turn(uid, req.message, result['answer'], role)
         return {**result, 'user_role':role}
-    if question in {"سلام", "درود", "سلام دستیار"}:
-        answer = "سلام! می‌توانم به سؤال‌های عمومی و آموزشی پاسخ بدهم و دربارهٔ اطلاعات کاریِ مجاز شما هم از دادهٔ ثبت‌شدهٔ سامانه کمک بگیرم."
-        save_turn(uid, req.message, answer, user.get("role", "unknown"))
-        return dict(answer=answer, mode="verified_greeting", user_role=user.get("role", "unknown"))
-    if question in {"فروش این ماه چقدر بود", "فروش این ماه چقدر است", "فروش ماه جاری چقدر است"} and "sales_month" in ctx:
+    if sales_summary and "sales_month" in ctx:
+        if ctx["sales_month"] is None:
+            return dict(answer="خواندن فروش ماه از منبع سامانه موفق نبود. برای دریافت عدد معتبر، گزارش فروش را دوباره بررسی کنید.", mode="sales_data_required", user_role=role)
         source = ctx.get("sales_source_date")
         answer = "فروش خالص ثبت‌شدهٔ ماه جاری شمسی پس از تخفیف و برگشت و بدون مالیات " + money(ctx["sales_month"]) + " است."
         answer += (" آخرین تاریخ فروش ثبت‌شده: " + business_date(source) + "." if source else " تاریخ آخرین فروش تأیید نشده است.")
@@ -599,18 +614,20 @@ def chat(req: ChatRequest, user: dict = Depends(require_user)):
             answer += " این داده مربوط به امروز نیست و ممکن است فروش تازه هنوز همگام نشده باشد."
         save_turn(uid, req.message, answer, user.get("role", "unknown"))
         return dict(answer=answer, mode="verified_sales", user_role=user.get("role", "unknown"))
-    if question in {"بدهکارترین مشتری‌ها کی‌اند", "بدهکارترین مشتری‌ها چه کسانی هستند", "بدهکارترین مشتریان"} and "top_debtors" in ctx:
+    if debt_ranking and "top_debtors" in ctx:
         rows = ctx["top_debtors"][:5]
         answer = ("بدهکارترین طرف‌حساب‌ها در آخرین گزارش: " + "؛ ".join(str(row.get("name") or "بدون نام") + ": " + money(row.get("mandeh")) for row in rows) + ".") if rows else ('در آخرین گزارش، بدهکار مثبتی ثبت نشده است.' if ctx.get('debt_rows') == 0 else 'خواندن فهرست مطالبات تأیید نشد؛ نبود بدهکار را نتیجه نمی‌گیرم.')
         if ctx.get("debt_snapshot_date"):
             answer += " تاریخ گزارش: " + business_date(ctx["debt_snapshot_date"]) + "."
         save_turn(uid, req.message, answer, user.get("role", "unknown"))
         return dict(answer=answer, mode="verified_debt", user_role=user.get("role", "unknown"))
-    if question in {"تسک‌های عقب‌افتاده چند تا است", "تسک‌های عقب‌افتاده چند تا هستند", "چند تسک عقب‌افتاده داریم"} and "overdue_tasks" in ctx:
+    if tasks_summary and "overdue_tasks" in ctx:
+        if ctx["overdue_tasks"] is None:
+            return dict(answer="شمارش کارهای عقب‌افتاده موفق نبود. فهرست وظایف را دوباره بررسی کنید.", mode="tasks_data_required", user_role=role)
         answer = "تعداد تسک‌های عقب‌افتادهٔ قابل‌مشاهده برای شما " + fa_num(ctx["overdue_tasks"]) + " مورد است."
         save_turn(uid, req.message, answer, user.get("role", "unknown"))
         return dict(answer=answer, mode="verified_tasks", user_role=user.get("role", "unknown"))
-    if question in {"وضعیت انبار چطور است", "وضعیت انبار", "انبار چطوره", "موجودی انبار چقدره"} and "products_active" in ctx:
+    if stock_summary and "products_active" in ctx:
         if any(ctx.get(k) is None for k in ('products_active','products_zero_stock','products_low_stock','products_zero_stock_without_target')):
             return {'answer':'خواندن آمار انبار کامل نشد؛ موجودی و تعداد کالا را صفر فرض نمی‌کنم. گزارش را دوباره دریافت کنید.','mode':'inventory_data_required','user_role':role}
         zero = int(ctx.get("products_zero_stock") or 0)
@@ -621,7 +638,7 @@ def chat(req: ChatRequest, user: dict = Depends(require_user)):
             + fa_num(zero) + " کالا موجودی صفر دارند و " + fa_num(low)
             + " کالا به حد سفارشِ ثبت‌شده رسیده‌اند."
         )
-        if "inventory_value" in ctx:
+        if ctx.get("inventory_value") is not None and ctx.get("inventory_missing_values") == 0:
             answer += " موجودی به قیمت فروش جاری " + money(ctx["inventory_value"]) + " است؛ این رقم بهای خرید یا سود نیست."
         if missing_target:
             answer += " برای " + fa_num(missing_target) + " کالای ناموجود، حد سفارش معتبر ثبت نشده است؛ این موارد باید جداگانه بررسی و حد سفارششان تنظیم شود."
@@ -629,10 +646,19 @@ def chat(req: ChatRequest, user: dict = Depends(require_user)):
         return dict(answer=answer, mode="verified_inventory", user_role=user.get("role", "unknown"))
     # Past answers may contain records no longer permitted after a role change.
     # Keep them in the local chat UI, but never resend them to a provider.
-    history = [{'role':'user','content':q} for q in previous[-4:]]
+    history = [
+        {'role': 'user', 'content': h['content']}
+        for h in load_history(uid, limit=12, role=role)
+        if h.get('role') == 'user'
+    ][-4:]
     # Reports are retrieved by an authorized tool, not by sending every matched
     # keyword's company aggregates before understanding the actual question.
-    relevant_ctx = {k:relevant_ctx[k] for k in ('today','scope','access_note') if k in relevant_ctx}
+    relevant_ctx = {
+        'today': iran_today().isoformat(),
+        'scope': 'company' if role in MANAGER_ROLES else 'personal',
+    }
+    if role in {'salesperson', 'visitor'} and not user.get('salesperson_id'):
+        relevant_ctx['access_note'] = 'حساب کاربر به ویزیتور مشخصی متصل نیست؛ دادهٔ شخصی نمایش داده نمی‌شود.'
     relevant_ctx['_actor'] = {k:user.get(k) for k in ('id','role','salesperson_id','password_version')}
     answer = call_gpt(req.message, relevant_ctx, history,
                       user.get("role", "unknown"), user.get("full_name", ""))
