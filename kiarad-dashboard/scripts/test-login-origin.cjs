@@ -16,13 +16,14 @@ async function scenario(origin, role, expectedPage, status = 200) {
   const process = { env: { NEXT_PUBLIC_API_URL: 'http://backend:8000' } };
   const apiExports = {};
   vm.runInNewContext(apiSource, { exports: apiExports, window, process });
-  let state = 0, sent, saved, redirected, error;
+  let state = 0, sent, saved, redirected, error, visibility;
   const react = {
     createElement: (type, props, ...children) => ({ type, props: props || {}, children: children.flat() }),
     useState: () => {
       const index = state++;
-      return [['synthetic-user', 'synthetic-password', '', false][index], value => {
-        if (index === 2) error = value;
+      return [['synthetic-user', 'synthetic-password', false, '', false][index], value => {
+        if (index === 2) visibility = value;
+        if (index === 3) error = value;
       }];
     },
   };
@@ -48,6 +49,12 @@ async function scenario(origin, role, expectedPage, status = 200) {
   }
   const form = findForm(component.default());
   assert.ok(form);
+  const passwordToggle = form.children
+    .flatMap(function flatten(node) { return node && typeof node === 'object' ? [node, ...(node.children || []).flatMap(flatten)] : []; })
+    .find(node => node.type === 'button' && node.props['aria-label'] === 'نمایش کلمه عبور');
+  assert.ok(passwordToggle);
+  passwordToggle.props.onClick();
+  assert.equal(visibility(false), true);
   await form.props.onSubmit({ preventDefault() {} });
   assert.equal(sent.url, origin + '/api/auth/login');
   assert.equal(sent.options.method, 'POST');
