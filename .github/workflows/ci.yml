@@ -180,6 +180,9 @@ jobs:
             throw 'Windows PowerShell 5.1 parser rejected tracked scripts.'
           }
           Write-Output ("Parsed {0} tracked PowerShell files with Windows PowerShell {1}." -f $files.Count, $PSVersionTable.PSVersion)
+      - name: Exercise WireGuard portproxy recovery with simulated Windows commands
+        shell: powershell
+        run: .\tests\test_wireguard_portproxy.ps1
       - name: Build a disposable transfer-kit fixture
         shell: powershell
         run: |
