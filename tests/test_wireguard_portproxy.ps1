@@ -7,6 +7,8 @@ $global:PortproxyFixture = @{
     TunnelRunning = $true
     HasOtherListener = $false
     FailNextAdd = $false
+    AddressDelay = 0
+    WaitTicks = 0
     Actions = [Collections.Generic.List[string]]::new()
     Bound = @{ '3300' = $true; '8190' = $true }
     Destinations = @{ '3300' = '127.0.0.1'; '8190' = '127.0.0.1' }
@@ -27,9 +29,20 @@ function Get-NetTCPConnection {
     [CmdletBinding()] param($LocalAddress, $LocalPort, $State)
     if ($global:PortproxyFixture.HasOtherListener) { $true }
 }
-function Start-Service($Name) { $global:PortproxyFixture.Actions.Add('start'); $global:PortproxyFixture.HasAddress = $true }
-function Restart-Service($Name) { $global:PortproxyFixture.Actions.Add('restart'); $global:PortproxyFixture.HasAddress = $true }
-function Start-Sleep($Seconds) {}
+function Set-FixtureTunnelReady($Action) {
+    $global:PortproxyFixture.Actions.Add($Action)
+    $global:PortproxyFixture.HasAddress = $global:PortproxyFixture.AddressDelay -eq 0
+}
+function Start-Service($Name) { Set-FixtureTunnelReady 'start' }
+function Restart-Service($Name) { Set-FixtureTunnelReady 'restart' }
+function Start-Sleep($Seconds) {
+    if ($global:PortproxyFixture.AddressDelay -gt 0) {
+        $global:PortproxyFixture.WaitTicks++
+        if ($global:PortproxyFixture.WaitTicks -ge $global:PortproxyFixture.AddressDelay) {
+            $global:PortproxyFixture.HasAddress = $true
+        }
+    }
+}
 function curl.exe {
     $uri = [Uri]$args[-1]
     $port = [string]$uri.Port
@@ -92,8 +105,10 @@ try {
 
     $fixture.HasAddress = $false
     $fixture.TunnelRunning = $true
+    $fixture.AddressDelay = 16
     Assert-Equal (@(Invoke-Fixture -Repair)[0].Status) 'Healthy'
     Assert-Equal $fixture.Actions[-1] 'restart'
+    Assert-Equal $fixture.WaitTicks 16
     'WireGuard portproxy checks passed.'
 } finally {
     Remove-Variable -Name PortproxyFixture -Scope Global

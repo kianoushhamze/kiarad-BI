@@ -45,10 +45,11 @@ if ($Repair -and -not $tunnelReady -and ($loopback.Values -contains $true)) {
     } elseif ($tunnel.Status -eq 'Running') {
         Restart-Service -Name $serviceName
     }
-    for ($attempt = 0; $attempt -lt 10; $attempt++) {
-        $tunnelReady = Test-TunnelAddress
-        if ($tunnelReady) { break }
+    # WireGuardNT can wait 15 seconds for the adapter before the address is assigned.
+    $tunnelReady = Test-TunnelAddress
+    for ($attempt = 0; $attempt -lt 25 -and -not $tunnelReady; $attempt++) {
         Start-Sleep -Seconds 1
+        $tunnelReady = Test-TunnelAddress
     }
 }
 
