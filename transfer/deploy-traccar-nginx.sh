@@ -18,6 +18,7 @@ fi
 site=/etc/nginx/sites-available/$host
 link=/etc/nginx/sites-enabled/$host
 webroot=/var/www/kiarad-gps-acme
+cert_dir=/etc/letsencrypt/live/$host
 
 code=$(curl --noproxy '*' --interface "$source_ip" --silent --show-error --max-time 8 \
     --output /dev/null --write-out '%{http_code}' "http://$peer_ip:5055/")
@@ -29,7 +30,7 @@ if [[ -e $site || -L $site || -e $link || -L $link ]]; then
     echo 'nginx site already exists' >&2
     exit 1
 fi
-nginx -t
+nginx -t -q
 install -d -m 755 "$webroot"
 tmp=$(mktemp)
 cleanup() {
@@ -37,7 +38,7 @@ cleanup() {
     trap - exit
     if ((result != 0)); then
         rm -f -- "$link" "$site"
-        nginx -t && systemctl reload nginx || true
+        nginx -t -q && systemctl reload nginx || true
     fi
     rm -f -- "$tmp"
     exit "$result"
@@ -58,22 +59,27 @@ server {
     location / { return 404; }
 }
 nginx_http
-install -m 644 "$tmp" "$site"
-ln -s "$site" "$link"
-nginx -t
-systemctl reload nginx
+if [[ -s $cert_dir/fullchain.pem && -s $cert_dir/privkey.pem ]] &&
+    openssl x509 -in "$cert_dir/fullchain.pem" -checkend 0 -noout >/dev/null; then
+    echo 'using existing gps certificate'
+else
+    install -m 644 "$tmp" "$site"
+    ln -s "$site" "$link"
+    nginx -t -q
+    systemctl reload nginx
 
-certbot certonly --webroot -w "$webroot" -d "$host" --cert-name "$host" \
-    --non-interactive --keep-until-expiring \
-    --deploy-hook 'nginx -t && systemctl reload nginx'
+    certbot certonly --webroot -w "$webroot" -d "$host" --cert-name "$host" \
+        --non-interactive --keep-until-expiring \
+        --deploy-hook 'nginx -t -q && systemctl reload nginx'
+fi
 
 cat >> "$tmp" <<nginx_https
 limit_req_zone \$binary_remote_addr zone=kiarad_gps:10m rate=5r/s;
 server {
     listen 443 ssl;
     server_name $host;
-    ssl_certificate /etc/letsencrypt/live/$host/fullchain.pem;
-    ssl_certificate_key /etc/letsencrypt/live/$host/privkey.pem;
+    ssl_certificate $cert_dir/fullchain.pem;
+    ssl_certificate_key $cert_dir/privkey.pem;
     access_log off;
     error_log /var/log/nginx/kiarad-gps-error.log crit;
     client_max_body_size 8k;
@@ -90,13 +96,27 @@ server {
 }
 nginx_https
 install -m 644 "$tmp" "$site"
-nginx -t
+if [[ ! -L $link ]]; then
+    ln -s "$site" "$link"
+fi
+nginx -t -q
 systemctl reload nginx
 
-code=$(curl --noproxy '*' --resolve "$host:443:127.0.0.1" --silent --show-error \
-    --max-time 12 --output /dev/null --write-out '%{http_code}' "https://$host/")
-if [[ $code != 400 ]]; then
-    printf 'unexpected traccar https response: %s\n' "$code" >&2
-    exit 1
-fi
-printf 'gps_https_ready=%s\n' "$code"
+for attempt in {1..8}; do
+    if probe=$(curl --noproxy '*' --resolve "$host:443:127.0.0.1" --silent --show-error \
+        --connect-timeout 2 --max-time 5 --output /dev/null --write-out '%{http_code}' \
+        "https://$host/" 2>&1) && [[ $probe == 400 ]]; then
+        printf 'gps_https_ready=%s\n' "$probe"
+        exit 0
+    fi
+    if ((attempt < 8)); then
+        sleep 1
+    fi
+done
+printf 'traccar https verification failed: %s\n' "$probe" >&2
+printf 'certificate loaded from disk: ' >&2
+openssl x509 -in "$cert_dir/fullchain.pem" -noout -ext subjectAltName >&2 || true
+printf 'certificate served on 127.0.0.1:443: ' >&2
+timeout 5 openssl s_client -connect 127.0.0.1:443 -servername "$host" </dev/null 2>/dev/null |
+    openssl x509 -noout -ext subjectAltName >&2 || true
+exit 1
