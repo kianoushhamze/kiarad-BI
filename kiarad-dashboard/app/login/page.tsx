@@ -34,6 +34,8 @@ export default function LoginPage() {
 
       if (data.user?.role === "salesperson" || data.user?.role === "visitor") {
         router.push("/my-plan");
+      } else if (data.user?.role === "finance") {
+        router.push("/treasury");
       } else {
         router.push("/management");
       }
