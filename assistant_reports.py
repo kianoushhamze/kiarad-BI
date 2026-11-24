@@ -330,7 +330,7 @@ def read_report(a, user):
             customer_scope='' if manager else ''' AND (EXISTS(SELECT 1 FROM sales s WHERE s.customer_id=c.id AND s.salesperson_id=:sp)
                 OR EXISTS(SELECT 1 FROM proforma_invoices pf WHERE pf.customer_id=c.id AND pf.salesperson_id=:sp))'''
             if not a.query:
-                snapshot=conn.execute(text('SELECT id,snapshot_date, CASE WHEN source_file LIKE 'holoo:customers:%' THEN 'holoo_customer_balance' ELSE 'imported_receivables_report' END AS source FROM receivable_snapshots ORDER BY snapshot_date DESC,id DESC LIMIT 1')).mappings().first()
+                snapshot=conn.execute(text("SELECT id,snapshot_date, CASE WHEN source_file LIKE 'holoo:customers:%' THEN 'holoo_customer_balance' ELSE 'imported_receivables_report' END AS source FROM receivable_snapshots ORDER BY snapshot_date DESC,id DESC LIMIT 1")).mappings().first()
                 if not snapshot:
                     return {**metadata,'status':'source_missing','message':'گزارش مطالبات ثبت‌شده موجود نیست؛ مانده صفر نتیجه نمی‌شود.'}
                 debt_base=''' FROM receivable_balances rb LEFT JOIN customers c ON c.id=rb.customer_id WHERE rb.snapshot_id=:snap AND rb.balance>0'''+customer_scope
