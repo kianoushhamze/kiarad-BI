@@ -158,6 +158,39 @@ def trim(value, max_rows=20):
     return value
 
 
+def holoo_person_balance(conn, customer_id, snapshot_id):
+    if not snapshot_id:
+        return None
+    from holoo_finance import numeric
+
+    records = conn.execute(text("""
+        SELECT s.id AS snapshot_id, s.captured_at, s.payload->>'to_date' AS report_date,
+               s.payload->>'currency_factor' AS factor, person->>'Mandeh' AS amount
+        FROM holoo_financial_snapshots s
+        JOIN holoo_entity_mappings m ON m.entity_type='customer' AND m.local_id=:customer_id
+        CROSS JOIN LATERAL jsonb_array_elements(s.payload #> '{sources,customers,rows}') AS person
+        WHERE s.id=:snapshot_id AND s.payload #>> '{sources,customers,ok}'='true'
+          AND s.payload #>> '{sources,customers,complete}'='true'
+          AND btrim(person->>'ErpCode')=m.holoo_erp_code
+        LIMIT 2
+    """), {'customer_id':customer_id,'snapshot_id':snapshot_id}).mappings().all()
+    if len(records) != 1:
+        return None
+    record = records[0]
+    try:
+        factor = numeric(record['factor'])
+        if factor not in (1, 10):
+            return None
+        amount = numeric(record['amount']) * factor
+    except ValueError:
+        return None
+    return {'signed_balance_irr': amount,
+            'balance_kind': 'debtor' if amount > 0 else 'creditor' if amount < 0 else 'zero',
+            'source': 'holoo_customer_balance',
+            'snapshot_id': record['snapshot_id'], 'captured_at': record['captured_at'],
+            'report_date': record['report_date']}
+
+
 def prepare_target(args, user):
     if user.get('role') not in MANAGER_ROLES:
         raise HTTPException(403, 'تعریف تارگت فقط با مدیر است.')
@@ -330,14 +363,14 @@ def read_report(a, user):
             customer_scope='' if manager else ''' AND (EXISTS(SELECT 1 FROM sales s WHERE s.customer_id=c.id AND s.salesperson_id=:sp)
                 OR EXISTS(SELECT 1 FROM proforma_invoices pf WHERE pf.customer_id=c.id AND pf.salesperson_id=:sp))'''
             if not a.query:
-                snapshot=conn.execute(text('SELECT id,snapshot_date FROM receivable_snapshots ORDER BY snapshot_date DESC,id DESC LIMIT 1')).mappings().first()
+                snapshot=conn.execute(text("SELECT id,snapshot_date, CASE WHEN source_file LIKE 'holoo:customers:%' THEN 'holoo_customer_balance' ELSE 'imported_receivables_report' END AS source FROM receivable_snapshots ORDER BY snapshot_date DESC,id DESC LIMIT 1")).mappings().first()
                 if not snapshot:
                     return {**metadata,'status':'source_missing','message':'گزارش مطالبات ثبت‌شده موجود نیست؛ مانده صفر نتیجه نمی‌شود.'}
                 debt_base=''' FROM receivable_balances rb LEFT JOIN customers c ON c.id=rb.customer_id WHERE rb.snapshot_id=:snap AND rb.balance>0'''+customer_scope
                 debt_params={**p,'snap':snapshot['id']}
                 summary=rows(conn,'SELECT COUNT(*) AS debtor_rows,COALESCE(SUM(rb.balance),0) AS receivable_irr'+debt_base,debt_params)[0]
                 top=rows(conn,'SELECT c.id,COALESCE(c.name,rb.counterparty) AS name,rb.balance AS receivable_irr'+debt_base+' ORDER BY rb.balance DESC LIMIT 20',debt_params)
-                return {**metadata,'receivable_snapshot_date':snapshot['snapshot_date'],'totals':summary,'top_debtors':top,'top_rows_limited_to':20,
+                return {**metadata,'receivable_snapshot_date':snapshot['snapshot_date'],'receivable_source':snapshot['source'],'totals':summary,'top_debtors':top,'top_rows_limited_to':20,
                         'note':'ماندهٔ مثبت آخرین گزارش اشخاص است؛ معین کامل حساب یا وجه وصول‌شده نیست.'}
             candidates=rows(conn,'''SELECT c.id,c.name,c.code,c.city FROM customers c WHERE (replace(replace(c.name,'ي','ی'),'ك','ک') ILIKE :q OR c.code ILIKE :q)'''+customer_scope+' ORDER BY c.id LIMIT 20',p)
             if len(candidates)!=1:
@@ -345,9 +378,15 @@ def read_report(a, user):
             cid=candidates[0]['id']
             sales=rows(conn,'SELECT s.date,s.total_amount AS net_sales_irr,s.holoo_sanad FROM sales s WHERE s.customer_id=:cid AND s.date>=:begin AND s.date<:end'+scope+' ORDER BY s.date DESC,s.id DESC LIMIT 20',{**p,'cid':cid})
             totals=rows(conn,'SELECT COUNT(*) AS documents,COALESCE(SUM(s.total_amount),0) AS net_sales_irr FROM sales s WHERE s.customer_id=:cid AND s.date>=:begin AND s.date<:end'+scope,{**p,'cid':cid})[0]
-            debt=rows(conn,'''SELECT rb.balance,rs.snapshot_date FROM receivable_balances rb JOIN receivable_snapshots rs ON rs.id=rb.snapshot_id
+            debt=rows(conn,'''SELECT rb.balance,rs.snapshot_date,
+                CASE WHEN rs.source_file LIKE 'holoo:customers:%' THEN 'holoo_customer_balance' ELSE 'imported_receivables_report' END AS source
+                FROM receivable_balances rb JOIN receivable_snapshots rs ON rs.id=rb.snapshot_id
                 WHERE rb.customer_id=:cid AND rb.snapshot_id=(SELECT id FROM receivable_snapshots ORDER BY snapshot_date DESC,id DESC LIMIT 1)''',{'cid':cid})
-            return {**metadata,'customer':candidates[0],'totals':totals,'recent_sales_limited_to_20':sales,'latest_reported_receivable':debt,'note':'مطالبات گزارش اشخاص جای دفتر کامل معین و تراکنش وصول نیست.'}
+            return {**metadata,'customer':candidates[0],'totals':totals,'recent_sales_limited_to_20':sales,'latest_reported_receivable':debt,
+                    'receivable_status':'reported' if debt else 'no_matching_report_row',
+                    'holoo_person_balance':holoo_person_balance(conn,cid,applied),
+                    'note':('برای ماندهٔ معین شخص از holoo_person_balance با تاریخ و منبع استفاده کنید. مبلغ مثبت بدهکار، منفی بستانکار و صفر تسویه است. '
+                            'نبود ردیف گزارش به معنی صفر نیست. دفتر رسمی معین و اسناد وصول در این منبع موجود نیستند.')}
         if a.section == 'tasks':
             task_scope='' if manager else ' AND assigned_to=:uid'
             return {**metadata,'items':rows(conn,"SELECT id,title,status,priority,due_date FROM tasks WHERE status NOT IN ('done','cancelled')"+task_scope+' ORDER BY due_date NULLS LAST,id LIMIT 30',{'uid':user.get('id') or -1}),'limited_to':30}
