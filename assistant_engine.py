@@ -463,6 +463,8 @@ def call_gpt(msg, ctx, history, role, full_name):
                         value = {"status": "invalid_arguments"}
                 if fn.get('name') == 'prepare_agent_mission' and value.get('state') == 'draft':
                     return {'answer':'برنامهٔ چندمرحله‌ای آمادهٔ بازبینی است. هنوز عملیاتی اجرا نشده؛ گام‌ها، اطلاعات ناقص و حدود اختیار را در مرکز فرمان بررسی و تصویب کن.', 'action':{'label':'بازبینی مأموریت و حدود اختیار','href':value['review_href']},'mode':'operation_preview'}
+                if name == 'prepare_sales_targets' and value.get('status') == 'retry_target_rows':
+                    retry_target_preview = True
                 if name in {'prepare_panel_operation', 'prepare_sales_targets', 'prepare_visit_coverage'} and value.get('status') == 'operation_preview':
                     return {'answer':value['message'],'action':{'label':'بررسی جزئیات و تأیید عملیات','href':value['review_href']},'mode':'operation_preview'}
                 if name == 'open_target_template' and value.get('status') == 'form_ready':

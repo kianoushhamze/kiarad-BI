@@ -17,13 +17,25 @@ def _normalized_money(text):
 
 
 def _in_rials(match):
-    raw, scale, unit = match.groups()
-    value = Decimal(WORDS[raw]) if raw in WORDS else Decimal(raw)
-    return value * SCALES.get(scale, 1) * (10 if unit in {'تومان', 'تومن'} else 1)
+    return _in_rials_from_parts(*match.groups())
 
 
 def explicit_money(message):
     return [_in_rials(match) for match in _MONEY.finditer(_normalized_money(message))]
+
+
+def listed_money(message, shared_unit=None):
+    if not shared_unit:
+        return explicit_money(message)
+    pattern = re.compile(rf'(?<![\w\-−]){_AMOUNT}(?:\s*{_UNIT})?(?![\w.])')
+    return [_in_rials_from_parts(raw, scale, unit or shared_unit)
+            for raw, scale, unit in pattern.findall(_normalized_money(message))
+            if scale or unit]
+
+
+def _in_rials_from_parts(raw, scale, unit):
+    value = Decimal(WORDS[raw]) if raw in WORDS else Decimal(raw)
+    return value * SCALES.get(scale, 1) * (10 if unit in {'تومان', 'تومن'} else 1)
 
 
 def parse_money_phrase(phrase, shared_unit=None):
