@@ -279,6 +279,7 @@ export default function MyPlanPage() {
   return <PortalShell title={manager ? "برنامهٔ تیم" : "امروز من"} eyebrow="ویزیت و پیگیری مشتری">
     <div className="kskin space-y-5" dir="rtl">
       <div className="flex flex-wrap items-center justify-between gap-3">
+        {!manager && <Link href="/monthly-plans" className="rounded-lg border border-violet-500/30 px-3 py-2 text-sm text-violet-200">ثبت پیشنهاد برنامهٔ ماهانه</Link>}
         <p className="text-sm text-slate-400">برنامهٔ {selected?.full_name || "شما"} · {formatIranDate(new Date())}</p>
         {manager && <label className="flex items-center gap-3 text-sm text-slate-300">انتخاب پرسنل<select className={fieldClass} value={person} onChange={e=>setPerson(e.target.value)}>{people.map(p=><option key={p.id} value={p.id}>{p.full_name}</option>)}</select></label>}
       </div>

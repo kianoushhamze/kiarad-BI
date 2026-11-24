@@ -33,23 +33,16 @@ const menuGroups: { label: string; icon: string; href?: string; children?: strin
     ["حقوق و قرارداد", "/compensation", "💵"],
     ["فیش حقوقی", "/payroll", "🧾"],
     ["چت تیم", "/team-chat", "💬"],
-    ["آموزش و آزمون", "/training", "🎓"],
   ]},
   { label: "امکانات پیشرفته", icon: "⋯", children: [
-    ["پیشنهاد مسیر", "/route-builder", "🧭"],
     ["ورود و منبع اطلاعات", "/data-entry", "📥"],
     ["مدیریت سایت و فروشگاه", "/site-cms", "🖥️"],
     ["مدیریت کانال‌های آنلاین", "/online-sales", "🛒"],
     ["مدیریت سکوهای فروش", "/platforms", "🏬"],
     ["نگاشت دیجی‌کالا", "/digikala-mapping", "🧩"],
     ["کمپین‌ها", "/campaigns", "🎯"],
-    ["مارکتینگ و برندینگ", "/marketing", "📈"],
-    ["مدیریت شبکه‌های اجتماعی", "/social", "📡"],
     ["مرکز فرمان تخصصی", "/agent-center", "✨"],
-    ["برنامه‌های دوره‌ای و لید", "/automation-hub", "🔁"],
     ["پیام مشتری و رسید", "/outbound", "✉️"],
-    ["تحلیل تخصصی و قرارداد", "/specialists", "📐"],
-    ["اتوماسیون‌های دستیار", "/assistant-automations", "⏱️"],
   ]},
   { label: "حساب من و تغییر رمز", icon: "🔐", href: "/account" },
 ];
@@ -194,6 +187,7 @@ export function PortalShell({ title, eyebrow, actions, children }: { title: stri
     return allowedModules.includes(mod);
   };
   const visibleGroups = menuGroups.map((g) => {
+    if (g.href === "/customers" && !isAllowed("/customers") && isAllowed("/crm")) return {...g, href:"/crm"};
     if (g.href) return isAllowed(g.href) ? g : null;
     const kids = (g.children || []).filter((c: string[]) => isAllowed(c[1]));
     return kids.length > 0 ? { ...g, children: kids } : null;
