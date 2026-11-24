@@ -57,7 +57,7 @@ function ValueBlock({ value }: { value: unknown }) {
     const entries = Object.entries(value as Record<string, unknown>).filter(([, v]) => v !== null && v !== undefined && v !== "");
     if (entries.length === 0) return null;
     return <ul className="space-y-0.5 text-[11px] text-slate-300">
-      {entries.map(([k, v]) => <li key={k}><span className="text-slate-500">{k}:</span> {Array.isArray(v) ? `(${v.length.toLocaleString("fa-IR")} مورد)` : faNum(String(v))}</li>)}
+      {entries.map(([k, v]) => <li key={k}><span className="text-slate-500">{k}:</span> <ValueBlock value={v} /></li>)}
     </ul>;
   }
   return null;
@@ -104,7 +104,7 @@ export default function RouteBuilderPage() {
       const body: Record<string, unknown> = {
         kind,
         per_route: Number(perRoute) || (kind === "bases" ? 10 : 6),
-        session,
+        session: session === "صبح" ? "morning" : "evening",
       };
       const trimmed = city.trim();
       if (trimmed) body.city = trimmed;
@@ -122,7 +122,6 @@ export default function RouteBuilderPage() {
         }
         else if (Array.isArray(obj.items)) foundRoutes = obj.items;
         else if (Array.isArray(obj.data)) foundRoutes = obj.data;
-        else if (Array.isArray(obj)) foundRoutes = obj;
       } else if (Array.isArray(res)) {
         foundRoutes = res;
         foundSummary = null;
@@ -155,7 +154,7 @@ export default function RouteBuilderPage() {
       return <div className="flex flex-wrap gap-x-5 gap-y-1 text-xs text-slate-300">
         {entries.map(([k, v]) => <span key={k}>
           <span className="text-slate-500">{k}: </span>
-          <b className="text-white">{Array.isArray(v) ? v.length.toLocaleString("fa-IR") + " مورد" : faNum(String(v))}</b>
+          <b className="text-white"><ValueBlock value={v} /></b>
         </span>)}
       </div>;
     }
@@ -164,7 +163,7 @@ export default function RouteBuilderPage() {
 
   function renderRoute(r: unknown, i: number) {
     const o = (r && typeof r === "object" ? r : {}) as Record<string, unknown>;
-    const label = textOf(o.label) || textOf(o.name) || textOf(o.title) || `مسیر ${faNum(i + 1)}`;
+    const label = textOf(o.route) || textOf(o.label) || textOf(o.name) || textOf(o.title) || `مسیر ${faNum(i + 1)}`;
     const rCity = textOf(o.city) || textOf(o.cities);
     const rSession = textOf(o.session);
     const members = asArray(o.members ?? o.stops ?? o.items ?? o.people ?? o.bases ?? o.physicians ?? o.list);
@@ -180,7 +179,7 @@ export default function RouteBuilderPage() {
       </div>
       {members.length > 0
         ? <div className="mt-3 flex flex-wrap gap-1.5">
-            {members.map((m, j) => <span key={j} className="rounded-full bg-white/[0.07] px-2.5 py-1 text-[11px] text-slate-200">{chipOf(m, j)}</span>)}
+            {members.map((m, j) => <span key={j} className="rounded-full bg-white/[0.07] px-2.5 py-1 text-[11px] text-slate-200">{chipOf(m, j)}{m && typeof m === "object" && textOf((m as Record<string, unknown>).address) ? " ـ " + textOf((m as Record<string, unknown>).address) : ""}</span>)}
           </div>
         : <div className="mt-3 text-xs text-slate-400">{Object.keys(o).length > 0
             ? Object.entries(o).filter(([k]) => !["label","name","title","city","cities","session","member_count"].includes(k)).map(([k, v], j) => <div key={j} className="mt-1"><span className="text-slate-500">{k}: </span><ValueBlock value={v} /></div>)
@@ -235,6 +234,8 @@ export default function RouteBuilderPage() {
 
       {routes.length > 0 && <Surface className="space-y-3 p-5">
         <h2 className="text-base font-bold">مسیرهای پیشنهادی</h2>
+        <p className="text-xs text-slate-300">برای انتخاب پایگاه‌ها، تعیین روز و ثبت مسیر، برنامهٔ ماهانهٔ ویزیت را باز کنید.</p>
+        <a href="/monthly-plans" className="inline-block text-sm text-violet-300">باز کردن فرم ثبت برنامهٔ ویزیت</a>
         <div className="space-y-3">{routes.map((r, i) => renderRoute(r, i))}</div>
       </Surface>}
 

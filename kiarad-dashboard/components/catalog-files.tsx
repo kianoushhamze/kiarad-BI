@@ -37,6 +37,7 @@ export function CatalogFiles() {
   }, []);
 
   const upload = async (file: File, mediaType: "image" | "pdf") => {
+    if (!file.size || file.size > 10 * 1024 * 1024) { setMsg("فایل باید غیرخالی و حداکثر ۱۰ مگابایت باشد."); return; }
     setUploading(true);
     setMsg("");
     const fd = new FormData();
@@ -45,13 +46,13 @@ export function CatalogFiles() {
     fd.append("file", file);
     try {
       const r = await authFetch("/upload/catalog-file", { method: "POST", body: fd });
-      const data = await r.json();
-      if (r.ok) {
+      const data = await r.json().catch(() => null);
+      if (r.ok && data?.ok) {
         setMsg("آپلود شد");
         setCaption("");
         load();
       } else {
-        setMsg("خطا: " + (data.detail || r.status));
+        setMsg(r.status === 413 ? "حجم فایل از سقف بارگذاری سرور بیشتر است (HTTP 413)." : "بارگذاری انجام نشد: " + (typeof data?.detail === "string" ? data.detail : `HTTP ${r.status}`));
       }
     } catch (e: unknown) {
       setMsg("خطا: " + (e instanceof Error ? e.message : ""));

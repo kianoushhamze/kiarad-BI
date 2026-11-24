@@ -74,7 +74,14 @@ export default function MonthlyPlans(){
   {message&&<p role="status" className="rounded-xl bg-amber-500/10 p-4 text-amber-200">{message}</p>}
   <Surface className="grid gap-4 p-5 sm:grid-cols-2"><label>ماه شمسی<input aria-label="ماه برنامه" className={fieldClass} value={month} onChange={e=>{setMonth(e.target.value);setStops([]);}} dir="ltr" placeholder="1405-09"/></label><label>پرسنل<select aria-label="پرسنل برنامه" className={fieldClass} value={person} onChange={e=>{setPerson(e.target.value);setStops([]);}}>{users.map(u=><option key={u.id} value={u.id}>{u.full_name}</option>)}</select></label></Surface>
   <Surface className="space-y-4 p-5"><h2>تهیهٔ پیش‌نویس چندپایگاهی</h2><label className="flex gap-2"><input type="checkbox" checked={weekly} onChange={e=>setWeekly(e.target.checked)}/>تکرار الگوی روز هفته در ماه انتخاب‌شده</label>{weekly?<select aria-label="روز هفته" className={fieldClass} value={weekday} onChange={e=>setWeekday(e.target.value)}>{weekdays.map((d,i)=><option value={i} key={d}>{d}</option>)}</select>:<IranDateInput value={single} onChange={setSingle} className={fieldClass}/>}
-   <label className="block">پایگاه‌ها؛ به ترتیب انتخاب چند مورد را اضافه کنید<select aria-label="پایگاه‌های برنامه" multiple size={7} className={fieldClass} value={selected} onChange={e=>setSelected(Array.from(e.target.selectedOptions,o=>o.value))}>{bases.map(b=><option key={`${b.source}:${b.id}`} value={`${b.source}:${b.id}`}>{b.name} ـ {b.city}</option>)}</select></label><label className="block">هدف ویزیت<input className={fieldClass} value={objective} onChange={e=>setObjective(e.target.value)}/></label><button onClick={add} className={primaryButton}>افزودن روزها و پایگاه‌ها به پیش‌نویس</button>
+   <fieldset className="space-y-2"><legend>پایگاه‌های برنامه</legend>
+    <div className="max-h-56 overflow-y-auto rounded-lg border border-white/10 p-2">
+     {bases.map(base=>{const key=`${base.source}:${base.id}`;return <label key={key} className="flex items-center gap-2 p-1">
+      <input type="checkbox" checked={selected.includes(key)} onChange={e=>{const checked=e.target.checked;setSelected(previous=>checked?[...previous,key]:previous.filter(item=>item!==key));}}/>
+      {base.name} ـ {base.city}
+     </label>;})}
+    </div><p>{selected.length.toLocaleString("fa-IR")} پایگاه انتخاب شده</p>
+   </fieldset><label className="block">هدف ویزیت<input className={fieldClass} value={objective} onChange={e=>setObjective(e.target.value)}/></label><button onClick={add} className={primaryButton}>تأیید انتخاب و افزودن به پیش‌نویس</button>
    <label className="block">توضیح برنامه<textarea className={fieldClass} value={note} onChange={e=>setNote(e.target.value)}/></label>
    {draftDays.map(day=>{const items=itemsOf(day);return <div key={day} className="rounded-xl bg-white/5 p-3">
     <div className="flex flex-wrap items-center justify-between gap-2"><span className="text-sm font-bold">{formatIranDate(day)} · {items.length.toLocaleString("fa-IR")} توقف</span><button type="button" disabled={busy||items.length<2} onClick={()=>void optimize(day)} className="text-xs text-violet-300 disabled:opacity-40">مرتب‌سازی نزدیک‌ترین پایگاه</button></div>

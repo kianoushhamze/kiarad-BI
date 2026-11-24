@@ -139,7 +139,15 @@ export default function AssistantPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ message: msg }),
       });
-      const data = await r.json();
+      const data = await r.json().catch(() => null);
+      if (!data || typeof data !== "object") {
+        const detail = r.status === 504
+          ? "مهلت پاسخ دستیار به پایان رسید (HTTP 504). اگر قصد ثبت داشتید، ابتدا پیش‌نمایش‌ها را بررسی کنید."
+          : `پاسخ دستیار قابل خواندن نبود (HTTP ${r.status}).`;
+        setError(detail);
+        setMessages((prev) => [...prev, { role: "assistant", content: detail }]);
+        return;
+      }
       if (r.ok && data.answer) {
         setMessages((prev) => [...prev, { role: "assistant", content: data.answer, action: data.action }]);
         if (voiceReply && typeof window !== "undefined" && "speechSynthesis" in window) {
@@ -156,11 +164,13 @@ export default function AssistantPage() {
         setMessages((prev) => [...prev, { role: "assistant", content: detail }]);
       }
     } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : "خطای شبکه");
-      setMessages((prev) => [...prev, { role: "assistant", content: "خطای شبکه. اتصال اینترنت رو چک کن." }]);
+      const detail = e instanceof Error && e.message ? e.message : "ارتباط با سرویس دستیار برقرار نشد.";
+      setError(detail);
+      setMessages((prev) => [...prev, { role: "assistant", content: detail }]);
+    } finally {
+      setSending(false);
+      scrollDown();
     }
-    setSending(false);
-    scrollDown();
   };
 
   const startVoiceQuestion = () => {

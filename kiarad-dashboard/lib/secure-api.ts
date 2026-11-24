@@ -90,7 +90,9 @@ export async function secureApi<T>(path: string, options: RequestInit = {}): Pro
     const body = await response.json().catch(function () { return null; });
     const detail = response.status === 401
       ? (getToken() ? "درخواست با نشست قبلی انجام شد؛ دوباره تلاش کنید." : "نشست شما معتبر نیست؛ دوباره وارد شوید.")
-      : body && body.detail ? String(body.detail) : "خطای سرویس (" + response.status + ")";
+      : typeof body?.detail === "string" ? body.detail
+      : Array.isArray(body?.detail) ? body.detail.map((item: {msg?: string}) => item?.msg).filter(Boolean).join("، ") || "اطلاعات درخواست معتبر نیست."
+      : "خطای سرویس (" + response.status + ")";
     throw new ApiError(detail, response.status);
   }
   return response.json();
@@ -99,6 +101,6 @@ export async function secureApi<T>(path: string, options: RequestInit = {}): Pro
 export async function authFetch(path: string, options: RequestInit = {}): Promise<Response> {
   return fetch(API_URL + path, Object.assign({}, options, {
     headers: buildHeaders(options),
-    cache: "no-store"
+    cache: options.cache ?? "no-store"
   }));
 }

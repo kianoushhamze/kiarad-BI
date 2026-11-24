@@ -68,8 +68,9 @@ function CrmPageInner() {
 
   const submit = async function (e: React.FormEvent) {
     e.preventDefault();
-    if (!custName.trim() || !notes.trim() || saving) return;
-    setSaving(true); setOkMsg("");
+    if (!custName.trim() || saving) return;
+    if (!followDate || !followTime) { setError("تاریخ و ساعت یادآوری را مشخص کنید."); return; }
+    setSaving(true); setOkMsg(""); setError("");
     try {
       await secureApi("/crm/interactions", {
         method: "POST",
@@ -182,7 +183,7 @@ function CrmPageInner() {
             </div>
             <div>
               <label style={labelStyle}>خلاصه گفتگو و هدف پیگیری:</label>
-              <textarea required rows={2} value={notes} onChange={function(e){setNotes(e.target.value);}} style={{ resize: "none", ...inputStyle }} />
+              <textarea rows={2} value={notes} onChange={function(e){setNotes(e.target.value);}} style={{ resize: "none", ...inputStyle }} />
             </div>
             <div style={{ background: "#111C35", padding: "12px", borderRadius: "8px", border: "1px solid #334155" }}>
               <div style={{ fontSize: "12px", fontWeight: "bold", color: "#FBBF24", marginBottom: "8px" }}>📅 زمان‌بندی پیگیری:</div>

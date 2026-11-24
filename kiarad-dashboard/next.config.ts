@@ -7,6 +7,7 @@ const nextConfig: NextConfig = {
     webpackMemoryOptimizations: true,
     cpus: 1,
     workerThreads: false,
+    proxyClientMaxBodySize: "12mb",
   },
   allowedDevOrigins: ["127.0.0.1", "kianoushsurf.taile287ae.ts.net", "kiarad.taile287ae.ts.net"],
   async rewrites() {
@@ -35,6 +36,11 @@ const nextConfig: NextConfig = {
         // left users on a dead old build after every deployment.
         source: "/:path*",
         headers: [{ key: "Cache-Control", value: "no-store, must-revalidate" }],
+      },
+      {
+        // The backend authenticates the request and revalidates the file ETag.
+        source: "/api/files/:path*",
+        headers: [{ key: "Cache-Control", value: "private, no-cache" }],
       },
       {
         // Immutable build assets are the exception; their names are content-hashed.
