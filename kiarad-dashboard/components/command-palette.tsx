@@ -5,40 +5,9 @@ import { useRouter } from "next/navigation";
 
 type Destination = { label: string; href: string; icon: string; group: string };
 
-const DESTINATIONS: Destination[] = [
-  { label: "مرکز فرماندهی", href: "/management", icon: "⚡", group: "عمومی" },
-  { label: "مدیریت سایت و فروشگاه", href: "/site-cms", icon: "🖥️", group: "فروش آنلاین" },
-  { label: "برنامهٔ من", href: "/my-plan", icon: "📅", group: "عمومی" },
-  { label: "برنامهٔ ماهانهٔ ویزیت", href: "/monthly-plans", icon: "🗓️", group: "عمومی" },
-  { label: "ورود و منبع اطلاعات", href: "/data-entry", icon: "📥", group: "عمومی" },
-  { label: "عملکرد ویزیتورها (تب داشبورد مدیریت)", href: "/management", icon: "📊", group: "رشد و فروش" },
-  { label: "تارگت فردی", href: "/person-targets", icon: "🎯", group: "رشد و فروش" },
-  { label: "اطلاعات مشتریان", href: "/customers", icon: "👥", group: "رشد و فروش" },
-  { label: "بدهکاران", href: "/debtors", icon: "🧾", group: "رشد و فروش" },
-  { label: "پایگاه‌های کرمان", href: "/kerman-bases", icon: "📍", group: "رشد و فروش" },
-  { label: "پیش‌فاکتورها", href: "/proformas", icon: "📄", group: "رشد و فروش" },
-  { label: "پرسنل", href: "/personnel", icon: "💼", group: "تیم" },
-  { label: "عملکرد تیم فروش", href: "/visitors", icon: "📋", group: "تیم" },
-  { label: "حقوق و قرارداد", href: "/compensation", icon: "💵", group: "تیم" },
-  { label: "فیش حقوقی", href: "/payroll", icon: "🧾", group: "تیم" },
-  { label: "نقشه و ویزیت‌ها", href: "/map", icon: "🗺️", group: "تیم" },
-  { label: "گزارش شبانه", href: "/daily-reports", icon: "🌙", group: "تیم" },
-  { label: "CRM", href: "/crm", icon: "🤝", group: "CRM و کمپین" },
-  { label: "کمپین‌ها", href: "/campaigns", icon: "🎯", group: "CRM و کمپین" },
-  { label: "کالا و کانال‌ها", href: "/catalog", icon: "📦", group: "CRM و کمپین" },
-  { label: "خزانه‌داری", href: "/treasury", icon: "💰", group: "مالی" },
-  { label: "مدیریت کانال‌های آنلاین", href: "/online-sales", icon: "🛒", group: "فروش آنلاین" },
-  { label: "مدیریت شبکه‌های اجتماعی", href: "/social", icon: "📡", group: "فضای مجازی" },
-  { label: "دستیار هوشمند", href: "/assistant", icon: "🤖", group: "هوش مصنوعی" },
-  { label: "اتوماسیون‌های دستیار", href: "/assistant-automations", icon: "⏱️", group: "هوش مصنوعی" },
-  { label: "تسک‌ها", href: "/tasks", icon: "☑", group: "همکاری" },
-  { label: "چت تیم", href: "/team-chat", icon: "💬", group: "همکاری" },
-  { label: "حساب من و تغییر رمز", href: "/account", icon: "🔐", group: "همکاری" },
-];
-
 type Row = { key: string; label: string; href: string; icon: string; hint: string };
 
-export function CommandPalette({ canManageSite = false }: { canManageSite?: boolean }) {
+export function CommandPalette({ destinations }: { destinations: Destination[] }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
@@ -72,19 +41,18 @@ export function CommandPalette({ canManageSite = false }: { canManageSite?: bool
   const rows = useMemo<Row[]>(() => {
     const result: Row[] = [];
     const q = query.trim();
-    if (q) {
+    if (q && destinations.some(item => item.href === "/assistant")) {
       result.push({ key: "ask-ai", label: `پرسیدن از دستیار: «${q}»`, href: "/assistant", icon: "✨", hint: "AI" });
     }
     const needle = q.replace(/[\u200c\s]/g, "");
-    for (const item of DESTINATIONS) {
-      if (item.href === "/site-cms" && !canManageSite) continue;
+    for (const item of destinations) {
       const haystack = (item.label + item.group).replace(/[\u200c\s]/g, "").toLowerCase();
       if (!needle || haystack.includes(needle.toLowerCase())) {
         result.push({ key: item.href, label: item.label, href: item.href, icon: item.icon, hint: item.group });
       }
     }
     return result.slice(0, 9);
-  }, [query, canManageSite]);
+  }, [query, destinations]);
 
 
   if (!open) return null;
