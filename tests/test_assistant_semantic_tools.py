@@ -107,7 +107,7 @@ class SemanticToolsTests(unittest.TestCase):
         local = {'city': 'کرمان', 'scope': 'all_bases', 'visits': 2, 'days': [5, 16]}
         trip = {'city': 'شهرستان بم', 'scope': 'trip', 'visits': 1}
         with patch('assistant_intake.options', return_value=choices):
-            partial = prepare_visit_coverage({'person': 'سامان نمونه', 'cities': [local, trip]}, MANAGER)
+            partial = prepare_visit_coverage({'person': 'سامان نمونه', 'cities': [local, {**trip, 'scope': 'selected_bases'}]}, MANAGER)
             prepare.assert_not_called()
             ready = prepare_visit_coverage({'person': 'سامان نمونه', 'cities': [
                 local, {**trip, 'base_names': ['پایگاه پ'], 'days': [22]},
@@ -119,6 +119,28 @@ class SemanticToolsTests(unittest.TestCase):
         self.assertEqual(body['user_id'], 91)
         self.assertEqual([s['base_id'] for s in body['stops']], [122, 355, 122, 355, 311])
         self.assertEqual(len({s['visit_date'] for s in body['stops']}), 3)
+
+    @patch('assistant_intake.prepare', return_value=PREVIEW.copy())
+    @patch('assistant_intake.iran_today', return_value=date(2026, 11, 24))
+    def test_two_kerman_rounds_and_five_county_trips_share_one_preview(self, _today, prepare):
+        counties = ['سیرجان', 'رفسنجان', 'زرند', 'بم', 'جیرفت']
+        choices = {'users': [{'id': 91, 'full_name': 'مهران ایرانمنش'}], 'bases': [
+            {'id': index, 'name': f'پایگاه {index}', 'city': city, 'source': 'pharmacies'}
+            for index, city in enumerate(['کرمان', 'شهر کرمان', *counties], 1)
+        ]}
+        with patch('assistant_intake.options', return_value=choices):
+            result = prepare_visit_coverage({'person': 'مهران ایرانمنش', 'cities': [
+                {'city': 'کرمان', 'scope': 'all_bases', 'visits': 2},
+                *({'city': city, 'scope': 'trip', 'visits': 1} for city in counties),
+            ]}, MANAGER)
+
+        self.assertEqual(result['status'], 'operation_preview')
+        prepare.assert_called_once()
+        body = prepare.call_args.args[0]['payload']['body']
+        self.assertEqual(body['user_id'], 91)
+        self.assertEqual([stop['base_id'] for stop in body['stops']], [1, 2, 1, 2, 3, 4, 5, 6, 7])
+        self.assertEqual(len({stop['visit_date'] for stop in body['stops']}), 7)
+        self.assertIn('جیرفت', result['message'])
 
     def test_model_can_choose_tool_with_unexpected_wording(self):
         def complete(payload, _headers):

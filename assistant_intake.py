@@ -230,6 +230,13 @@ def prepare_visit_coverage(args, user):
     coverage = []
     stops = []
     used = defaultdict(int)
+    reserved_days = {day for wanted in request.cities for day in wanted.days}
+    suggested_days = [
+        day for day in range(1, (end - start).days + 1)
+        if day not in reserved_days
+        and (candidate := start + timedelta(days=day - 1)) >= today
+        and candidate.weekday() != 4
+    ]
     seen_cities = set()
     issues = []
     for wanted in request.cities:
@@ -245,7 +252,7 @@ def prepare_visit_coverage(args, user):
             issues.append(f'برای «{wanted.city}» پایگاهی در فهرست پیدا نشد؛ نام شهر را بررسی کنید.')
             continue
         selected = available
-        if wanted.scope != 'all_bases':
+        if wanted.scope == 'selected_bases' or wanted.base_names:
             if not wanted.base_names:
                 issues.append(f'در «{wanted.city}» کدام پایگاه‌ها را می‌خواهید؟ اگر همه‌اند، همان را بگویید.')
                 continue
@@ -255,13 +262,20 @@ def prepare_visit_coverage(args, user):
                 issues.append(f'نام یک یا چند پایگاه در «{wanted.city}» یکتا یا موجود نیست.')
                 continue
         per_cycle = ceil(len(selected) / MAX_STOPS_PER_DAY)
+        if wanted.scope == 'trip' and per_cycle > 1:
+            issues.append(f'«{wanted.city}» برای یک سفر بیش از {MAX_STOPS_PER_DAY} پایگاه دارد؛ پایگاه‌های اولویت‌دار را مشخص کنید.')
+            continue
         needed_days = per_cycle * wanted.visits
         item.update(required_stops=len(selected) * wanted.visits, minimum_days=needed_days)
         days = sorted(set(wanted.days))
+        if not days:
+            days = suggested_days[:needed_days]
+            del suggested_days[:needed_days]
         valid = all(1 <= day <= (end - start).days and start + timedelta(days=day - 1) >= today for day in days)
         if len(days) < needed_days or not valid:
             issues.append(f'برای «{wanted.city}» دست‌کم {needed_days} روز با ظرفیت فرم لازم است. روزهای کاریِ باقی‌ماندهٔ همین ماه را مشخص کنید.')
             continue
+        item['days'] = days[:needed_days]
         for cycle in range(wanted.visits):
             for index, base in enumerate(selected):
                 day = days[cycle * per_cycle + index // MAX_STOPS_PER_DAY]
@@ -277,7 +291,18 @@ def prepare_visit_coverage(args, user):
     if issues:
         return {'status': 'visit_coverage_review', 'person': matches[0]['name'], 'month': month,
                 'coverage': coverage, 'questions': issues, 'saved': False}
-    return prepare({'operation': 'monthly_plan_create', 'payload': {'body': {
+    result = prepare({'operation': 'monthly_plan_create', 'payload': {'body': {
         'user_id': matches[0]['id'], 'month': month, 'stops': stops,
-        'note': 'روزها از درخواست انتخاب شدند. ترتیب و زمان سفر بین پایگاه‌ها به بازبینی نیاز دارد.',
+        'note': 'روزهای صریح از درخواست و روزهای دیگر از تقویم پیشنهادی انتخاب شدند. روزها و ترتیب سفر را بازبینی کنید.',
     }}}, user)
+    if result.get('status') == 'operation_preview':
+        details = '، '.join(
+            f'{item["city"]}: {item["requested_visits"]} نوبت، {item["required_stops"]} توقف'
+            for item in coverage
+        )
+        result['message'] = (
+            f'برنامهٔ {matches[0]["name"]} برای {month} آمادهٔ بررسی است. {details}. '
+            'روزها و پایگاه‌های پیشنهادی را بررسی کنید. تأیید شما برنامه را به‌صورت پیش‌نویس ثبت می‌کند.'
+        )
+        result['coverage'] = coverage
+    return result
