@@ -406,12 +406,20 @@ def call_gpt(msg, ctx, history, role, full_name):
         messages.append(dict(role=r, content=h.get("content", "")))
     messages.append(dict(role="user", content=msg))
     from assistant_reports import REPORT_TOOLS, execute_report_tool
+    from assistant_money import explicit_money
+    has_stated_amount = bool(explicit_money(msg))
+    retry_target_preview = False
     payload = dict(model=model, messages=messages, tools=REPORT_TOOLS, temperature=0.1, max_tokens=2400)
     try:
         used = 0
         for round_number in range(10):
             if round_number == 9:
                 payload["tool_choice"] = "none"
+            elif retry_target_preview:
+                payload["tool_choice"] = {"type": "function", "function": {"name": "prepare_sales_targets"}}
+                retry_target_preview = False
+            else:
+                payload.pop("tool_choice", None)
             data = _chat_completion(payload, headers)
             if data is None:
                 return None
@@ -439,7 +447,15 @@ def call_gpt(msg, ctx, history, role, full_name):
                             else:
                                 args['payload']=normalize_explicit_toman(msg,args.get('payload'))
                                 currency_error=check_proposed_money(msg,args.get('operation'),args.get('payload'))
-                        if name in {'prepare_sales_targets', 'analyze_catalog_selection'}:
+                        if name == 'open_target_template' and has_stated_amount:
+                            retry_target_preview = True
+                            value = {
+                                'status': 'use_specialized_tool',
+                                'message': ('درخواست مبلغ دارد. پیش‌نمایش پرشده را با prepare_sales_targets بساز. '
+                                            'همهٔ افراد و همهٔ ردیف‌های فروش و تسویه را همراه ماه و واحد مشترک حفظ کن. '
+                                            'مبلغ را از متن نقل کن و عنوان اختیاری را حدس نزن.'),
+                            }
+                        elif name in {'prepare_sales_targets', 'analyze_catalog_selection'}:
                             value = execute_report_tool(name, args, ctx.get('_actor', {}), message=msg, history=history)
                         else:
                             value = currency_error or execute_report_tool(name, args, ctx.get('_actor', {}))
