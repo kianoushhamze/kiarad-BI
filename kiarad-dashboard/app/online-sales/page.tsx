@@ -13,7 +13,8 @@ export default function OnlineSalesPage() {
   const [website, setWebsite] = useState("");
 
   useEffect(() => {
-    setCeo(getSavedUser()?.role === "ceo");
+    const timer = window.setTimeout(() => setCeo(getSavedUser()?.role === "ceo"), 0);
+    return () => window.clearTimeout(timer);
   }, []);
 
   async function checkWebsite() {
