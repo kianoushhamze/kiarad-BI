@@ -6,66 +6,56 @@ import { usePathname } from "next/navigation";
 import { useCallback, useEffect, useState, type ReactNode } from "react";
 import { ApiError, clearSession, getToken, secureApi, type SessionUser, authFetch } from "../lib/secure-api";
 import { CommandPalette } from "./command-palette";
-// assistant-chat removed
 
 const menuGroups: { label: string; icon: string; href?: string; children?: string[][] }[] = [
-  { label: "مرکز فرماندهی", icon: "⚡", href: "/management" },
-  { label: "مدیریت سایت و فروشگاه", icon: "🖥️", href: "/site-cms" },
+  { label: "داشبورد مدیریت", icon: "📊", href: "/management" },
   { label: "برنامهٔ من", icon: "📅", href: "/my-plan" },
-  { label: "فروش و مشتریان", icon: "📈", children: [
-    ["عملکرد ویزیتورها (تب داشبورد مدیریت)", "/management", "📊"],
-    ["تارگت فردی", "/person-targets", "🎯"],
-    ["اطلاعات مشتریان", "/customers", "👥"],
-    ["بدهکاران", "/debtors", "🧾"],
+  { label: "مشتریان و پیگیری", icon: "👥", href: "/crm" },
+  { label: "فروش", icon: "📈", children: [
     ["پیش‌فاکتورها", "/proformas", "📄"],
-    ["CRM", "/crm", "🤝"]
-  ]},
-  { label: "تیم فروش و پرسنل", icon: "👥", children: [
-    ["پرسنل", "/personnel", "💼"],
+    ["فهرست مشتریان", "/customers", "👥"],
+    ["اهداف فروش و تسویه", "/person-targets", "🎯"],
     ["عملکرد تیم فروش", "/visitors", "📋"],
-    ["حقوق و قرارداد", "/compensation", "💵"],
-    ["فیش حقوقی", "/payroll", "🧾"],
-    ["مسیرسازی ویزیت", "/route-builder", "🧭"],
+    ["کالا و موجودی", "/catalog", "📦"],
+  ]},
+  { label: "عملیات ویزیت", icon: "🗺️", children: [
     ["برنامهٔ ماهانهٔ ویزیت", "/monthly-plans", "🗓️"],
     ["نقشه و ویزیت‌ها", "/map", "🗺️"],
-    ["موقعیت زندهٔ تیم", "/live-tracking", "📡"],
-    ["گزارش شبانه", "/daily-reports", "🌙"]
-  ]},
-  { label: "پایگاه‌ها و پوشش", icon: "📍", children: [
-    ["پایگاه‌های کرمان", "/kerman-bases", "📍"]
-  ]},
-  { label: "کالا و انبار", icon: "📦", children: [
-    ["کالا و کانال‌ها", "/catalog", "📦"],
-    ["ورود و منبع اطلاعات", "/data-entry", "📥"]
-  ]},
-  { label: "کمپین و محتوا", icon: "📣", children: [
-    ["کمپین‌ها", "/campaigns", "🎯"],
-    ["مارکتینگ و برندینگ", "/marketing", "📈"],
-    ["مدیریت شبکه‌های اجتماعی", "/social", "📡"]
+    ["پایگاه‌های کرمان", "/kerman-bases", "📍"],
+    ["گزارش روزانه", "/daily-reports", "🌙"],
   ]},
   { label: "مالی", icon: "💰", children: [
+    ["بدهکاران", "/debtors", "🧾"],
     ["خزانه‌داری", "/treasury", "💰"],
-    ["ثبت چک با دوربین", "/check-scan", "📷"]
+    ["اسکن QR چک", "/check-scan", "📷"],
   ]},
-  { label: "فروش آنلاین", icon: "🛒", children: [
+  { label: "دستیار", icon: "🤖", href: "/assistant" },
+  { label: "کارهای تیم", icon: "☑", href: "/tasks" },
+  { label: "تیم و حقوق", icon: "💼", children: [
+    ["پرسنل", "/personnel", "💼"],
+    ["حقوق و قرارداد", "/compensation", "💵"],
+    ["فیش حقوقی", "/payroll", "🧾"],
+    ["چت تیم", "/team-chat", "💬"],
+    ["آموزش و آزمون", "/training", "🎓"],
+  ]},
+  { label: "امکانات پیشرفته", icon: "⋯", children: [
+    ["پیشنهاد مسیر", "/route-builder", "🧭"],
+    ["موقعیت زندهٔ تیم", "/live-tracking", "📡"],
+    ["ورود و منبع اطلاعات", "/data-entry", "📥"],
+    ["مدیریت سایت و فروشگاه", "/site-cms", "🖥️"],
     ["مدیریت کانال‌های آنلاین", "/online-sales", "🛒"],
+    ["مدیریت سکوهای فروش", "/platforms", "🏬"],
     ["نگاشت دیجی‌کالا", "/digikala-mapping", "🧩"],
-    ["مدیریت سکوهای فروش", "/platforms", "🏬"]
-  ]},
-  { label: "هوش مصنوعی", icon: "🤖", children: [
+    ["کمپین‌ها", "/campaigns", "🎯"],
+    ["مارکتینگ و برندینگ", "/marketing", "📈"],
+    ["مدیریت شبکه‌های اجتماعی", "/social", "📡"],
     ["مرکز فرمان تخصصی", "/agent-center", "✨"],
     ["برنامه‌های دوره‌ای و لید", "/automation-hub", "🔁"],
     ["پیام مشتری و رسید", "/outbound", "✉️"],
     ["تحلیل تخصصی و قرارداد", "/specialists", "📐"],
-    ["دستیار هوشمند", "/assistant", "🤖"],
-    ["اتوماسیون‌های دستیار", "/assistant-automations", "⏱️"]
+    ["اتوماسیون‌های دستیار", "/assistant-automations", "⏱️"],
   ]},
-  { label: "همکاری تیمی", icon: "💬", children: [
-    ["آموزش و آزمون", "/training", "🎓"],
-    ["تسک‌ها", "/tasks", "☑"],
-    ["چت تیم", "/team-chat", "💬"]
-  ]},
-  { label: "حساب من و تغییر رمز", icon: "🔐", href: "/account" }
+  { label: "حساب من و تغییر رمز", icon: "🔐", href: "/account" },
 ];
 
 type NotificationItem = { key:string; title:string; message:string; href:string; severity:string; read:boolean };
@@ -215,7 +205,9 @@ export function PortalShell({ title, eyebrow, actions, children }: { title: stri
 
   if (!ready) return <div dir="rtl" className="grid min-h-screen place-items-center bg-[#08070b] p-6 text-sm text-slate-400"><div role={sessionError ? "alert" : "status"}>{sessionError || "در حال بررسی دسترسی…"}{sessionError && <button onClick={()=>{setSessionError("");setSessionRetry(n=>n+1);}} className="mr-3 rounded-lg bg-violet-600 px-4 py-2 text-white">تلاش مجدد</button>}</div></div>;
   return <div dir="rtl" className={`kiarad-module-shell min-h-screen bg-[#08070b] text-slate-200${embedded ? " kiarad-module-embedded" : ""}`}>
-    <CommandPalette canManageSite={user?.role === "ceo"} />
+    <CommandPalette destinations={visibleGroups.flatMap(group => group.href
+      ? [{ label: group.label, href: group.href, icon: group.icon, group: "عمومی" }]
+      : (group.children ?? []).map(([label, href, icon]) => ({ label, href, icon, group: group.label })))} />
     <div className="pointer-events-none fixed inset-0 bg-[radial-gradient(640px_360px_at_84%_-8%,rgba(139,124,255,.22),transparent_62%),radial-gradient(520px_300px_at_6%_106%,rgba(94,197,255,.1),transparent_60%),radial-gradient(460px_280px_at_50%_55%,rgba(61,220,151,.04),transparent_65%)]" />
     {!embedded && <aside aria-label="منوی اصلی" className={`kiarad-rail fixed inset-y-0 right-0 z-40 hidden ${collapsed ? "w-[76px]" : "w-[245px]"} flex-col border-l border-white/[0.06] bg-[#0d0b16]/85 backdrop-blur-2xl lg:flex`}>
       <Link href={homeHref} title="کیاراد BI" className={`flex h-[76px] items-center gap-3 border-b border-white/[0.06] ${collapsed ? "justify-center px-0" : "px-5"}`}>
