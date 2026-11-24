@@ -158,6 +158,39 @@ def trim(value, max_rows=20):
     return value
 
 
+def holoo_person_balance(conn, customer_id, snapshot_id):
+    if not snapshot_id:
+        return None
+    from holoo_finance import numeric
+
+    records = conn.execute(text("""
+        SELECT s.id AS snapshot_id, s.captured_at, s.payload->>'to_date' AS report_date,
+               s.payload->>'currency_factor' AS factor, person->>'Mandeh' AS amount
+        FROM holoo_financial_snapshots s
+        JOIN holoo_entity_mappings m ON m.entity_type='customer' AND m.local_id=:customer_id
+        CROSS JOIN LATERAL jsonb_array_elements(s.payload #> '{sources,customers,rows}') AS person
+        WHERE s.id=:snapshot_id AND s.payload #>> '{sources,customers,ok}'='true'
+          AND s.payload #>> '{sources,customers,complete}'='true'
+          AND btrim(person->>'ErpCode')=m.holoo_erp_code
+        LIMIT 2
+    """), {'customer_id':customer_id,'snapshot_id':snapshot_id}).mappings().all()
+    if len(records) != 1:
+        return None
+    record = records[0]
+    try:
+        factor = numeric(record['factor'])
+        if factor not in (1, 10):
+            return None
+        amount = numeric(record['amount']) * factor
+    except ValueError:
+        return None
+    return {'signed_balance_irr': amount,
+            'balance_kind': 'debtor' if amount > 0 else 'creditor' if amount < 0 else 'zero',
+            'source': 'holoo_customer_balance',
+            'snapshot_id': record['snapshot_id'], 'captured_at': record['captured_at'],
+            'report_date': record['report_date']}
+
+
 def prepare_target(args, user):
     if user.get('role') not in MANAGER_ROLES:
         raise HTTPException(403, 'تعریف تارگت فقط با مدیر است.')
@@ -351,7 +384,8 @@ def read_report(a, user):
                 WHERE rb.customer_id=:cid AND rb.snapshot_id=(SELECT id FROM receivable_snapshots ORDER BY snapshot_date DESC,id DESC LIMIT 1)''',{'cid':cid})
             return {**metadata,'customer':candidates[0],'totals':totals,'recent_sales_limited_to_20':sales,'latest_reported_receivable':debt,
                     'receivable_status':'reported' if debt else 'no_matching_report_row',
-                    'note':('ماندهٔ گزارش‌شده با تاریخ و منبع ارائه می‌شود. '
+                    'holoo_person_balance':holoo_person_balance(conn,cid,applied),
+                    'note':('برای ماندهٔ معین شخص از holoo_person_balance با تاریخ و منبع استفاده کنید. مبلغ مثبت بدهکار، منفی بستانکار و صفر تسویه است. '
                             'نبود ردیف گزارش به معنی صفر نیست. دفتر رسمی معین و اسناد وصول در این منبع موجود نیستند.')}
         if a.section == 'tasks':
             task_scope='' if manager else ' AND assigned_to=:uid'
