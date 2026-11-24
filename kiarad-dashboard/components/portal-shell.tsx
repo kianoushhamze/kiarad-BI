@@ -20,13 +20,11 @@ const menuGroups: { label: string; icon: string; href?: string; children?: strin
   { label: "عملیات ویزیت", icon: "🗺️", children: [
     ["برنامهٔ ماهانهٔ ویزیت", "/monthly-plans", "🗓️"],
     ["نقشه و ویزیت‌ها", "/map", "🗺️"],
-    ["پایگاه‌های کرمان", "/kerman-bases", "📍"],
     ["گزارش روزانه", "/daily-reports", "🌙"],
   ]},
   { label: "مالی", icon: "💰", children: [
     ["بدهکاران", "/debtors", "🧾"],
     ["خزانه‌داری", "/treasury", "💰"],
-    ["اسکن QR چک", "/check-scan", "📷"],
   ]},
   { label: "دستیار", icon: "🤖", href: "/assistant" },
   { label: "کارهای تیم", icon: "☑", href: "/tasks" },
@@ -39,7 +37,6 @@ const menuGroups: { label: string; icon: string; href?: string; children?: strin
   ]},
   { label: "امکانات پیشرفته", icon: "⋯", children: [
     ["پیشنهاد مسیر", "/route-builder", "🧭"],
-    ["موقعیت زندهٔ تیم", "/live-tracking", "📡"],
     ["ورود و منبع اطلاعات", "/data-entry", "📥"],
     ["مدیریت سایت و فروشگاه", "/site-cms", "🖥️"],
     ["مدیریت کانال‌های آنلاین", "/online-sales", "🛒"],
@@ -77,7 +74,7 @@ export function PortalShell({ title, eyebrow, actions, children }: { title: stri
     try { window.localStorage.setItem("kiarad:rail", value ? "1" : "0"); } catch {}
   };
   const activeGroup = menuGroups.find((g) => g.children?.some((c) => c[1] === pathname))?.label;
-  const homeHref = user?.role === "visitor" || user?.role === "salesperson" ? "/my-plan" : "/management";
+  const homeHref = user?.role === "visitor" || user?.role === "salesperson" ? "/my-plan" : user?.role === "finance" ? "/treasury" : "/management";
   const isGroupOpen = (label: string) => openGroups[label] ?? activeGroup === label;
   const toggleGroup = (label: string) => setOpenGroups((prev) => ({
     ...prev,
@@ -177,6 +174,7 @@ export function PortalShell({ title, eyebrow, actions, children }: { title: stri
   };
 
   const isAllowed = (href: string) => {
+    if (href === "/map" && allowedModules?.includes("kerman-bases")) return true;
     if (href === "/account" || href === "/training") return Boolean(user);
     if (["/automation-hub","/outbound","/specialists"].includes(href)) return user?.role === "ceo";
     if (href === "/agent-center") return user?.role === "ceo";
