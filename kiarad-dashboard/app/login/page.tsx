@@ -33,7 +33,7 @@ export default function LoginPage() {
       saveSession(data.access_token, data.user);
 
       if (data.user?.role === "salesperson" || data.user?.role === "visitor") {
-        router.push("/visitors");
+        router.push("/my-plan");
       } else {
         router.push("/management");
       }

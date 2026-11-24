@@ -395,7 +395,7 @@ def list_visit_routes(user_id: int | None = None, visit_date: date | None = None
                    COALESCE(p.city, c.city, m.city) AS city,
                    COALESCE(p.address, c.address, m.address) AS address,
                    ci.id AS checkin_id, ci.status AS checkin_status,
-                   ci.checked_in_at, ci.distance_m
+                   ci.checked_in_at, ci.distance_m, ms.id AS monthly_stop_id, ms.outcome_status
             FROM visit_route_assignments r
             LEFT JOIN pharmacies p ON r.base_source='pharmacies' AND p.id=r.base_id
             LEFT JOIN cosmetics_shops c ON r.base_source='cosmetics_shops' AND c.id=r.base_id
@@ -406,6 +406,12 @@ def list_visit_routes(user_id: int | None = None, visit_date: date | None = None
                   AND base_id=r.base_id AND checked_in_at::date=r.visit_date
                 ORDER BY CASE WHEN status='verified' THEN 0 ELSE 1 END, checked_in_at DESC, id DESC LIMIT 1
             ) ci ON TRUE
+            LEFT JOIN LATERAL (
+                SELECT s.id,s.outcome_status FROM monthly_visit_plan_stops s
+                JOIN monthly_visit_plans plan ON plan.id=s.plan_id
+                WHERE s.route_id=r.id AND plan.user_id=r.user_id AND plan.status='approved'
+                ORDER BY s.id DESC LIMIT 1
+            ) ms ON TRUE
             WHERE r.user_id=%s{date_clause}
             ORDER BY r.visit_date, r.stop_order, r.id
         """, tuple(params))
