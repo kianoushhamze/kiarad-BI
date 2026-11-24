@@ -136,7 +136,16 @@ export default function ProformaPage() {
 
     authFetch("/operations/customers-list", { headers })
       .then(res => res.json())
-      .then(data => setCustomers(Array.isArray(data) ? data : []))
+      .then(data => {
+        const available: Customer[] = Array.isArray(data) ? data : [];
+        setCustomers(available);
+        const requestedName = new URLSearchParams(window.location.hash.slice(1)).get("customer");
+        if (!requestedName) return;
+        setCustomerQuery(requestedName);
+        const normalizeName = (value: string) => value.trim().replaceAll("ي", "ی").replaceAll("ك", "ک");
+        const matches = available.filter(customer => normalizeName(customer.name) === normalizeName(requestedName));
+        if (matches.length === 1) setSelectedCustomer(String(matches[0].id));
+      })
       .catch(() => {});
 
     authFetch("/operations/products-list", { headers })

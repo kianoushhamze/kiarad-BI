@@ -14,6 +14,9 @@ class FakeCursor:
     def execute(self, _query, params=None):
         self.params = params
 
+    def fetchone(self):
+        return (None, None)
+
     def fetchall(self):
         return []
 

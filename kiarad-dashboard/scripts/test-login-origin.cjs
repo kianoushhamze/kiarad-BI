@@ -69,8 +69,8 @@ async function scenario(origin, role, expectedPage, status = 200) {
 }
 (async () => {
   await scenario('http://127.0.0.1:3000', 'ceo', '/management');
-  await scenario('http://review.invalid:3000', 'visitor', '/visitors');
-  await scenario('https://review.invalid', 'salesperson', '/visitors');
+  await scenario('http://review.invalid:3000', 'visitor', '/my-plan');
+  await scenario('https://review.invalid', 'salesperson', '/my-plan');
   await scenario('https://review.invalid', 'ceo', '/management', 401);
   console.log('PASS: 4 login submit scenarios (HTTP/HTTPS, role redirects, rejected credentials)');
 })().catch(error => { console.error(error); process.exitCode = 1; });

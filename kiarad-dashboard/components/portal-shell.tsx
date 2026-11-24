@@ -9,7 +9,7 @@ import { CommandPalette } from "./command-palette";
 
 const menuGroups: { label: string; icon: string; href?: string; children?: string[][] }[] = [
   { label: "داشبورد مدیریت", icon: "📊", href: "/management" },
-  { label: "برنامهٔ من", icon: "📅", href: "/my-plan" },
+  { label: "امروز من", icon: "📅", href: "/my-plan" },
   { label: "مشتریان و پیگیری", icon: "👥", href: "/crm" },
   { label: "فروش", icon: "📈", children: [
     ["پیش‌فاکتورها", "/proformas", "📄"],
@@ -78,7 +78,7 @@ export function PortalShell({ title, eyebrow, actions, children }: { title: stri
     try { window.localStorage.setItem("kiarad:rail", value ? "1" : "0"); } catch {}
   };
   const activeGroup = menuGroups.find((g) => g.children?.some((c) => c[1] === pathname))?.label;
-  const homeHref = "/management";
+  const homeHref = user?.role === "visitor" || user?.role === "salesperson" ? "/my-plan" : "/management";
   const isGroupOpen = (label: string) => openGroups[label] ?? activeGroup === label;
   const toggleGroup = (label: string) => setOpenGroups((prev) => ({
     ...prev,

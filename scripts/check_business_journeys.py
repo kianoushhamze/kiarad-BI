@@ -270,7 +270,7 @@ def main():
                 assert page.url.endswith('/login')
             page.locator('input[type=password]').fill(password)
             page.get_by_role('button', name='ورود به سامانه').click()
-            page.wait_for_url(re.compile(r'.*/(management|visitors)$'))
+            page.wait_for_url('**/my-plan' if role in {'alice', 'bob'} else '**/management')
             page.locator('main').wait_for()
             contexts[role], pages[role] = ctx, page
 

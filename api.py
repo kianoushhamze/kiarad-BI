@@ -1862,7 +1862,11 @@ def record_stop_structured_outcome(
         ).scalar_one_or_none()
         if plan_id is None:
             raise HTTPException(404, "توقف پیدا نشد.")
-        authorize_monthly_plan(session, plan_id, user, lock=True)
+        plan = authorize_monthly_plan(session, plan_id, user, lock=True)
+        new_outcome = payload.get("only_if_unreported") is True
+        if new_outcome and (plan["status"] != "approved" or payload.get("outcome_status") not in ("completed", "no_order", "not_visited")):
+            raise HTTPException(422, "ثبت نتیجه برای توقف برنامهٔ تأییدشده و با وضعیت معتبر ممکن است.")
+
         if "expected_stop" in payload:
             stop = session.execute(text(
                 "SELECT id, plan_id, visit_date, base_source, base_id, objective, outcome_status, "
@@ -1879,6 +1883,7 @@ def record_stop_structured_outcome(
                     order_amount_rial = :amount,
                     outcome_notes = :notes
                 WHERE id = :sid AND plan_id = :plan_id
+                  AND (NOT :new_outcome OR (route_id IS NOT NULL AND outcome_status IS NULL AND visit_date <= :today))
             """),
             {
                 "status": payload.get("outcome_status", "completed"),
@@ -1887,8 +1892,12 @@ def record_stop_structured_outcome(
                 "notes": payload.get("outcome_notes", ""),
                 "sid": stop_id,
                 "plan_id": plan_id,
+                "new_outcome": new_outcome,
+                "today": iran_today(),
             }
         )
+        if new_outcome and result.rowcount != 1:
+            raise HTTPException(409, "توقف هنوز قابل ثبت نیست یا نتیجهٔ آن قبلاً ثبت شده است.")
         if result.rowcount != 1:
             raise HTTPException(404, "توقف پیدا نشد.")
         session.commit()
