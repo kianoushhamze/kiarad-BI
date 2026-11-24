@@ -102,17 +102,16 @@ def _test_telegram(credentials: dict) -> dict:
     if not re.fullmatch(r"\d+:[A-Za-z0-9_-]{30,}", token):
         return {"status": "error", "message": "شکل توکن ربات تلگرام معتبر نیست (123456:ABC-...)."}
     try:
-        resp = requests.get(
-            f"https://api.telegram.org/bot{token}/getMe",
-            timeout=10, trust_env=False,
-        )
+        with requests.Session() as session:
+            session.trust_env = False
+            resp = session.get(f"https://api.telegram.org/bot{token}/getMe", timeout=10, allow_redirects=False)
         payload = resp.json() if resp.headers.get("content-type", "").startswith("application/json") else {}
         if resp.status_code == 200 and payload.get("ok"):
             bot = payload.get("result", {})
             return {"status": "connected", "message": f"اتصال موفق: @{bot.get('username', '')}"}
         return {"status": "error", "message": f"تلگرام توکن را نپذیرفت (کد {resp.status_code})."}
-    except requests.RequestException as exc:
-        return {"status": "error", "message": f"خطای شبکه در تماس با تلگرام: {exc}"}
+    except (requests.RequestException, ValueError):
+        return {"status": "error", "message": "ارتباط با تلگرام بررسی نشد."}
 
 
 @router.post("/channels/{platform}/test")

@@ -3,6 +3,9 @@ from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 from datetime import datetime
+import math
+from operations import current_user
+from stock_reservations import reserved_quantity
 import db
 from digikala_api import DigikalaClient
 
@@ -79,13 +82,17 @@ class MappingUpdate(BaseModel):
 
 
 @router.patch("/variants/{variant_id}/mapping")
-def set_variant_mapping(variant_id: int, body: MappingUpdate, db_session: Session = Depends(get_db)):
+def set_variant_mapping(variant_id: int, body: MappingUpdate, user: dict = Depends(current_user), db_session: Session = Depends(get_db)):
     """ثبت نگاشت واریانت دیجی‌کالا ← کد هلو (جایگزین جریان دستی variant_map.csv).
 
     کلید مسیر شناسهٔ دیجی‌کالاست: در اسکیمای فعلی dkp_id و در نصب‌های قدیمی variant_id —
     هر دو همان شناسهٔ دیجی‌کالا هستند و کد تأمین‌کننده در خروجی اکسل هم همین است.
     """
+    if user.get("role") != "ceo":
+        raise HTTPException(403, "دسترسی مدیرعامل لازم است.")
     code = body.holoo_code.strip()
+    if code and not db_session.execute(text("SELECT 1 FROM products WHERE code = :code"), {"code": code}).scalar():
+        raise HTTPException(422, "کالای هلو یافت نشد.")
     if not code:
         raise HTTPException(422, "کد هلو نمی‌تواند خالی باشد.")
     with db.engine.connect() as conn:
@@ -124,3 +131,40 @@ def update_variant_stock(variant_id: int, count: int, db_session: Session = Depe
             db_session.commit()
         return {"success": True, "variant_id": variant_id, "new_stock": count}
     raise HTTPException(status_code=resp.status_code, detail=resp.text)
+
+
+@router.post("/variants/{variant_key}/sync-stock")
+def sync_variant_stock(variant_key: int, user: dict = Depends(current_user)):
+    """Publish dashboard availability to one mapped seller variant."""
+    if user.get("role") != "ceo":
+        raise HTTPException(403, "دسترسی مدیرعامل لازم است.")
+    with db.engine.begin() as conn:
+        variant = conn.execute(text("""
+            SELECT raw->>'id' AS seller_id, holoo_code, status
+            FROM digikala_variants WHERE dkp_id = :key FOR UPDATE
+        """), {"key": variant_key}).mappings().first()
+        if not variant:
+            raise HTTPException(404, "کالای دیجی‌کالا یافت نشد.")
+        seller_id = variant["seller_id"] or ""
+        if not seller_id.isascii() or not seller_id.isdecimal() or int(seller_id) <= 0:
+            raise HTTPException(409, "شناسهٔ فروشندهٔ این کالا در دیجی‌کالا موجود نیست.")
+        if not variant["holoo_code"] or variant["status"] != "active":
+            raise HTTPException(409, "برای ارسال موجودی، کالا باید فعال و به هلو متصل باشد.")
+        product = conn.execute(text("""
+            SELECT id, is_active, stock FROM products WHERE code = :code FOR UPDATE
+        """), {"code": variant["holoo_code"]}).mappings().first()
+        if not product or product["stock"] is None or not math.isfinite(float(product["stock"])):
+            raise HTTPException(409, "موجودی کالای متصل در داشبورد مشخص نیست.")
+        count = 0
+        if product["is_active"]:
+            count = max(0, math.floor(float(product["stock"]) - reserved_quantity(conn, product["id"])))
+        try:
+            response = get_client().update_stock(int(seller_id), count)
+        except Exception as exc:
+            raise HTTPException(502, "ارسال موجودی به دیجی‌کالا انجام نشد.") from exc
+        if response.status_code not in (200, 201, 204):
+            raise HTTPException(502, f"دیجی‌کالا موجودی را نپذیرفت ({response.status_code}).")
+        conn.execute(text("""
+            UPDATE digikala_variants SET stock = :count, updated_at = NOW() WHERE dkp_id = :key
+        """), {"count": count, "key": variant_key})
+    return {"new_stock": count}
