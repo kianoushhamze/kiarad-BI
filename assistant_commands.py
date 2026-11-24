@@ -43,6 +43,14 @@ COMMANDS={
      fields=['name','customer_type','city','phone','medical_system_code','guild_license_code','latitude','longitude'],
      required=['name','customer_type']),
  'monthly_plan_create':command('تهیهٔ پیش‌نویس برنامهٔ ماهانهٔ چندپایگاهی','map','POST','/monthly-visit-plans',CATALOG_ROLES|{'visitor','salesperson'}),
+ 'monthly_plan_record_outcome':command(
+     'ثبت نتیجهٔ اعلام‌شده ویزیت؛ بدون تأیید حضور یا ارسال به هلو',
+     'map','POST','/monthly-visit-plans/stops/{stop_id}/outcome',MANAGERS|{'visitor','salesperson'},
+     'monthly_visit_plan_stops','stop_id',
+     fields=['outcome_status','holoo_preinvoice_code','order_amount_rial','outcome_notes'],
+     required=['outcome_status'],
+     snapshot=('id','plan_id','visit_date','base_source','base_id','objective','outcome_status',
+               'holoo_preinvoice_code','order_amount_rial','outcome_notes')),
  'monthly_plan_submit':command('ارسال برنامهٔ ماهانه برای تأیید مدیرعامل','map','POST','/monthly-visit-plans/{ident}/submit',CATALOG_ROLES|{'visitor','salesperson'}),
  'monthly_plan_review':command('تأیید یا برگشت برنامهٔ ماهانه','map','POST','/monthly-visit-plans/{ident}/review',{'ceo'}),
  'monthly_plan_workday':command('تطبیق اجرای برنامه با کارکرد حقوق','map','POST','/monthly-visit-plans/{ident}/workday-review',{'ceo'}),
@@ -240,6 +248,9 @@ def before_state(spec,params,user):
     with engine.connect() as conn:
         columns = ', '.join(spec['snapshot']) if spec.get('snapshot') else '*'
         row=conn.execute(text(f"SELECT {columns} FROM {spec['table']} WHERE {spec.get('db_key', 'id')}=:id"),{'id':params[spec['key']]}).mappings().first()
+        if row and spec['table'] == 'monthly_visit_plan_stops':
+            from monthly_visit_plans import plan
+            plan(conn, row['plan_id'], user)
         product_meta = None
         if row and spec['path'] == '/site-cms/products/{code}':
             product_meta = conn.execute(text('SELECT site_category, image_url, hidden, discount_price_irr FROM cms_product_meta WHERE code=:code'),
@@ -266,6 +277,17 @@ def fingerprint(value):
 
 
 def validate_dict(name,body):
+    if name == 'monthly_plan_record_outcome':
+        if body['outcome_status'] not in ('completed', 'order_placed', 'no_order', 'not_visited', 'rescheduled', 'scientific', 'follow_up'):
+            raise HTTPException(422, 'نتیجهٔ ویزیت باید از وضعیت‌های معتبر برنامه انتخاب شود.')
+        amount = body.get('order_amount_rial', 0)
+        if type(amount) is not int or not 0 <= amount < 10**15:
+            raise HTTPException(422, 'مبلغ سفارش باید عدد صحیح نامنفی به ریال باشد.')
+        if (body['outcome_status'] == 'order_placed') != (amount > 0):
+            raise HTTPException(422, 'مبلغ مثبت تنها برای ویزیت دارای سفارش لازم است.')
+        for key, limit in (('holoo_preinvoice_code', 100), ('outcome_notes', 4000)):
+            if key in body and (not isinstance(body[key], str) or len(body[key]) > limit):
+                raise HTTPException(422, 'کد پیش‌فاکتور یا توضیح نتیجه معتبر نیست.')
     if name == 'daily_report_submit' and not all(isinstance(body[key], str) and body[key].strip() for key in ('summary', 'raw_text')):
         raise HTTPException(422, 'متن گزارش و خلاصه لازم است.')
     if name == 'kerman_customer_create':
@@ -335,6 +357,8 @@ def prepare(name,payload,user):
         if errors:raise HTTPException(422,'ساختار اطلاعات با فرم پنل سازگار نیست.')
         body=jsonable_encoder(validated, exclude_unset=True)
         validate_dict(name,body)
+        if name == 'monthly_plan_record_outcome':
+            body = {'order_amount_rial': 0, 'outcome_notes': '', 'holoo_preinvoice_code': None, **body}
         if name == 'daily_report_submit':
             if user['role'] in MANAGERS:
                 if not body.get('salesperson_id'):
@@ -388,4 +412,7 @@ def execute(name,payload,baseline,user):
     if payload.get('query_params'):path+='?'+urlencode(payload['query_params'])
     if fingerprint(before_state(spec,payload['path_params'],user))!=baseline.get('before_hash'):
         raise HTTPException(409,'رکورد پس از پیش‌نمایش تغییر کرده؛ پیشنهاد تازه لازم است.')
-    return dispatch(spec,path,payload['body'],user)
+    body = payload['body']
+    if name == 'monthly_plan_record_outcome':
+        body = {**body, 'expected_stop': baseline['before']}
+    return dispatch(spec,path,body,user)

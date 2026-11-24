@@ -58,3 +58,21 @@ class CommandTests(unittest.TestCase):
         self.assertTrue(path_for(spec, {'erp_code': 'ERP.42'}).endswith('/ERP.42'))
         with self.assertRaises(HTTPException):
             path_for(spec, {'erp_code': '../ERP.42'})
+
+    def test_visit_outcome_does_not_accept_verified_presence(self):
+        args = {'path_params': {'stop_id': 12}, 'body': {'outcome_status': 'verified'}}
+        with patch('assistant_commands.before_state') as state, self.assertRaises(HTTPException):
+            prepare('monthly_plan_record_outcome', args, CEO)
+        state.assert_not_called()
+
+    def test_visit_outcome_dispatch_includes_expected_stop(self):
+        args = {'path_params': {'stop_id': 12}, 'body': {
+            'outcome_status': 'order_placed', 'order_amount_rial': 120000,
+        }}
+        before = {'id': 12, 'outcome_status': None}
+        with patch('assistant_commands.before_state', return_value=before), patch('assistant_commands.dispatch') as request:
+            payload, baseline = prepare('monthly_plan_record_outcome', args, CEO)
+            self.assertNotIn('expected_stop', payload['body'])
+            execute('monthly_plan_record_outcome', payload, baseline, CEO)
+        self.assertEqual(request.call_args.args[2]['expected_stop'], before)
+        self.assertEqual(request.call_args.args[2]['order_amount_rial'], 120000)

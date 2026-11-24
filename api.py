@@ -1862,7 +1862,15 @@ def record_stop_structured_outcome(
         ).scalar_one_or_none()
         if plan_id is None:
             raise HTTPException(404, "توقف پیدا نشد.")
-        authorize_monthly_plan(session, plan_id, user)
+        authorize_monthly_plan(session, plan_id, user, lock=True)
+        if "expected_stop" in payload:
+            stop = session.execute(text(
+                "SELECT id, plan_id, visit_date, base_source, base_id, objective, outcome_status, "
+                "holoo_preinvoice_code, order_amount_rial, outcome_notes "
+                "FROM monthly_visit_plan_stops WHERE id = :id AND plan_id = :plan_id FOR UPDATE"
+            ), {"id": stop_id, "plan_id": plan_id}).mappings().first()
+            if stop is None or jsonable_encoder(dict(stop)) != payload["expected_stop"]:
+                raise HTTPException(409, "توقف پس از پیش‌نمایش تغییر کرده است؛ پیشنهاد تازه لازم است.")
         result = session.execute(
             text("""
                 UPDATE monthly_visit_plan_stops
@@ -1870,14 +1878,15 @@ def record_stop_structured_outcome(
                     holoo_preinvoice_code = :code,
                     order_amount_rial = :amount,
                     outcome_notes = :notes
-                WHERE id = :sid
+                WHERE id = :sid AND plan_id = :plan_id
             """),
             {
                 "status": payload.get("outcome_status", "completed"),
                 "code": payload.get("holoo_preinvoice_code"),
                 "amount": int(payload.get("order_amount_rial") or 0),
                 "notes": payload.get("outcome_notes", ""),
-                "sid": stop_id
+                "sid": stop_id,
+                "plan_id": plan_id,
             }
         )
         if result.rowcount != 1:
