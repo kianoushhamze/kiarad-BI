@@ -232,7 +232,7 @@ export default function AssistantPage() {
                       }
                     >
                       {m.role === "assistant" ? renderMarkdown(m.content) : m.content}
-                      {m.role === "assistant" && m.action && /^\/(catalog|person-targets|compensation|assistant-actions)(\?|$)/.test(m.action.href) ? <a href={m.action.href} className="mt-3 block text-sky-300 underline">{m.action.label}</a> : null}
+                      {m.role === "assistant" && m.action && /^\/(catalog|person-targets|compensation|assistant-actions|data-entry)(\?|$)/.test(m.action.href) ? <a href={m.action.href} className="mt-3 block text-sky-300 underline">{m.action.label}</a> : null}
                     </div>
                   </div>
                 ))

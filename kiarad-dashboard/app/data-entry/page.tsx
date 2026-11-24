@@ -22,8 +22,15 @@ export default function DataEntryPage(){
   let active=true;
   secureApi<{entities:Entity[]}>("/data-entry/schema").then(data=>{
    if(!active)return;setEntities(data.entities);
-   const requested=new URLSearchParams(window.location.search).get("entity");
-   setEntity(data.entities.some(item=>item.id===requested)?requested!:data.entities[0]?.id||"products");
+   const params=new URLSearchParams(window.location.search);
+   const requested=params.get("entity");
+   const allowedEntity=data.entities.find(item=>item.id===requested);
+   setEntity(allowedEntity?.id||data.entities[0]?.id||"products");
+   const rowCount=params.get("rows");
+   if(allowedEntity?.id==="targets"&&rowCount&&/^\d{1,3}$/.test(rowCount)){
+    const count=Number(rowCount);
+    if(count>=1&&count<=500)setRows(Array.from({length:count},()=>({})));
+   }
   }).catch(error=>{if(active)setMessage(error instanceof Error?error.message:"خواندن تنظیمات ورود انجام نشد.");});
   return()=>{active=false;};
  },[]);

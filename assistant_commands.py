@@ -228,6 +228,10 @@ def prepare(name,payload,user):
         if errors:raise HTTPException(422,'ساختار اطلاعات با فرم پنل سازگار نیست.')
         body=jsonable_encoder(validated)
         validate_dict(name,body)
+        if name == 'monthly_plan_create':
+            from monthly_visit_plans import validate_draft
+            with engine.connect() as conn:
+                validate_draft(conn, validated, user)
     else:
         if p.body:raise HTTPException(422,'این عملیات بدنهٔ اطلاعاتی ندارد.')
         body={}

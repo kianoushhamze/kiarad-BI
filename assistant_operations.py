@@ -53,7 +53,8 @@ def authorize(operation,user):
 
 def prepare(args,user):
     a=OperationArgs.model_validate(args);authorize(a.operation,user)
-    if len(json.dumps(a.payload,ensure_ascii=False,allow_nan=False))>30000:
+    max_payload = 120000 if a.operation == 'monthly_plan_create' else 30000
+    if len(json.dumps(a.payload,ensure_ascii=False,allow_nan=False)) > max_payload:
         raise HTTPException(422,'شرح عملیات بیش از حد طولانی است.')
     baseline={}
     from assistant_commands import COMMANDS

@@ -192,23 +192,29 @@ def order_suggestion(data:OrderRequest,user=Depends(current_user)):
     return {'order':order,'distance_m':round(distance),'missing_coordinates':missing,'note':note}
 
 
-@router.post('',status_code=201)
-def create_draft(data:Draft,user=Depends(current_user)):
+def validate_draft(conn, data, user):
     start,end=month_window(data.month)
+    today = iran_today()
     if data.user_id!=user['id'] and user.get('role') not in MANAGER_ROLES:raise HTTPException(403,'فقط برنامهٔ خودتان را می‌توانید بنویسید.')
-    if end<=iran_today():raise HTTPException(422,'برای ماه پایان‌یافته برنامهٔ تازه ساخته نمی‌شود.')
+    if end<=today:raise HTTPException(422,'برای ماه پایان‌یافته برنامهٔ تازه ساخته نمی‌شود.')
     schedule_guard(data.stops)
     seen=set();orders=set()
+    person=conn.execute(text('SELECT salesperson_id FROM users WHERE id=:id AND is_active::text IN (\'1\',\'true\',\'t\')'),{'id':data.user_id}).scalar()
+    if not person:raise HTTPException(422,'حساب فعال متصل به پروفایل پرسنلی لازم است.')
+    for stop in data.stops:
+        if not start<=stop.visit_date<end or stop.visit_date<today:raise HTTPException(422,'روزهای برنامه باید در ماه انتخاب‌شده و از امروز به بعد باشند.')
+        key=(stop.visit_date,stop.base_source,stop.base_id);order=(stop.visit_date,stop.stop_order)
+        if key in seen or order in orders:raise HTTPException(422,'پایگاه یا ترتیب توقف روز تکراری است.')
+        seen.add(key);orders.add(order)
+        if not conn.execute(text('SELECT 1 FROM '+stop.base_source+' WHERE id=:id'),{'id':stop.base_id}).scalar():raise HTTPException(422,'پایگاه انتخاب‌شده وجود ندارد.')
+    return person
+
+
+@router.post('',status_code=201)
+def create_draft(data:Draft,user=Depends(current_user)):
     with engine.begin() as conn:
         conn.execute(text("SELECT pg_advisory_xact_lock(hashtextextended('monthly-visit-plans',0))"))
-        person=conn.execute(text('SELECT salesperson_id FROM users WHERE id=:id AND is_active::text IN (\'1\',\'true\',\'t\')'),{'id':data.user_id}).scalar()
-        if not person:raise HTTPException(422,'حساب فعال متصل به پروفایل پرسنلی لازم است.')
-        for stop in data.stops:
-            if not start<=stop.visit_date<end or stop.visit_date<iran_today():raise HTTPException(422,'روزهای برنامه باید در ماه انتخاب‌شده و از امروز به بعد باشند.')
-            key=(stop.visit_date,stop.base_source,stop.base_id);order=(stop.visit_date,stop.stop_order)
-            if key in seen or order in orders:raise HTTPException(422,'پایگاه یا ترتیب توقف روز تکراری است.')
-            seen.add(key);orders.add(order)
-            if not conn.execute(text('SELECT 1 FROM '+stop.base_source+' WHERE id=:id'),{'id':stop.base_id}).scalar():raise HTTPException(422,'پایگاه انتخاب‌شده وجود ندارد.')
+        person = validate_draft(conn, data, user)
         revision=conn.execute(text('SELECT COALESCE(MAX(revision),0)+1 FROM monthly_visit_plans WHERE user_id=:u AND month=:m'),{'u':data.user_id,'m':data.month}).scalar()
         ident=conn.execute(text('INSERT INTO monthly_visit_plans(user_id,salesperson_id,month,revision,created_by,note) VALUES(:u,:sp,:m,:r,:a,:n) RETURNING id'),{'u':data.user_id,'sp':person,'m':data.month,'r':revision,'a':user['id'],'n':data.note}).scalar_one()
         for stop in data.stops:conn.execute(text('INSERT INTO monthly_visit_plan_stops(plan_id,visit_date,base_source,base_id,stop_order,objective,start_time,end_time) VALUES(:p,:visit_date,:base_source,:base_id,:stop_order,:objective,:start_time,:end_time)'),{'p':ident,**stop.model_dump()})
