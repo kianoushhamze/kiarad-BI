@@ -407,6 +407,9 @@ def internal_alert(conn,mission_id,uid,message,key,severity='warning'):
 
 def run_step(mission,step,user):
     spec=step['spec'];op=spec['operation']
+    from assistant_commands import COMMANDS
+    if COMMANDS.get(op, {}).get('method') == 'DELETE':
+        raise HTTPException(409, 'برای حذف، پیشنهاد جداگانهٔ همان رکورد را در دستیار باز و تأیید کنید.')
     with engine.connect() as conn:
         receipts={r['step_key']:r['receipt'] for r in conn.execute(text("SELECT step_key,receipt FROM agent_steps WHERE mission_id=:id AND state='applied'"),{'id':str(mission['id'])}).mappings()}
     payload=resolve_refs(spec['payload'],receipts,spec['depends_on'])

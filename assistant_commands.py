@@ -74,6 +74,8 @@ COMMANDS={
      fields=['username','full_name'],snapshot=('id','username','full_name','role','salesperson_id','is_active')),
  'target_update':command('ویرایش مبلغ، پاداش، بازه، نوع یا باز و بسته‌کردن تارگت','personnel','PATCH','/targets/person-targets/{tid}',MANAGERS,'targets','tid',fields=PERSON_TARGET_FIELDS),
  'target_delete':command('حذف هدف فروش','personnel','DELETE','/targets/person-targets/{tid}',MANAGERS,'targets','tid'),
+ 'personnel_delete_account':command('حذف حساب کاربری پرسنل','manager','DELETE','/users/{user_id}',{'ceo'},'users','user_id',
+     snapshot=('id','username','full_name','role','salesperson_id','is_active')),
  'site_product_update':command('اصلاح نمایش، دسته‌بندی یا تخفیف کالای فروشگاه','online-sales','PATCH','/site-cms/products/{code}',{'ceo'},'products','code',
      snapshot=('code','name','price'),db_key='code'),
  'site_product_set_price':command('تغییر قیمت محلی کالای فروشگاه','online-sales','POST','/site-cms/products/{code}/price',{'ceo'},'products','code',
@@ -97,6 +99,7 @@ COMMANDS={
  'campaign_close':command('بستن کمپین','campaigns','POST','/campaigns/close',fields=['campaign_id'],required=['campaign_id']),
  'map_assign_route':command('تعیین مسیر ویزیت پرسنل','map','POST','/api/compensation/visit-routes',fields=['user_id','source','base_id','visit_date','stop_order','note'],required=['user_id','source','base_id','visit_date']),
  'map_delete_route':command('حذف برنامهٔ مسیر','map','DELETE','/api/compensation/visit-routes/{route_id}',MANAGERS,'visit_route_assignments','route_id'),
+ 'base_delete':command('حذف پایگاه محلی','kerman-bases','DELETE','/crud/kerman_bases_manual/{row_id}',MANAGERS,'kerman_bases_manual','row_id'),
  'map_set_base_location':command('اصلاح موقعیت مرجع پایگاه با مختصات واقعی','map','PUT','/api/compensation/bases/{source}/{base_id}/location',fields=['lat','lng','accuracy_m','visit_radius_m'],required=['lat','lng']),
  'map_assign_portfolio':command('انتساب پایگاه به ویزیتور','map','POST','/api/compensation/base-portfolios'),
  'map_review_base':command('بررسی پیشنهاد پایگاه','map','POST','/api/compensation/base-proposals/{proposal_id}/review',MANAGERS,'base_proposals','proposal_id'),
@@ -262,6 +265,8 @@ def validate_dict(name,body):
 def prepare(name,payload,user):
     spec=authorize(name,user)
     p=CommandPayload.model_validate(payload)
+    if name == 'personnel_delete_account' and p.path_params.get('user_id') in {1, user['id']}:
+        raise HTTPException(403, 'حذف حساب خودتان یا مدیرعامل اصلی مجاز نیست.')
     if spec['method']=='ENTRY':
         from data_entry import ManualInput,manual_preview
         if p.path_params or p.query_params:raise HTTPException(422,'ورود گروهی پارامتر مسیر ندارد.')
