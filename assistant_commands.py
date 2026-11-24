@@ -32,6 +32,16 @@ def command(label,module,method,path,roles=MANAGERS,table=None,key=None,fields=N
 
 
 COMMANDS={
+ 'daily_report_submit':command(
+     'ثبت گزارش روزانه و در صورت درخواست کار پیگیری؛ مبلغ‌ها به ریال',
+     'daily-reports','POST','/operations/submit-daily-report',MANAGERS|{'visitor','salesperson'},
+     fields=['salesperson_id','assigned_user_id','customer_id','customer_name','visits_count','orders_count',
+             'reported_sales_amount','reported_collections_amount','followup_task','summary','raw_text'],
+     required=['summary','raw_text']),
+ 'kerman_customer_create':command(
+     'افزودن مشتری محلی کرمان','kerman-bases','POST','/kerman/customers/add',
+     fields=['name','customer_type','city','phone','medical_system_code','guild_license_code','latitude','longitude'],
+     required=['name','customer_type']),
  'monthly_plan_create':command('تهیهٔ پیش‌نویس برنامهٔ ماهانهٔ چندپایگاهی','map','POST','/monthly-visit-plans',CATALOG_ROLES|{'visitor','salesperson'}),
  'monthly_plan_submit':command('ارسال برنامهٔ ماهانه برای تأیید مدیرعامل','map','POST','/monthly-visit-plans/{ident}/submit',CATALOG_ROLES|{'visitor','salesperson'}),
  'monthly_plan_review':command('تأیید یا برگشت برنامهٔ ماهانه','map','POST','/monthly-visit-plans/{ident}/review',{'ceo'}),
@@ -240,6 +250,18 @@ def fingerprint(value):
 
 
 def validate_dict(name,body):
+    if name == 'daily_report_submit' and not all(isinstance(body[key], str) and body[key].strip() for key in ('summary', 'raw_text')):
+        raise HTTPException(422, 'متن گزارش و خلاصه لازم است.')
+    if name == 'kerman_customer_create':
+        if not isinstance(body['name'], str) or not body['name'].strip() or body['customer_type'] not in ('pharmacy','doctor','cosmetics_shop'):
+            raise HTTPException(422, 'نام و نوع معتبر مشتری لازم است.')
+        lat, lng = body.get('latitude'), body.get('longitude')
+        if lat is not None or lng is not None:
+            try:
+                if not -90 <= float(lat) <= 90 or not -180 <= float(lng) <= 180:
+                    raise ValueError()
+            except (TypeError, ValueError):
+                raise HTTPException(422, 'عرض و طول جغرافیایی معتبر لازم است.') from None
     if name=='campaign_create':
         try:
             if not str(body['title']).strip() or len(body['title'])>200 or date.fromisoformat(body['starts_at'])>date.fromisoformat(body['ends_at']):raise ValueError()
@@ -294,6 +316,18 @@ def prepare(name,payload,user):
         if errors:raise HTTPException(422,'ساختار اطلاعات با فرم پنل سازگار نیست.')
         body=jsonable_encoder(validated, exclude_unset=True)
         validate_dict(name,body)
+        if name == 'daily_report_submit':
+            if user['role'] in MANAGERS:
+                if not body.get('salesperson_id'):
+                    raise HTTPException(422, 'پروفایل پرسنل را مشخص کنید.')
+            else:
+                if not user.get('salesperson_id'):
+                    raise HTTPException(403, 'حساب شما به پروفایل پرسنل متصل نیست.')
+                body['salesperson_id'] = user['salesperson_id']
+                body['assigned_user_id'] = user['id']
+            if body.get('followup_task') and not role_has_module_permission(user['role'], 'tasks', 'can_write'):
+                raise HTTPException(403, 'مجوز ساخت کار پیگیری ندارید.')
+            body['submission_key'] = str(validated.submission_key)
         if name == 'monthly_plan_create':
             from monthly_visit_plans import validate_draft
             with engine.connect() as conn:
