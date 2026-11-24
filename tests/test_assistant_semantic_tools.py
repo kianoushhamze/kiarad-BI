@@ -176,3 +176,37 @@ class SemanticToolsTests(unittest.TestCase):
                     'path_params': {'user_id': 8}, 'body': {'username':'visitor_8','role':'ceo'},
                 }, MANAGER)
         read.assert_not_called()
+
+    @patch('assistant_intake.prepare', return_value=PREVIEW.copy())
+    @patch('assistant_intake.iran_today', return_value=date(2026, 11, 24))
+    def test_populated_group_retries_when_model_selects_empty_form(self, _today, prepare):
+        message = ('برای آذر، برای خانم راد سولامور ۱۰۰ میلیون، لوفنته ۱۰۰ میلیون و وی‌ان‌وی ۲۰۰ میلیون تومان تارگت فروش بگذار. '
+                   'برای آقای سامان نمونه هم یک میلیارد تومان تارگت تسویه بگذار')
+        args = {'month': 'آذر', 'person': 'خانم راد', 'shared_unit': 'تومان', 'rows': [
+            {'product_focus': 'سولامور', 'amount_phrase': '۱۰۰ میلیون'},
+            {'product_focus': 'لوفنته', 'amount_phrase': '۱۰۰ میلیون'},
+            {'product_focus': 'وی‌ان‌وی', 'amount_phrase': '۲۰۰ میلیون تومان'},
+            {'person': 'آقای سامان نمونه', 'kind': 'settlement', 'amount_phrase': 'یک میلیارد تومان'},
+        ]}
+
+        def completion(name, arguments):
+            return {'choices': [{'message': {'tool_calls': [{'id': name, 'type': 'function', 'function': {
+                'name': name, 'arguments': json.dumps(arguments),
+            }}]}}]}
+
+        def complete(payload, _headers):
+            if 'tool_choice' not in payload:
+                return completion('open_target_template', {'rows': 4})
+            self.assertEqual(payload['tool_choice']['function']['name'], 'prepare_sales_targets')
+            return completion('prepare_sales_targets', args)
+
+        with patch('assistant_intake.engine', self.database), \
+             patch.object(assistant_engine, 'get_env_live', return_value='model'), \
+             patch.object(assistant_engine, '_chat_completion', side_effect=complete) as model:
+            response = assistant_engine.call_gpt(message, {'_actor': MANAGER}, [], 'ceo', '')
+        self.assertEqual(response['mode'], 'operation_preview')
+        self.assertEqual(model.call_count, 2)
+        rows = prepare.call_args.args[0]['payload']['body']['rows']
+        self.assertEqual([row['salesperson_id'] for row in rows], [9, 9, 9, 6])
+        self.assertEqual([row['target_amount'] for row in rows], ['1000000000', '1000000000', '2000000000', '10000000000'])
+        self.assertEqual(rows[-1]['target_type'], 'تسویه')
