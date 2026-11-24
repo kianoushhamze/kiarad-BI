@@ -6,7 +6,7 @@ the same authenticated HTTP route and middleware as the manual panel.
 from datetime import date
 from decimal import Decimal
 from urllib.parse import quote, urlencode
-from uuid import UUID
+from uuid import UUID, uuid4
 import hashlib
 import json
 import re
@@ -59,6 +59,16 @@ COMMANDS={
  'catalog_link_channel':command('نگاشت کالا به کانال فروش','catalog','POST','/catalog/products/{product_id}/channels',CATALOG_ROLES),
  'catalog_reserve':command('رزرو موجودی محلی','catalog','POST','/catalog/products/{product_id}/reservations',CATALOG_ROLES),
  'catalog_restore_holoo':command('بازگرداندن مقدار کالا از آخرین منبع هلو','catalog','POST','/catalog/products/{product_id}/restore-holoo',CATALOG_ROLES,'products','product_id'),
+ 'inventory_update_policy':command(
+     'ذخیره سیاست موجودی کالا با واحد تأییدشده و نسخه فعلی سیاست',
+     'catalog','POST','/catalog/intelligence/policies/{erp_code}',CATALOG_ROLES,
+     fields=['expected_revision','lead_days','review_days','safety_units','minimum_order',
+             'pack_units','units_confirmed','source_note'],
+     required=['expected_revision']),
+ 'inventory_order_create':command(
+     'ثبت پیشنهاد خرید موجودی از تحلیل مستند انبار؛ بدون ارسال به تأمین‌کننده',
+     'catalog','POST','/catalog/intelligence/orders',CATALOG_ROLES,
+     fields=['erp_code','snapshot_id','policy_revision','window_days']),
  'inventory_order_review':command('بررسی پیش‌نویس درخواست خرید انبار','catalog','POST','/catalog/intelligence/orders/{order_id}/review',FINANCE,'inventory_order_drafts','order_id'),
  'treasury_create_account':command('ایجاد حساب بانک یا صندوق','treasury','POST','/treasury/accounts',FINANCE),
  'treasury_update_account':command('اصلاح مانده و ذخیرهٔ حساب','treasury','PATCH','/treasury/accounts/{account_id}',FINANCE,'cash_accounts','account_id'),
@@ -190,6 +200,11 @@ def catalog(user,module=None,operation=None):
                 route=route_for(spec)
                 model=route.body_field.field_info.annotation if route.body_field else None
                 item['body_schema']=model.model_json_schema() if isinstance(model,type) and issubclass(model,BaseModel) else {'fields':spec['fields'] or [],'required':spec['required']}
+                if isinstance(model, type) and issubclass(model, BaseModel) and spec['fields'] is not None:
+                    schema = item['body_schema']
+                    schema['properties'] = {key: value for key, value in schema['properties'].items() if key in spec['fields']}
+                    schema['required'] = sorted(set(schema.get('required', [])) & set(spec['fields']) | set(spec['required']))
+                    schema['additionalProperties'] = False
                 item['query_parameters']=[{'name':f.name,'required':f.field_info.is_required()} for f in route.dependant.query_params]
         result.append(item)
     return {'operations':result,'notes':['شناسه را از منابع مجاز بخوان؛ نام مبهم را سؤال کن.','مبالغ مدل‌های مالی ریال هستند. ورود گروهی واحد صریح دارد.','ورود رمز، بارگذاری فایل، ضبط صوت و ثبت موقعیت زنده در فرم بومی انجام می‌شود.','این عملیات ارسال مالی به هلو یا انتشار بیرونی محتوا انجام نمی‌دهند.']}
@@ -205,8 +220,9 @@ def path_for(spec,params):
         elif key=='channel':
             from integrations import CHANNELS
             if value not in CHANNELS:raise HTTPException(422,'کانال معتبر نیست.')
-        elif key=='code':
-            if not isinstance(value, str) or not re.fullmatch(r'[\w.+ -]{1,80}', value) or value in {'.', '..'}:
+        elif key in {'code', 'erp_code'}:
+            max_length = 200 if key == 'erp_code' else 80
+            if not isinstance(value, str) or not re.fullmatch(r'[\w.+ -]+', value) or len(value) > max_length or value in {'.', '..'}:
                 raise HTTPException(422,'کد کالا معتبر نیست.')
             value = quote(value, safe='')
         elif key == 'ident' and spec['path'].startswith('/training/programmes/'):
@@ -312,7 +328,10 @@ def prepare(name,payload,user):
         if spec['fields'] is not None:
             fields &= set(spec['fields'])
         if set(p.body)-fields or any(key not in p.body for key in spec['required']):raise HTTPException(422,'اطلاعات عملیات ناقص است یا فیلد ناشناخته دارد.')
-        validated,errors=route.body_field.validate(p.body,{},loc=('body',))
+        body_input = p.body
+        if name == 'inventory_order_create':
+            body_input = {**p.body, 'submission_key': str(uuid4())}
+        validated,errors=route.body_field.validate(body_input,{},loc=('body',))
         if errors:raise HTTPException(422,'ساختار اطلاعات با فرم پنل سازگار نیست.')
         body=jsonable_encoder(validated, exclude_unset=True)
         validate_dict(name,body)

@@ -152,6 +152,11 @@ def read_panel(args,user):
     if user.get('role')!='ceo' and (module=='site-cms' or not role_has_module_permission(user.get('role',''),module,'can_read')):
         raise HTTPException(403,'این ماژول در دسترسی شما نیست.')
     params = {'q': a.query, 'days': a.days}
+    if a.resource == 'catalog_intelligence':
+        if 'days' not in a.model_fields_set:
+            params['days'] = 90
+        elif a.days < 30:
+            raise HTTPException(422, 'بازهٔ تحلیل انبار باید بین ۳۰ تا ۳۶۵ روز باشد.')
     if a.month:
         params['month'] = a.month
     elif a.resource in MONTH_REQUIRED:
