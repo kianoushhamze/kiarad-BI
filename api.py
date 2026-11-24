@@ -1443,6 +1443,9 @@ def _ensure_crm_table(conn):
     conn.execute(text(
         "CREATE INDEX IF NOT EXISTS idx_customer_interactions_followup ON customer_interactions(next_followup_date, status)"
     ))
+    conn.execute(text("ALTER TABLE customer_interactions ADD COLUMN IF NOT EXISTS customer_id INTEGER REFERENCES customers(id)"))
+    conn.execute(text("ALTER TABLE customer_interactions ADD COLUMN IF NOT EXISTS archived_at TIMESTAMPTZ"))
+    conn.execute(text("CREATE INDEX IF NOT EXISTS idx_customer_interactions_customer ON customer_interactions(customer_id) WHERE archived_at IS NULL"))
     has_owner = conn.execute(text("""
         SELECT EXISTS (
             SELECT 1 FROM pg_attribute
@@ -1617,15 +1620,20 @@ def get_compatible_full_dashboard(range: str = "month", authorization: str = Hea
 
 
 @app.get("/crm/interactions")
-def get_crm_interactions(user: dict = Depends(current_user)):
+def get_crm_interactions(user: dict = Depends(current_user), customer_id: int | None = None):
     """لیست واقعی یادآوری‌های ثبت‌شده"""
     with engine.connect() as conn:
-        params = {"user_id": user["id"]}
-        scope = ""
+        params = {"user_id": user["id"], "customer_id": customer_id}
+        scope = "WHERE ci.archived_at IS NULL"
         if user.get("role") not in MANAGER_ROLES:
-            scope = "WHERE ci.owner_user_id = :user_id"
+            scope += " AND ci.owner_user_id = :user_id"
+        if customer_id is not None:
+            scope += """ AND (ci.customer_id=:customer_id OR (ci.customer_id IS NULL AND EXISTS (
+                SELECT 1 FROM customers c WHERE c.id=:customer_id AND lower(trim(c.name))=lower(trim(ci.customer_name))
+                AND NOT EXISTS (SELECT 1 FROM customers other WHERE other.id<>c.id AND lower(trim(other.name))=lower(trim(c.name)))
+            )))"""
         rows = conn.execute(text("""
-            SELECT ci.id, ci.customer_name,
+            SELECT ci.id, ci.customer_name, ci.next_followup_date::text AS followup_date,
                    COALESCE(u.full_name, ci.visitor_name) AS visitor_name,
                    ci.interaction_type, ci.product_discussed, ci.notes, ci.status,
                    COALESCE(TO_CHAR(ci.next_followup_date, 'YYYY/MM/DD'), '') AS next_date,
@@ -1642,7 +1650,8 @@ def get_crm_interactions(user: dict = Depends(current_user)):
 def add_crm_interaction(data: dict, user: dict = Depends(current_user)):
     """ثبت واقعی یادآوری تماس با تاریخ و ساعت پیگیری"""
     cust = (data.get("customer_name") or "").strip()
-    if not cust:
+    customer_id = data.get("customer_id")
+    if not cust and customer_id is None:
         raise HTTPException(status_code=422, detail="customer_name is required")
     is_manager = user.get("role") in MANAGER_ROLES
     vis = ("@" + str(user.get("username", "")) if not is_manager else (data.get("visitor_name") or "مدیریت")).strip()
@@ -1654,8 +1663,14 @@ def add_crm_interaction(data: dict, user: dict = Depends(current_user)):
     ftime = (data.get("followup_time") or "").strip() or None
 
     with engine.begin() as conn:
-        owner_id = user["id"] if not is_manager else None
-        if is_manager:
+        if customer_id is not None:
+            if type(customer_id) is not int or customer_id < 1:
+                raise HTTPException(422, "شناسهٔ مشتری معتبر نیست")
+            cust = conn.execute(text("SELECT name FROM customers WHERE id=:id"), {"id":customer_id}).scalar()
+            if cust is None:
+                raise HTTPException(404, "مشتری پیدا نشد")
+        owner_id = user["id"] if not is_manager or customer_id is not None else None
+        if is_manager and (customer_id is None or data.get("visitor_name")):
             owners = conn.execute(text("""
                 SELECT id FROM users
                 WHERE CASE WHEN :visitor LIKE '@%' THEN '@' || username=:visitor
@@ -1667,9 +1682,9 @@ def add_crm_interaction(data: dict, user: dict = Depends(current_user)):
             owner_id = owners[0] if owners else None
         conn.execute(text("""
             INSERT INTO customer_interactions
-                (customer_name, visitor_name, owner_user_id, interaction_type, product_discussed, notes, status, next_followup_date, followup_time)
-            VALUES (:cust, :vis, :owner_id, :itype, :prod, :notes, :status_val, :fdate, :ftime)
-        """), {"cust": cust, "vis": vis, "itype": itype, "prod": prod,
+                (customer_id, customer_name, visitor_name, owner_user_id, interaction_type, product_discussed, notes, status, next_followup_date, followup_time)
+            VALUES (:customer_id, :cust, :vis, :owner_id, :itype, :prod, :notes, :status_val, :fdate, :ftime)
+        """), {"customer_id":customer_id, "cust": cust, "vis": vis, "itype": itype, "prod": prod,
                "owner_id": owner_id, "notes": notes, "status_val": status_val, "fdate": fdate, "ftime": ftime})
     return {"status": "ok", "message": "پیگیری با موفقیت ثبت شد"}
 
@@ -1686,7 +1701,7 @@ def update_crm_interaction_status(interaction_id: int, data: dict, user: dict = 
         raise HTTPException(status_code=422, detail="وضعیت ارتباط با مشتری نامعتبر است")
     with engine.begin() as conn:
         row = conn.execute(text("""
-            SELECT id, owner_user_id FROM customer_interactions WHERE id=:id FOR UPDATE
+            SELECT id, owner_user_id FROM customer_interactions WHERE id=:id AND archived_at IS NULL FOR UPDATE
         """), {"id": interaction_id}).mappings().first()
         if not row:
             raise HTTPException(status_code=404, detail="پیگیری پیدا نشد")
@@ -1696,6 +1711,42 @@ def update_crm_interaction_status(interaction_id: int, data: dict, user: dict = 
             UPDATE customer_interactions SET status=:status WHERE id=:id
         """), {"id": interaction_id, "status": status_value})
     return {"status": "updated", "interaction_id": interaction_id, "stage": status_value}
+
+
+@app.patch("/crm/interactions/{interaction_id}")
+def edit_crm_interaction(interaction_id: int, data: dict, user: dict = Depends(current_user)):
+    from datetime import date, time
+    notes = data.get("notes", "")
+    if not isinstance(notes, str) or len(notes) > 5000:
+        raise HTTPException(422, "متن پیگیری معتبر نیست")
+    try:
+        day = date.fromisoformat(data["followup_date"]) if data.get("followup_date") else None
+        hour = time.fromisoformat(data["followup_time"]).strftime("%H:%M") if data.get("followup_time") else None
+    except (TypeError, ValueError):
+        raise HTTPException(422, "تاریخ یا ساعت پیگیری معتبر نیست") from None
+    return change_crm_card(interaction_id, user, {"notes":notes, "next_followup_date":day, "followup_time":hour})
+
+
+@app.delete("/crm/interactions/{interaction_id}")
+def archive_crm_interaction(interaction_id: int, user: dict = Depends(current_user)):
+    return change_crm_card(interaction_id, user, None)
+
+
+def change_crm_card(interaction_id, user, fields):
+    with engine.begin() as conn:
+        owner = conn.execute(text("SELECT owner_user_id FROM customer_interactions WHERE id=:id AND archived_at IS NULL FOR UPDATE"),
+                             {"id":interaction_id}).first()
+        if owner is None:
+            raise HTTPException(404, "پیگیری پیدا نشد")
+        if user["role"] not in MANAGER_ROLES and owner[0] != user["id"]:
+            raise HTTPException(403, "فقط پیگیری‌های خودتان قابل تغییر است")
+        if fields is None:
+            conn.execute(text("UPDATE customer_interactions SET archived_at=NOW() WHERE id=:id"), {"id":interaction_id})
+        else:
+            conn.execute(text("""UPDATE customer_interactions SET notes=:notes,
+                next_followup_date=:next_followup_date, followup_time=:followup_time WHERE id=:id"""),
+                         {"id":interaction_id, **fields})
+    return {"ok":True}
 
 @app.get("/targets/custom-list")
 def get_custom_targets(user: dict = Depends(current_user)):

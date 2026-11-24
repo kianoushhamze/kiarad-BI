@@ -393,7 +393,7 @@ def read_report(a, user):
         if a.section == 'crm':
             crm_scope='' if manager else ' AND owner_user_id=:uid'
             return {**metadata,'items':rows(conn,'''SELECT id,customer_name,interaction_type,product_discussed,notes,status,next_followup_date,followup_time
-                FROM customer_interactions WHERE customer_name ILIKE :q'''+crm_scope+' ORDER BY next_followup_date NULLS LAST,id DESC LIMIT 30',{**p,'uid':user['id']}),'limited_to':30,'note':'گزارش پیگیری ثبت‌شده است؛ متن یادداشت، اظهارات کاربر است و اثبات فروش یا وصول نیست.'}
+                FROM customer_interactions WHERE archived_at IS NULL AND customer_name ILIKE :q'''+crm_scope+' ORDER BY next_followup_date NULLS LAST,id DESC LIMIT 30',{**p,'uid':user['id']}),'limited_to':30,'note':'گزارش پیگیری ثبت‌شده است؛ متن یادداشت، اظهارات کاربر است و اثبات فروش یا وصول نیست.'}
         if a.section == 'daily_reports':
             report_scope='' if manager else ' AND dr.salesperson_id=:sp'
             return {**metadata,'items':rows(conn,'''SELECT dr.report_date,sp.name,dr.visits_count,dr.orders_count,dr.lost_orders_count,

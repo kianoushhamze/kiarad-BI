@@ -173,6 +173,61 @@ def get_customer_directory(q: Optional[str] = Query(default=None, max_length=100
         rows = conn.execute(text(query), params).mappings().all()
     return [dict(row) for row in rows]
 
+@router.get("/directory/customers/{customer_id}")
+def customer_workspace(customer_id: int, user: dict = Depends(current_user)):
+    from assistant_reports import holoo_person_balance
+    from holoo_operational_sync import operational_status
+    from operations import role_has_module_permission
+
+    with engine.connect() as conn:
+        row = conn.execute(text("SELECT id,code,name,city,phone FROM customers WHERE id=:id"),
+                           {"id":customer_id}).mappings().first()
+        if row is None:
+            raise HTTPException(404, "مشتری پیدا نشد")
+        result = {"customer":dict(row), "can_edit":user["role"] in MANAGER_ROLES
+                  and role_has_module_permission(user["role"], "customers", "can_write", connection=conn),
+                  "can_write_cards":role_has_module_permission(user["role"], "crm", "can_write", connection=conn),
+                  "can_archive_cards":role_has_module_permission(user["role"], "crm", "can_delete", connection=conn)}
+        if role_has_module_permission(user["role"], "debtors", "can_read", connection=conn):
+            sync = operational_status(conn)
+            result["finance"] = {
+                "holoo_balance":holoo_person_balance(conn, customer_id, sync.get("snapshot_id")),
+                "last_sale":conn.execute(text("""
+                    SELECT date,total_amount FROM sales WHERE customer_id=:id AND total_amount>0
+                    ORDER BY date DESC,id DESC LIMIT 1
+                """), {"id":customer_id}).mappings().first(),
+            }
+            if result["finance"]["last_sale"] is not None:
+                result["finance"]["last_sale"] = dict(result["finance"]["last_sale"])
+    return result
+
+
+class CustomerContactEdit(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    name: str = Field(min_length=1, max_length=150)
+    city: str = Field(default="", max_length=100)
+    phone: str = Field(default="", max_length=30)
+
+
+@router.patch("/directory/customers/{customer_id}")
+def change_customer_contact(customer_id: int, data: CustomerContactEdit, user: dict = Depends(require_manager)):
+    from data_sources import save_manual_fields
+    values = {key:value.strip() for key,value in data.model_dump().items()}
+    if not values["name"]:
+        raise HTTPException(422, "نام مشتری لازم است")
+    with engine.begin() as conn:
+        row = conn.execute(text("SELECT name FROM customers WHERE id=:id FOR UPDATE"), {"id":customer_id}).first()
+        if row is None:
+            raise HTTPException(404, "مشتری پیدا نشد")
+        if values["name"] != row[0] and conn.execute(text("""
+            SELECT 1 FROM customer_interactions WHERE customer_id IS NULL AND archived_at IS NULL
+            AND lower(trim(customer_name))=lower(trim(:name)) LIMIT 1
+        """), {"name":row[0]}).first():
+            raise HTTPException(409, "برای تغییر نام، ابتدا پیگیری‌های قدیمی را تطبیق دهید. شماره و شهر قابل تغییرند.")
+        save_manual_fields(conn, "customers", customer_id, values, user["id"])
+    return {"ok":True}
+
+
 # ۲. لیست کالاها بدون قفل ۴۰۱ و با قیمت و موجودی
 @router.get("/operations/products-list")
 @router.get("/products-list")

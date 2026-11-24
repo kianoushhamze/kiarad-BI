@@ -10,10 +10,9 @@ import { CommandPalette } from "./command-palette";
 const menuGroups: { label: string; icon: string; href?: string; children?: string[][] }[] = [
   { label: "داشبورد مدیریت", icon: "📊", href: "/management" },
   { label: "امروز من", icon: "📅", href: "/my-plan" },
-  { label: "مشتریان و پیگیری", icon: "👥", href: "/crm" },
+  { label: "مشتریان و پیگیری", icon: "👥", href: "/customers" },
   { label: "فروش", icon: "📈", children: [
     ["پیش‌فاکتورها", "/proformas", "📄"],
-    ["فهرست مشتریان", "/customers", "👥"],
     ["اهداف فروش و تسویه", "/person-targets", "🎯"],
     ["عملکرد تیم فروش", "/visitors", "📋"],
     ["کالا و موجودی", "/catalog", "📦"],

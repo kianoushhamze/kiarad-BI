@@ -37,6 +37,8 @@ class PersonnelAccessE2ETests(unittest.TestCase):
                 password_version INTEGER DEFAULT 0,created_at TIMESTAMP DEFAULT NOW())""",
             """CREATE TEMP TABLE role_permissions(role TEXT,module TEXT,can_read BOOLEAN,
                 can_write BOOLEAN,can_delete BOOLEAN)""",
+            "CREATE TEMP TABLE customers(id INTEGER PRIMARY KEY,name TEXT)",
+            "INSERT INTO customers VALUES (101,'مشتری اول'),(102,'مشتری دوم')",
             """CREATE TEMP TABLE customer_interactions(id SERIAL PRIMARY KEY,customer_name TEXT,
                 visitor_name TEXT,interaction_type TEXT,product_discussed TEXT,notes TEXT,
                 next_followup_date DATE,followup_time TEXT,status TEXT DEFAULT 'در انتظار تماس',
@@ -200,6 +202,19 @@ class PersonnelAccessE2ETests(unittest.TestCase):
         self.assertEqual(self.client.patch(f"/crm/interactions/{item['id']}/status", headers=alice,
                                           json={"status": "پیگیری شد"}).status_code, 200)
         self.assertEqual(self.conn.execute(text("SELECT owner_user_id FROM customer_interactions")).scalar(), 2)
+
+    def test_customer_card_is_scoped_and_can_be_archived(self):
+        alice, bob, chief = self.login(), self.login("bob"), self.login("chief")
+        self.assertEqual(self.post_crm(alice, customer_id=101).status_code, 200)
+        cards = self.client.get("/crm/interactions?customer_id=101", headers=alice).json()
+        self.assertEqual([card["customer_name"] for card in cards], ["مشتری اول"])
+        self.assertEqual(self.client.get("/crm/interactions?customer_id=102", headers=alice).json(), [])
+        path = f"/crm/interactions/{cards[0]['id']}"
+        self.assertEqual(self.client.patch(path, headers=bob, json={"notes": "ignored"}).status_code, 403)
+        self.assertEqual(self.client.patch(path, headers=alice, json={"notes": "updated"}).status_code, 200)
+        self.assertEqual(self.client.delete(path, headers=chief).status_code, 200)
+        self.assertEqual(self.client.get("/crm/interactions?customer_id=101", headers=alice).json(), [])
+        self.assertEqual(self.conn.execute(text("SELECT notes FROM customer_interactions")).scalar(), "updated")
 
     def test_legacy_crm_owner_migration_is_unambiguous_and_runs_once(self):
         self.conn.execute(text("ALTER TABLE customer_interactions DROP COLUMN owner_user_id"))
