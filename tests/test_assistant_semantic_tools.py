@@ -210,3 +210,27 @@ class SemanticToolsTests(unittest.TestCase):
         self.assertEqual([row['salesperson_id'] for row in rows], [9, 9, 9, 6])
         self.assertEqual([row['target_amount'] for row in rows], ['1000000000', '1000000000', '2000000000', '10000000000'])
         self.assertEqual(rows[-1]['target_type'], 'تسویه')
+
+    @patch('assistant_intake.prepare', return_value=PREVIEW.copy())
+    @patch('assistant_intake.iran_today', return_value=date(2026, 11, 24))
+    def test_group_requires_all_amounts_and_drops_invented_title_and_reward(self, _today, prepare):
+        message = ('برای آذر، برای خانم راد سولامور ۱۰۰ میلیون، لوفنته ۱۰۰ میلیون و وی‌ان‌وی ۲۰۰ میلیون تومان تارگت فروش بگذار. '
+                   'برای آقای سامان نمونه هم یک میلیارد تومان تارگت تسویه بگذار')
+        settlement = {'person': 'آقای سامان نمونه', 'kind': 'settlement',
+                      'title': 'عنوان ساختگی', 'amount_phrase': 'یک میلیارد تومان',
+                      'reward_phrase': 'یک میلیارد تومان'}
+        with patch('assistant_intake.engine', self.database):
+            partial = prepare_sales_targets({'month': 'آذر', 'rows': [settlement]}, MANAGER, message, [])
+            self.assertEqual(partial['status'], 'retry_target_rows')
+            prepare.assert_not_called()
+            result = prepare_sales_targets({'month': 'آذر', 'person': 'خانم راد', 'rows': [
+                {'product_focus': 'سولامور', 'amount_phrase': '۱۰۰ میلیون'},
+                {'product_focus': 'لوفنته', 'amount_phrase': '۱۰۰ میلیون'},
+                {'product_focus': 'وی‌ان‌وی', 'amount_phrase': '۲۰۰ میلیون تومان'},
+                settlement,
+            ]}, MANAGER, message, [])
+        self.assertEqual(result['status'], 'operation_preview')
+        rows = prepare.call_args.args[0]['payload']['body']['rows']
+        self.assertEqual(len(rows), 4)
+        self.assertEqual(rows[-1]['title'], 'تارگت تسویه')
+        self.assertNotIn('bonus_reward', rows[-1])

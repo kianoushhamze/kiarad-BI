@@ -1,5 +1,5 @@
 """Structured handoffs from natural language to existing panel workflows."""
-from collections import defaultdict
+from collections import Counter, defaultdict
 from datetime import timedelta
 from math import ceil
 from typing import Literal
@@ -13,7 +13,7 @@ from sqlalchemy import text
 
 from assistant_commands import authorize
 from assistant_inventory import ALIASES, normalize
-from assistant_money import DIGITS, explicit_money, money_units, parse_money_phrase, quoted_shared_amount
+from assistant_money import DIGITS, explicit_money, listed_money, money_units, parse_money_phrase, quoted_shared_amount
 from assistant_operations import prepare
 from db import engine
 from iran_time import iran_today
@@ -134,13 +134,22 @@ def prepare_sales_targets(args, user, message, history):
     current = normalize(message)
     previous_normalized = normalize(previous)
     targets = [row if row.person or row.company or not request.person else row.model_copy(update={'person': request.person}) for row in request.rows]
+    targets = [
+        row.model_copy(update={'title': None})
+        if row.title and not any(normalize(row.title) in context for context in (current, previous_normalized))
+        else row
+        for row in targets
+    ]
     previous_context = any(not _mentions_target(current, row) for row in targets)
     if previous_context and (len(targets) != 1 or not _mentions_target(previous_normalized, targets[0])):
         return {'status': 'needs_information', 'message': 'فقط تارگت همین درخواست را بیاور. اگر کاربر عنوان نداده، فیلد عنوان را خالی بگذار.'}
     amount_source = message if explicit_money(message) else (previous if previous_context else message)
     amounts = explicit_money(amount_source)
     units = money_units(amount_source)
-    shared_unit = request.shared_unit if units == {request.shared_unit} else None
+    shared_unit = next(iter(units)) if len(units) == 1 else None
+    stated_amounts = Counter(listed_money(amount_source, shared_unit))
+    proposed_amounts = Counter()
+    reward_requested = any(word in normalize(amount_source) for word in ('پاداش', 'پورسانت', 'جایزه'))
     with engine.connect() as conn:
         people = [dict(row) for row in conn.execute(text('SELECT id, name FROM salespersons ORDER BY name')).mappings()]
     rows = []
@@ -154,7 +163,7 @@ def prepare_sales_targets(args, user, message, history):
                 return {'status': 'needs_information', 'message': 'نام کامل فرد موردنظر همین تارگت را مشخص کنید.',
                         'candidates': [item['name'] for item in matches[:8]]}
             person = matches[0]
-        phrases = (target.amount_phrase, target.reward_phrase)
+        phrases = (target.amount_phrase, target.reward_phrase if reward_requested else None)
         try:
             parsed = [parse_money_phrase(phrase, shared_unit) if phrase else None for phrase in phrases]
         except ValueError as exc:
@@ -164,8 +173,7 @@ def prepare_sales_targets(args, user, message, history):
             return {'status': 'needs_information', 'message': 'مبلغ همین تارگت را عیناً از متن کاربر و همراه واحد بردار.',
                     'explicit_amounts_irr': [str(value) for value in amounts]}
         target_amount, reward = parsed
-        if len(targets) == 1 and len(set(amounts)) == 2 and len(set(parsed) & set(amounts)) != 2:
-            return {'status': 'needs_information', 'message': 'هر دو مبلغ صریح همین درخواست را در فیلد هدف و پاداش قرار بده.'}
+        proposed_amounts.update(value for value in parsed if value is not None)
         if target_amount <= 0 or target_amount > 10**15 or (reward is not None and not 0 <= reward < 10**13):
             return {'status': 'needs_information', 'message': 'مبلغ هدف باید مثبت باشد و هدف و پاداش در محدودهٔ مجاز فرم باشند.'}
         title_brand = _explicit_brand(normalize(target.title).removeprefix('تارگت ').removeprefix('هدف '))
@@ -186,6 +194,11 @@ def prepare_sales_targets(args, user, message, history):
             row['product_focus'] = target.product_focus
         rows.append(row)
 
+    if len(stated_amounts) and sum(stated_amounts.values()) > 1 and stated_amounts != proposed_amounts:
+        return {'status': 'retry_target_rows',
+                'message': ('همهٔ مبلغ‌های همین درخواست را به ردیف‌های مربوط اختصاص بده. '
+                            'مبلغ فروش یا تسویه، مبلغ هدف است. پاداش فقط اگر صریحاً گفته شده باشد. '
+                            'عنوان اختیاری است و مبلغ یا واحدِ داده‌شده را دوباره نپرس.')}
     result = prepare({'operation': 'enter_targets', 'payload': {'body': {'unit': 'IRR', 'rows': rows}}}, user)
     if result.get('status') == 'operation_preview' and len(rows) == 1:
         row = rows[0]
