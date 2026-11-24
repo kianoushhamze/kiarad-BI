@@ -36,10 +36,7 @@ const menuGroups: { label: string; icon: string; href?: string; children?: strin
   ]},
   { label: "امکانات پیشرفته", icon: "⋯", children: [
     ["ورود و منبع اطلاعات", "/data-entry", "📥"],
-    ["مدیریت سایت و فروشگاه", "/site-cms", "🖥️"],
     ["مدیریت کانال‌های آنلاین", "/online-sales", "🛒"],
-    ["مدیریت سکوهای فروش", "/platforms", "🏬"],
-    ["نگاشت دیجی‌کالا", "/digikala-mapping", "🧩"],
     ["کمپین‌ها", "/campaigns", "🎯"],
     ["مرکز فرمان تخصصی", "/agent-center", "✨"],
     ["پیام مشتری و رسید", "/outbound", "✉️"],
@@ -173,9 +170,6 @@ export function PortalShell({ title, eyebrow, actions, children }: { title: stri
     if (href === "/agent-center") return user?.role === "ceo";
     if (href === "/assistant-automations") return user?.role === "ceo";
     if (href === "/route-builder") return user?.role === "ceo";
-    if (href === "/digikala-mapping") return user?.role === "ceo";
-    if (href === "/platforms") return user?.role === "ceo";
-    if (href === "/site-cms") return user?.role === "ceo";
     if (href === "/check-scan") return ["ceo","finance"].includes(user?.role||"");
     if (href === "/marketing") return ["ceo","sales_manager"].includes(user?.role||"");
     if (href === "/data-entry" && !["ceo","sales_manager","finance"].includes(user?.role||"")) return false;

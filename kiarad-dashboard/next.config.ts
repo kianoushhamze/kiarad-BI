@@ -12,6 +12,9 @@ const nextConfig: NextConfig = {
   allowedDevOrigins: ["127.0.0.1", "kianoushsurf.taile287ae.ts.net", "kiarad.taile287ae.ts.net"],
   async redirects() {
     return [
+      { source: "/digikala-mapping", destination: "/online-sales#digikala", permanent: false },
+      { source: "/platforms", destination: "/online-sales#digikala", permanent: false },
+      { source: "/social", destination: "/online-sales#telegram", permanent: false },
       { source: "/check-scan", destination: "/treasury?check=new", permanent: false },
       { source: "/kerman-bases", destination: "/map?view=bases", permanent: false },
       { source: "/live-tracking", destination: "/map?view=team", permanent: false },

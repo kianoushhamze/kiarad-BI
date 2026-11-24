@@ -96,6 +96,34 @@ class DigikalaMappingTests(unittest.TestCase):
         self.assertIn('یافت نشد', exc.detail)
 
 
+class DigikalaStockTests(unittest.TestCase):
+    def test_stock_sync_uses_seller_variant_and_available_quantity(self):
+        conn = _mock_connect()
+        variant = MagicMock()
+        variant.mappings.return_value.first.return_value = {
+            'seller_id': '5678', 'holoo_code': 'A', 'status': 'active',
+        }
+        product = MagicMock()
+        product.mappings.return_value.first.return_value = {
+            'id': 99, 'stock': 10, 'is_active': 1,
+        }
+        conn.execute.side_effect = [variant, product, None]
+        client = MagicMock()
+        client.update_stock.return_value.status_code = 204
+        with patch.object(digikala_router.db.engine, 'begin', return_value=conn), \
+             patch.object(digikala_router, 'reserved_quantity', return_value=3.5), \
+             patch.object(digikala_router, 'get_client', return_value=client):
+            self.assertEqual(digikala_router.sync_variant_stock(123, CEO_ROW), {'new_stock': 6})
+        client.update_stock.assert_called_once_with(5678, 6)
+        client.update_price.assert_not_called()
+        self.assertEqual(conn.execute.call_args.args[1], {'count': 6, 'key': 123})
+
+    def test_stock_sync_rejects_non_ceo(self):
+        with self.assertRaises(HTTPException) as error:
+            digikala_router.sync_variant_stock(123, {'role': 'visitor'})
+        self.assertEqual(error.exception.status_code, 403)
+
+
 class LeadDiscoveryTests(unittest.TestCase):
     def test_discover_requires_auth(self):
         self.assertEqual(TestClient(api.app).post('/marketing/leads/discover', json={}).status_code, 401)

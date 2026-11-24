@@ -272,7 +272,7 @@ def _dk_variant_id(conn, code: str) -> tuple[int | None, int | None]:
 
 
 def push_stock_many(codes: list[str]) -> list[dict]:
-    """Push available stock (and current target price) to each platform listing."""
+    """Push available stock to each platform listing."""
     results = []
     with engine.begin() as conn:
         ensure(conn)
@@ -282,7 +282,6 @@ def push_stock_many(codes: list[str]) -> list[dict]:
     for listing in listings:
         with engine.connect() as conn:
             available = available_stock(conn, listing["code"])
-            price = target_price_irr(conn, listing)
         errors = []
         if listing["platform"] == "digikala":
             try:
@@ -295,10 +294,6 @@ def push_stock_many(codes: list[str]) -> list[dict]:
                     resp = client.update_stock(vid, available)
                     if resp.status_code not in (200, 201, 204):
                         errors.append(f"stock push {resp.status_code}")
-                    if price is not None:
-                        resp_p = client.update_price(vid, price)
-                        if resp_p.status_code not in (200, 201, 204):
-                            errors.append(f"price push {resp_p.status_code}")
             except Exception as exc:
                 errors.append(type(exc).__name__)
         else:
@@ -307,7 +302,7 @@ def push_stock_many(codes: list[str]) -> list[dict]:
             conn.execute(text("UPDATE platform_listings SET last_push_at=NOW() WHERE id=:i"),
                          {"i": listing["id"]})
         results.append({"platform": listing["platform"], "code": listing["code"],
-                        "available": available, "price_irr": price, "errors": errors})
+                        "available": available, "errors": errors})
     return results
 
 
