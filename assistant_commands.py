@@ -6,6 +6,7 @@ the same authenticated HTTP route and middleware as the manual panel.
 from datetime import date
 from decimal import Decimal
 from urllib.parse import quote, urlencode
+from uuid import UUID
 import hashlib
 import json
 import re
@@ -62,6 +63,7 @@ COMMANDS={
  'treasury_save_growth':command('ثبت برنامهٔ رشد سود','treasury','POST','/treasury/strategy/settings',{'ceo'}),
  'treasury_save_month':command('ثبت گزارش مالی یا بودجهٔ ماه','treasury','POST','/treasury/strategy/monthly',FINANCE),
  'treasury_save_operating_plan':command('ثبت برنامهٔ هزینه و نقدینگی','treasury','POST','/treasury/strategy/operating-plan',{'ceo'}),
+ 'treasury_refresh_holoo':command('درخواست دریافت خواندنی دادهٔ مالی هلو','treasury','POST','/treasury/strategy/holoo-refresh',FINANCE),
  'social_review_content':command('تأیید یا رد پیش‌نویس محتوا','social','POST','/integrations/content-calendar/{item_id}/review',MANAGERS,'social_content_calendar','item_id'),
  'online_save_channel_draft':command('ثبت تنظیمات پیش‌نویس کانال؛ بدون اتصال یا انتشار بیرونی','online-sales','PUT','/integrations/{channel}/draft'),
  'task_progress':command('ثبت پیشرفت کار خودم','tasks','PATCH','/tasks/{task_id}/progress',CATALOG_ROLES|{'visitor','salesperson'},'tasks','task_id'),
@@ -82,6 +84,8 @@ COMMANDS={
  'site_order_status':command('تغییر وضعیت سفارش فروشگاه','online-sales','PATCH','/site-orders/{order_id}/status',MANAGERS,'site_orders','order_id',
      snapshot=('id','status')),
  'marketing_lead_create':command('ثبت مخاطب بالقوهٔ بازاریابی','online-sales','POST','/marketing/leads'),
+ 'marketing_refresh_demand':command('به‌روزرسانی گزارش تقاضای بازاریابی','online-sales','POST','/marketing/refresh-demand'),
+ 'marketing_generate_content':command('تولید پیش‌نویس محتوای بازاریابی','online-sales','POST','/marketing/generate-content'),
  'marketing_lead_delete':command('حذف مخاطب بالقوهٔ بازاریابی','online-sales','DELETE','/marketing/leads/{lead_id}',MANAGERS,'marketing_leads','lead_id',
      snapshot=('id','name','city','status')),
  'marketing_schedule_content':command('انتقال محتوای بازاریابی به تقویم','online-sales','POST','/marketing/content/{item_id}/to-calendar',MANAGERS,'marketing_content','item_id',
@@ -98,6 +102,11 @@ COMMANDS={
  'map_review_base':command('بررسی پیشنهاد پایگاه','map','POST','/api/compensation/base-proposals/{proposal_id}/review',MANAGERS,'base_proposals','proposal_id'),
  'map_review_checkin':command('بررسی حضور ثبت‌شده در پایگاه','map','POST','/api/compensation/base-checkins/{checkin_id}/review',MANAGERS,'base_checkins','checkin_id',fields=['decision','note'],required=['decision','note']),
  'proforma_create':command('ثبت پیش‌فاکتور و رزرو محلی؛ بدون ارسال به هلو','proformas','POST','/operations/proformas',CATALOG_ROLES|{'visitor','salesperson'}),
+ 'proforma_generate_export':command('ساخت فایل خروجی پیش‌فاکتور برای تاریخ منتخب','proformas','POST','/operations/proformas/exports/generate',fields=['date']),
+ 'training_create':command('ساخت پیش‌نویس دورهٔ آموزشی','tasks','POST','/training/programmes',{'ceo'}),
+ 'training_generate':command('تولید دوره از منابع منتخب','tasks','POST','/training/generate',{'ceo'}),
+ 'training_publish':command('انتشار دوره و تخصیص به فراگیران منتخب','tasks','POST','/training/programmes/{ident}/publish',{'ceo'},'training_programmes','ident',
+     snapshot=('id','owner_id','title','digest','state')),
  'proforma_approve':command('تأیید داخلی پیش‌فاکتور','proformas','POST','/operations/proformas/{proforma_id}/approve',MANAGERS,'proforma_invoices','proforma_id'),
  'proforma_reject':command('رد پیش‌فاکتور و آزادسازی رزرو','proformas','POST','/operations/proformas/{proforma_id}/reject',MANAGERS,'proforma_invoices','proforma_id'),
  'proforma_cancel':command('لغو پیش‌فاکتور و آزادسازی رزرو','proformas','POST','/operations/proformas/{proforma_id}/cancel',CATALOG_ROLES|{'visitor','salesperson'},'proforma_invoices','proforma_id'),
@@ -124,15 +133,18 @@ def authorize(name,user):
     return spec
 
 
+def panel_routes(items):
+    for route in items:
+        if isinstance(route, APIRoute):
+            yield route
+        elif hasattr(route, 'original_router'):
+            yield from panel_routes(route.original_router.routes)
+
+
 def route_for(spec):
     from api import app
-    def routes(items):
-        for route in items:
-            if isinstance(route,APIRoute):yield route
-            elif hasattr(route,'original_router'):
-                yield from routes(route.original_router.routes)
     route_path=spec['path'].replace('/crud/kerman_bases_manual','/crud/{table}')
-    for route in routes(app.routes):
+    for route in panel_routes(app.routes):
         if isinstance(route,APIRoute) and route.path==route_path and spec['method'] in route.methods:
             return route
     raise HTTPException(503,'مسیر عملیاتی پنل آماده نیست.')
@@ -184,6 +196,11 @@ def path_for(spec,params):
             if not isinstance(value, str) or not re.fullmatch(r'[\w.+ -]{1,80}', value) or value in {'.', '..'}:
                 raise HTTPException(422,'کد کالا معتبر نیست.')
             value = quote(value, safe='')
+        elif key == 'ident' and spec['path'].startswith('/training/programmes/'):
+            try:
+                value = str(UUID(value))
+            except (ValueError, TypeError, AttributeError):
+                raise HTTPException(422, 'شناسهٔ دوره معتبر نیست.') from None
         elif type(value) is not int or value<=0:raise HTTPException(422,'شناسه باید عدد مثبت و واقعی باشد.')
         clean[key]=value
     return spec['path'].format(**clean)
@@ -207,6 +224,8 @@ def before_state(spec,params,user):
         raise HTTPException(403,'این پیگیری متعلق به شما نیست.')
     if spec['table']=='users' and user['role'] != 'ceo' and row['role'] not in {'visitor','salesperson'}:
         raise HTTPException(403,'تغییر حساب مدیریتی فقط در دسترسی مدیرعامل است.')
+    if spec['table'] == 'training_programmes' and row['owner_id'] != user['id']:
+        raise HTTPException(404, 'دوره متعلق به این حساب پیدا نشد.')
     result = dict(row)
     if product_meta is not None:
         result['storefront'] = dict(product_meta)
