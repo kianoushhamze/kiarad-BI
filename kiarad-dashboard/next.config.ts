@@ -10,12 +10,22 @@ const nextConfig: NextConfig = {
     proxyClientMaxBodySize: "12mb",
   },
   allowedDevOrigins: ["127.0.0.1", "kianoushsurf.taile287ae.ts.net", "kiarad.taile287ae.ts.net"],
+  async redirects() {
+    return [
+      { source: "/check-scan", destination: "/treasury?check=new", permanent: false },
+      { source: "/kerman-bases", destination: "/map?view=bases", permanent: false },
+      { source: "/live-tracking", destination: "/map?view=team", permanent: false },
+      { source: "/newdash.html", destination: "/management", permanent: false },
+      { source: "/newdash_online.html", destination: "/management", permanent: false },
+      { source: "/login.html", destination: "/login", permanent: false },
+      { source: "/monthtarget.html", destination: "/person-targets", permanent: false },
+    ];
+  },
   async rewrites() {
     const apiOrigin = (process.env.KIARAD_API_URL ?? "http://127.0.0.1:8000").replace(/\/$/, "");
 
     return {
       beforeFiles: [
-        { source: "/newdash_online.html", destination: "/management" },
         // Uploaded catalog files are served only by the authenticated backend.
         { source: "/uploads/:path*", destination: `${apiOrigin}/files/:path*` },
         {

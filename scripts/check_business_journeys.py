@@ -327,7 +327,7 @@ def main():
 
         def render_routes():
             for role, routes in [('ceo', ['/management','/catalog','/proformas','/tasks','/monthly-plans','/site-cms','/treasury','/assistant']),
-                                 ('alice', ['/visitors','/my-plan','/tasks','/proformas']), ('finance', ['/treasury','/tasks'])]:
+                                 ('alice', ['/visitors','/my-plan','/monthly-plans','/tasks','/proformas']), ('finance', ['/treasury','/tasks'])]:
                 page = pages[role]
                 for width in (1440, 390):
                     page.set_viewport_size({'width': width, 'height': 1000})

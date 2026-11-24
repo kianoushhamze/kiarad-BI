@@ -60,6 +60,20 @@ export default function MonthlyPlans(){
    setMessage(`${r.note} مسافت تقریبی: ${(r.distance_m/1000).toLocaleString("fa-IR",{maximumFractionDigits:1})} کیلومتر.`);
   }catch(e){setMessage(e instanceof Error?e.message:"مرتب‌سازی انجام نشد.");}finally{setBusy(false);}
  }
+ async function suggestSelectedOrder(){
+  if(busy || selected.length<2)return;
+  if(selected.length>12){setMessage("برای پیشنهاد ترتیب یک مسیر حداکثر ۱۲ پایگاه انتخاب کنید.");return;}
+  const keys=[...selected];
+  setBusy(true);setMessage("");
+  try{
+   const result=await secureApi<{order:number[];note:string}>("/monthly-visit-plans/order-suggestion",{method:"POST",body:JSON.stringify({
+    stops:keys.map(key=>{const [base_source,id]=key.split(":");return {base_source,base_id:Number(id)};})
+   })});
+   if(result.order.length!==keys.length || new Set(result.order).size!==keys.length || result.order.some(index=>!Number.isInteger(index)||index<0||index>=keys.length))throw new Error("ترتیب پیشنهادی ناقص است.");
+   setSelected(current=>current.join("|")===keys.join("|")?result.order.map(index=>keys[index]):current);
+   setMessage(result.note+" ترتیب را بررسی و برای ذخیره به پیش‌نویس اضافه کنید.");
+  }catch(e){setMessage(e instanceof Error?e.message:"پیشنهاد ترتیب دریافت نشد.");}finally{setBusy(false);}
+ }
  function add(){
   const start=jalaliDateInputToIso(month.replace("-","/")+"/01");if(!start||!selected.length||objective.trim().length<3){setMessage("ماه، پایگاه و هدف ویزیت را کامل کنید.");return;}
   const dates:string[]=[];
@@ -81,6 +95,11 @@ export default function MonthlyPlans(){
       {base.name} ـ {base.city}
      </label>;})}
     </div><p>{selected.length.toLocaleString("fa-IR")} پایگاه انتخاب شده</p>
+    {selected.length>0 && <ol className="list-decimal space-y-1 pr-6 text-xs text-slate-300">
+      {selected.map(key=><li key={key}>{bases.find(base=>`${base.source}:${base.id}`===key)?.name}</li>)}
+    </ol>}
+    <button type="button" disabled={busy||selected.length<2} onClick={()=>void suggestSelectedOrder()}
+      className="text-sm text-violet-300 disabled:opacity-40">پیشنهاد ترتیب پایگاه‌ها</button>
    </fieldset><label className="block">هدف ویزیت<input className={fieldClass} value={objective} onChange={e=>setObjective(e.target.value)}/></label><button onClick={add} className={primaryButton}>تأیید انتخاب و افزودن به پیش‌نویس</button>
    <label className="block">توضیح برنامه<textarea className={fieldClass} value={note} onChange={e=>setNote(e.target.value)}/></label>
    {draftDays.map(day=>{const items=itemsOf(day);return <div key={day} className="rounded-xl bg-white/5 p-3">
@@ -96,7 +115,7 @@ export default function MonthlyPlans(){
     </div>)}</div>
     <p className="mt-2 text-[11px] text-slate-400">ساعت‌ها اختیاری‌اند؛ اگر ثبت شوند باید همهٔ توقف‌های همان روز ساعت داشته باشند و هم‌پوشانی نکنند.</p>
    </div>;})}
-   <button disabled={busy||!stops.length} onClick={()=>void save()} className={primaryButton}>ذخیرهٔ پیش‌نویس ماهانه</button>
+   <button disabled={busy||!stops.length||!person} onClick={()=>void save()} className={primaryButton}>{canApprove?"ذخیرهٔ پیش‌نویس ماهانه":"ثبت برنامهٔ پیشنهادی من"}</button>
   </Surface>
   <Surface className="space-y-3 p-5"><h2>برنامه‌های ماه انتخاب‌شده</h2>{plans.map(p=><button key={p.id} className="block w-full rounded-xl border border-white/10 p-3 text-right" onClick={()=>void open(p.id)}>{p.full_name} · نسخهٔ {p.revision.toLocaleString("fa-IR")} · {states[p.status]||p.status}</button>)}</Surface>
   {detail&&<Surface className="space-y-4 p-5"><h2>بازبینی و تطبیق برنامه</h2><p>توقف برنامه‌ریزی‌شده: {detail.summary.planned_stops.toLocaleString("fa-IR")} · ویزیت معتبر: {detail.summary.verified_stops.toLocaleString("fa-IR")} · تداخل: {detail.summary.conflicts.toLocaleString("fa-IR")} · دارای ساعت: {detail.summary.timed_stops.toLocaleString("fa-IR")}</p>

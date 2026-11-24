@@ -110,7 +110,7 @@ export default function TeamChatPage() {
 
   return (
     <PortalShell title="چت تیمی کیاراد" eyebrow="گفت‌وگوی مشترک کارکنان و ویزیتورها" actions={
-      <Link href={isFieldUser ? "/newdash_online.html" : "/management"} className="rounded-lg border border-violet-800/70 bg-violet-950/60 px-3.5 py-2 text-xs font-bold text-violet-200">بازگشت به داشبورد</Link>
+      <Link href={isFieldUser ? "/my-plan" : "/management"} className="rounded-lg border border-violet-800/70 bg-violet-950/60 px-3.5 py-2 text-xs font-bold text-violet-200">بازگشت به داشبورد</Link>
     }>
     <div style={{ maxWidth: 1000, margin: "0 auto", padding: 16, color: "#f0f3ff", direction: "rtl" }}>
 

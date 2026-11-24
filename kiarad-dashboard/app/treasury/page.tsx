@@ -154,6 +154,10 @@ export default function TreasuryPage() {
   };
 
   const [showStrategy, setShowStrategy] = useState(false);
+  useEffect(() => {
+    if (new URLSearchParams(window.location.search).get("check") !== "new") return;
+    void Promise.resolve().then(() => setModal("document"));
+  }, []);
   const summary = overview?.summary;
   const hasFinancialData = !!overview && (overview.accounts.length > 0 || overview.documents.length > 0 || overview.fixed_expenses.length > 0 || !!overview.debtor_snapshot);
   const liquidity = forecast?.summary;

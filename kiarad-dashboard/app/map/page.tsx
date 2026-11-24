@@ -5,6 +5,7 @@ import dynamic from "next/dynamic";
 import Link from "next/link";
 import { PortalShell, Surface } from "../../components/portal-shell";
 import ShiftTracker from "../../components/ShiftTracker";
+import { TraccarPanel } from "../live-tracking/traccar-panel";
 import LocationDiagnostic from "../../components/location-diagnostic";
 import { secureApi, type SessionUser } from "../../lib/secure-api";
 
@@ -16,6 +17,7 @@ const labels: Record<View, string> = { shift: "شیفت و موقعیت من", b
 export default function MapPage() {
   const [access, setAccess] = useState<{ user: SessionUser; modules: string[] }>();
   const [view, setView] = useState<View>("shift");
+  const [showGps, setShowGps] = useState(false);
   const [showPersonalMap, setShowPersonalMap] = useState(false);
   const [error, setError] = useState("");
   useEffect(() => {
@@ -50,6 +52,8 @@ export default function MapPage() {
         {access?.user.salesperson_id ? <ShiftTracker salespersonId={access.user.salesperson_id} /> : <p>برای این حساب شیفت ویزیتور تعریف نشده است.</p>}
         <button type="button" aria-expanded={showPersonalMap} onClick={() => setShowPersonalMap(value => !value)} className="text-sm text-violet-300">{showPersonalMap ? "بستن نقشهٔ آخرین موقعیت" : "نمایش نقشهٔ آخرین موقعیت"}</button>
         {showPersonalMap && <iframe src="/map_view.html" title="نقشهٔ آخرین موقعیت‌های ثبت‌شده" className="h-[60vh] min-h-80 w-full rounded-xl border border-white/10" />}
+        <button type="button" aria-expanded={showGps} onClick={() => setShowGps(value => !value)} className="block text-sm text-violet-300">تنظیم GPS گوشی</button>
+        {showGps && <TraccarPanel />}
         <details><summary className="cursor-pointer text-sm">بررسی اتصال موقعیت</summary><LocationDiagnostic /></details>
       </Surface>}
       {activeView === "bases" && <Bases />}
