@@ -203,7 +203,7 @@ def tool_customer_history(args):
     interactions = _rows("""
         SELECT interaction_type, product_discussed, notes, status, created_at, visitor_name
         FROM customer_interactions
-        WHERE customer_name ILIKE :q
+        WHERE archived_at IS NULL AND customer_name ILIKE :q
         ORDER BY created_at DESC LIMIT 10
     """, {"q": "%" + name + "%"})
     return {
@@ -258,7 +258,7 @@ def tool_salesperson_stats(args):
 
 
 def tool_crm_interactions(args):
-    sql = "SELECT * FROM customer_interactions WHERE 1=1"
+    sql = "SELECT * FROM customer_interactions WHERE archived_at IS NULL"
     params = {}
     if args.get("customer_name"):
         sql += " AND customer_name ILIKE :cn"

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { CustomerFile } from "./customer-file";
 import { DataEntryLink } from "../../components/data-entry-link";
 import { PortalShell } from "../../components/portal-shell";
 import { authFetch, secureApi } from "../../lib/secure-api";
@@ -17,6 +18,7 @@ type Customer = {
 };
 
 export default function CustomersPage() {
+  const [selected, setSelected] = useState<number | null>(null);
   const [items, setItems] = useState<Customer[]>([]);
   const [query, setQuery] = useState("");
   const [appliedQuery, setAppliedQuery] = useState("");
@@ -60,8 +62,10 @@ export default function CustomersPage() {
 
   return (
     <PortalShell title="اطلاعات مشتریان" eyebrow="مشتریان و پیگیری فروش">
-      <div className="kskin space-y-4"><DataEntryLink entity="customers"/>
-        <PublicRegistryReview/>
+      {selected !== null ? <CustomerFile key={selected} id={selected} onClose={() => setSelected(null)}
+        onUpdate={contact => { if (contact) setItems(rows => rows.map(row => row.id === selected ? {...row, ...contact} : row)); }} />
+      : <div className="kskin space-y-4"><details><summary>افزودن مشتری و ورود گروهی</summary><DataEntryLink entity="customers"/>
+        <PublicRegistryReview/></details>
         <section className="rounded-2xl border border-white/[0.07] bg-[#0f1222] p-4">
           <div className="flex flex-wrap items-end gap-3">
             <label className="min-w-56 flex-1 text-[11px] text-slate-400">
@@ -87,7 +91,7 @@ export default function CustomersPage() {
                 <thead className="bg-white/[0.025] text-slate-500"><tr><th className="px-4 py-3">نام</th><th className="px-4 py-3">نوع</th><th className="px-4 py-3">شهر / منطقه</th><th className="px-4 py-3">شماره تماس</th><th className="px-4 py-3">کد</th></tr></thead>
                 <tbody>{items.map((customer) => (
                   <tr key={customer.id} className="border-t border-white/[0.05] text-slate-300">
-                    <td className="px-4 py-3 font-bold text-white">{customer.name}</td>
+                    <td className="px-4 py-3 font-bold text-white"><button type="button" className="text-right text-violet-300 hover:underline" onClick={() => setSelected(customer.id)}>{customer.name}</button></td>
                     <td className="px-4 py-3">{customer.customer_type || "—"}</td>
                     <td className="px-4 py-3">{[customer.city, customer.province_area].filter(Boolean).join("، ") || "—"}</td>
                     <td className="px-4 py-3" dir="ltr">{customer.phone || "—"}</td>
@@ -98,7 +102,7 @@ export default function CustomersPage() {
             </div>
           ) : null}
         </section>
-      </div>
+      </div>}
     </PortalShell>
   );
 }
