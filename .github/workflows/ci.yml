@@ -231,7 +231,15 @@ jobs:
           cache: npm
           cache-dependency-path: kiarad-dashboard/package-lock.json
       - run: pip install -r requirements.txt playwright==1.65.0
-      - run: python -m playwright install --with-deps chromium
+      - name: Select browser for business journeys
+        timeout-minutes: 4
+        run: |
+          if browser=$(command -v google-chrome || command -v chromium); then
+            "$browser" --version
+            echo "CHROMIUM_EXECUTABLE_PATH=$browser" >> "$GITHUB_ENV"
+          else
+            python -m playwright install --with-deps chromium
+          fi
       - run: npm ci
         working-directory: kiarad-dashboard
       - run: npm run build
