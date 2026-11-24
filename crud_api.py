@@ -1,5 +1,5 @@
 """Kiarad CRUD API - generic add/edit/delete + file upload + excel import."""
-from fastapi import APIRouter, UploadFile, File, Form, HTTPException, Depends, Header
+from fastapi import APIRouter, UploadFile, File, Form, HTTPException, Depends, Header, Request, Response
 from fastapi.responses import FileResponse
 from pathlib import Path
 from typing import Optional, List
@@ -330,7 +330,7 @@ from fastapi.responses import FileResponse as _FR
 from fastapi import HTTPException as _HE
 
 @router.get("/files/{path:path}")
-def serve_file(path: str, user: dict = Depends(current_user)):
+def serve_file(path: str, request: Request, user: dict = Depends(current_user)):
     if not re.fullmatch(r"(?:catalog|products/(?:images|pdfs))/[A-Za-z0-9][A-Za-z0-9._-]*", path):
         raise _HE(403, "دسترسی به این مسیر فایل مجاز نیست")
     target = (UPLOAD_ROOT / path).resolve()
@@ -343,7 +343,15 @@ def serve_file(path: str, user: dict = Depends(current_user)):
         raise _HE(404, "not found")
     import mimetypes
     mt, _ = mimetypes.guess_type(str(target))
-    return _FR(str(target), media_type=mt or "application/octet-stream", headers={"Cache-Control":"private, no-store", "X-Content-Type-Options":"nosniff"})
+    headers = {"Cache-Control": "private, no-cache", "Vary": "Authorization, Cookie",
+               "X-Content-Type-Options": "nosniff"}
+    response = _FR(str(target), media_type=mt or "application/octet-stream",
+                   stat_result=target.stat(), headers=headers)
+    etag = response.headers["etag"]
+    validators = request.headers.get("if-none-match", "").split(",")
+    if any(value.strip().removeprefix("W/") in (etag, "*") for value in validators):
+        return Response(status_code=304, headers={**headers, "ETag": etag})
+    return response
 
 @router.post("/upload/catalog-file")
 async def upload_catalog_file(

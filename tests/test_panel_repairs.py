@@ -4,7 +4,7 @@ import tempfile
 from pathlib import Path
 import unittest
 from unittest.mock import MagicMock, patch
-from fastapi import HTTPException
+from fastapi import HTTPException, Request
 from assistant_inventory import resolve_selection
 from product_pricing import selected_price
 import campaign_ai
@@ -24,16 +24,22 @@ class PanelRepairTests(unittest.TestCase):
     def test_private_catalog_files_require_account_and_cannot_traverse(self):
         dep=inspect.signature(crud_api.serve_file).parameters['user'].default
         self.assertIs(dep.dependency,crud_api.current_user)
+        request = Request({'type':'http','headers':[]})
         for path in ('catalog/../temp/probe.pdf','products/images/../../temp/probe.pdf','temp/probe.pdf','catalog/..\\temp\\probe.pdf'):
             with self.subTest(path=path),self.assertRaises(HTTPException) as result:
-                crud_api.serve_file(path,{'role':'ceo'})
+                crud_api.serve_file(path,request,{'role':'ceo'})
             self.assertEqual(result.exception.status_code,403)
         scratch=Path(tempfile.gettempdir())
         with tempfile.TemporaryDirectory(dir=scratch) as folder,patch.object(crud_api,'UPLOAD_ROOT',Path(folder)):
             Path(folder).resolve().relative_to(scratch.resolve())
             target=Path(folder)/'catalog'/'probe.pdf';target.parent.mkdir();target.write_bytes(b'%PDF- synthetic')
-            result=crud_api.serve_file('catalog/probe.pdf',{'role':'ceo'})
-            self.assertEqual(result.headers['cache-control'],'private, no-store')
+            result=crud_api.serve_file('catalog/probe.pdf',request,{'role':'ceo'})
+            self.assertEqual(result.headers['cache-control'],'private, no-cache')
+            self.assertEqual(result.headers['vary'],'Authorization, Cookie')
+            conditional = Request({'type':'http','headers':[(b'if-none-match', result.headers['etag'].encode())]})
+            cached = crud_api.serve_file('catalog/probe.pdf',conditional,{'role':'ceo'})
+            self.assertEqual(cached.status_code,304)
+            self.assertEqual(cached.body,b'')
             self.assertEqual(result.headers['x-content-type-options'],'nosniff')
     def test_partial_product_keywords_and_conversation_words(self):
         rows=[{'id':1,'name':'کرم مرطوب کننده بدن آلوئه ورا ۲۰۰','code':'001'},

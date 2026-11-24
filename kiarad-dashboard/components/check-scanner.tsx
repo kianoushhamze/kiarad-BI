@@ -3,14 +3,10 @@ import { useRef, useState } from "react";
 
 export type CheckScannerPick = { sayad: string; serial: string };
 
-declare global {
-  interface Window { jsQR?: (data: Uint8ClampedArray, w: number, h: number, opts?: { inversionAttempts?: string }) => { data: string } | null }
-}
-
 type FoundNumber = { value: string; label: string };
 
 export function extractNumbers(text: string): FoundNumber[] {
-  const runs = Array.from(new Set(text.match(/\d{6,}/g) || []));
+  const runs = Array.from(new Set(text.replace(/[۰-۹٠-٩]/g, digit => "۰۱۲۳۴۵۶۷۸۹٠١٢٣٤٥٦٧٨٩".indexOf(digit) % 10 + "").match(/\d{6,}/g) || []));
   return runs.map(value => {
     let label = "عدد یافت‌شده";
     if (/sayad|صیاد/i.test(text)) label = "عدد در QR صیاد";
@@ -35,17 +31,6 @@ export function CheckScanner({ onNumbers, autoPick = true, showSummary = true }:
   const [picked, setPicked] = useState<CheckScannerPick>({ sayad: "", serial: "" });
   const [copied, setCopied] = useState("");
 
-  function loadJsQR(): Promise<boolean> {
-    if (window.jsQR) return Promise.resolve(true);
-    return new Promise(resolve => {
-      const s = document.createElement("script");
-      s.src = "https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js";
-      s.onload = () => resolve(Boolean(window.jsQR));
-      s.onerror = () => resolve(false);
-      document.head.appendChild(s);
-    });
-  }
-
   function pick(next: CheckScannerPick, notify = true) {
     setPicked(next);
     if (notify && onNumbers && (next.sayad || next.serial)) onNumbers(next);
@@ -53,29 +38,32 @@ export function CheckScanner({ onNumbers, autoPick = true, showSummary = true }:
 
   async function handleFile(file: File) {
     setStatus("در حال پردازش تصویر…"); setDecoded("");
-    const ok = await loadJsQR();
-    if (!ok) { setStatus("بارگذاری کتابخانه خواننده QR ناموفق بود؛ اتصال اینترنت را بررسی کن."); return; }
     const img = new Image();
     const url = URL.createObjectURL(file);
     try {
       await new Promise<void>((res, rej) => { img.onload = () => res(); img.onerror = () => rej(new Error("image")); img.src = url; });
       const canvas = canvasRef.current;
       if (!canvas) { setStatus("بوم تصویر آماده نیست."); return; }
-      const scale = Math.min(1, 900 / Math.max(img.width, img.height));
-      canvas.width = Math.round(img.width * scale);
-      canvas.height = Math.round(img.height * scale);
-      const ctx = canvas.getContext("2d");
+      const { default: decodeQr } = await import("jsqr");
+      const ctx = canvas.getContext("2d", { willReadFrequently: true });
       if (!ctx) { setStatus("رسم تصویر ممکن نشد."); return; }
-      ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-      const data = ctx.getImageData(0, 0, canvas.width, canvas.height);
-      const result = window.jsQR?.(data.data, canvas.width, canvas.height, { inversionAttempts: "attemptBoth" });
+      let result: ReturnType<typeof decodeQr> = null;
+      const longestSide = Math.max(img.naturalWidth, img.naturalHeight);
+      for (const limit of new Set([900, 1800, 2600].map(size => Math.min(size, longestSide)))) {
+        const scale = limit / longestSide;
+        canvas.width = Math.max(1, Math.round(img.naturalWidth * scale));
+        canvas.height = Math.max(1, Math.round(img.naturalHeight * scale));
+        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+        const data = ctx.getImageData(0, 0, canvas.width, canvas.height);
+        result = decodeQr(data.data, canvas.width, canvas.height, { inversionAttempts: "attemptBoth" });
+        if (result) break;
+      }
       if (result && result.data) {
         setDecoded(result.data);
         setStatus("QR خوانده شد.");
         if (autoPick) {
-          // انتخاب خودکار: بلندترین عدد به‌عنوان شماره صیاد و عدد بعدی به‌عنوان سریال
-          const numbers = extractNumbers(result.data).map(n => n.value).sort((a, b) => b.length - a.length);
-          pick({ sayad: numbers[0] || "", serial: numbers[1] || "" });
+          const identifiers = extractNumbers(result.data).filter(number => number.value.length === 16);
+          if (identifiers.length === 1) pick({ sayad: identifiers[0].value, serial: "" });
         }
       } else {
         setDecoded("");

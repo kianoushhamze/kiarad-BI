@@ -18,7 +18,7 @@ export function PrivateCatalogFile({ path, name, image = false, className = "" }
         setFailure(path); return;
       }
       try {
-        const response = await authFetch(path.slice(4), { signal: controller.signal });
+        const response = await authFetch(path.slice(4), { signal: controller.signal, cache: "no-cache" });
         if (!response.ok) throw new Error("دریافت فایل انجام نشد.");
         const blob = await response.blob();
         if (controller.signal.aborted) return;
