@@ -68,7 +68,7 @@ class EntryDatabaseTests(unittest.TestCase):
          'CREATE TEMP TABLE salespersons(id INT PRIMARY KEY,name TEXT)',
          'CREATE TEMP TABLE sales(id INT PRIMARY KEY,holoo_kind INT,holoo_erp_code TEXT,salesperson_id INT,date DATE DEFAULT CURRENT_DATE)',
          "INSERT INTO sales(id,holoo_kind,holoo_erp_code,salesperson_id) VALUES(10,2,'erp-10',NULL),(11,4,'erp-11',NULL),(12,2,'erp-owned',2)",
-         'CREATE TEMP TABLE targets(id SERIAL PRIMARY KEY,title TEXT,salesperson_id INT,target_amount NUMERIC,bonus_reward NUMERIC,start_date DATE,end_date DATE,status TEXT,period_type TEXT,target_type TEXT,product_focus TEXT,created_at TIMESTAMPTZ)',
+         'CREATE TEMP TABLE targets(id SERIAL PRIMARY KEY,title TEXT,salesperson_id INT,target_amount NUMERIC,bonus_reward NUMERIC,start_date DATE,end_date DATE,status TEXT,period_type TEXT,target_type TEXT,product_focus TEXT,month INT,year INT,created_at TIMESTAMPTZ)',
          'CREATE TEMP TABLE inventory_batches(id SERIAL PRIMARY KEY,product_id INT,batch_code TEXT,expiry_date DATE,quantity NUMERIC,note TEXT,created_by INT,UNIQUE(product_id,batch_code))',
          "INSERT INTO salespersons VALUES(1,'پرسنل آزمایشی')",
          "INSERT INTO products(code,name,price,stock) VALUES('001','کالای قبلی',100,20)",

@@ -18,6 +18,7 @@ from iran_time import iran_today, iran_month_bounds
 from operations import MANAGER_ROLES, role_has_module_permission
 from assistant_commands import COMMANDS
 from assistant_panel import RESOURCES as PANEL_RESOURCES
+from assistant_intake import BlankTargetRows, Targets, VisitCoverage
 
 logger = logging.getLogger(__name__)
 
@@ -49,6 +50,16 @@ class ContractReviewArgs(BaseModel):
     model_config = ConfigDict(extra='forbid')
     salesperson_id: int = Field(gt=0)
     description: str = Field(min_length=10, max_length=4000)
+
+
+class PublicSearch(BaseModel):
+    model_config = ConfigDict(extra='forbid')
+    query: str = Field(min_length=5, max_length=500)
+
+
+class CatalogSelection(BaseModel):
+    model_config = ConfigDict(extra='forbid')
+    query: str = Field(min_length=2, max_length=2000)
 
 
 def prepare_contract_review(args, user):
@@ -95,7 +106,7 @@ for tool in REPORT_TOOLS:
         tool['function']['parameters']['properties']['operation']['enum']=list(COMMANDS)
         tool['function']['parameters']['properties']['module']['enum']=sorted({s['module'] for s in COMMANDS.values()})
     if tool['function']['name']=='prepare_panel_operation':
-        tool['function']['parameters']['properties']['operation']['enum']=['create_task','create_daily_report','save_contract','create_content_draft',*COMMANDS]
+        tool['function']['parameters']['properties']['operation']['enum']=['create_task','create_daily_report','save_contract','create_content_draft',*(name for name in COMMANDS if name != 'enter_targets')]
         tool['function']['description']='آماده‌کردن عملیات واقعی برای صفحهٔ تأیید: وظیفه، گزارش کار، قرارداد، محتوا و عملیات تمام ماژول‌ها. برای نام و ساختار عملیات جدید ابتدا panel_operations را بخوان. عملیات جدید payload شامل body، path_params و در صورت نیاز query_params دارد. تا تأیید کاربر فقط پیشنهاد ذخیره می‌شود؛ عملیات تجاری اجرا نشده است.'
 
 
@@ -105,6 +116,24 @@ REPORT_TOOLS.extend([
         'parameters':{'type':'object','properties':{'objective':{'type':'string','minLength':5,'maxLength':6000},'domains':{'type':'array','items':{'type':'string','enum':['sales','marketing','finance','hr','logistics','inventory','customer_care','legal','coordination']},'minItems':1,'maxItems':9}},'required':['objective','domains'],'additionalProperties':False}}},
     {'type':'function','function':{'name':'read_agent_missions','description':'خواندن وضعیت و نتایج مأموریت‌های متعلق به مدیر؛ انجام کار فقط با رسید واقعی گزارش می‌شود.',
         'parameters':{'type':'object','properties':{},'additionalProperties':False}}},
+])
+
+REPORT_TOOLS.extend([
+    {'type': 'function', 'function': {'name': 'prepare_sales_targets',
+     'description': 'پیش‌نمایش تارگت تکی یا گروهی. اگر چند برند برای یک فرد است نام فرد را در person اصلی و هر برند، نوع و مبلغش را در یک ردیف بگذار. اگر واحد مشترک فقط انتهای فهرست آمده در shared_unit بده و عبارت مبلغ هر ردیف را همان‌گونه که گفته شده نقل کن. «وصول» یا «تسویه» kind=settlement است. ماه نامعلوم در پیش‌نمایش ماه جاری است. اگر عنوانی نداده عنوان را حذف کن. واحد را تبدیل نکن و تارگت قدیمی را با درخواست تازه ادغام نکن. اگر عنوان و کالای هدف متناقض‌اند، همان مورد را بپرس.',
+     'parameters': Targets.model_json_schema()}},
+    {'type': 'function', 'function': {'name': 'open_target_template',
+     'description': 'بازکردن فرم ورود دستی با تعداد مشخص ردیف تارگت خالی و قابل ویرایش. وقتی کاربر می‌خواهد بعداً مقادیر را خودش وارد کند این ابزار را بزن. نام و مبلغ ساختگی لازم نیست.',
+     'parameters': BlankTargetRows.model_json_schema()}},
+    {'type': 'function', 'function': {'name': 'prepare_visit_coverage',
+     'description': 'تبدیل خواستهٔ برنامهٔ ویزیت برای یک پرسنل و شهرها به پوشش مبتنی بر پایگاه‌های واقعی. برای چند بار پوشش تمام پایگاه‌های یک شهر scope=all_bases و visits=تعداد دفعات. برای سفر به یک شهر بدون انتخاب پایگاه scope=trip. اگر کاربر پایگاه‌ها یا روزهای شمسی ماه را مشخص کرده، همان‌ها را بده؛ روزهای ناگفته را ابزار پیشنهاد می‌دهد. برای سفر بدون نام پایگاه، ابزار پایگاه‌های ثبت‌شدهٔ شهر را تا سقف ظرفیت همان سفر پیشنهاد می‌دهد. هر شهرستان را یک آیتم مستقل بده. نیاز به شناسهٔ داخلی نیست.',
+     'parameters': VisitCoverage.model_json_schema()}},
+    {'type': 'function', 'function': {'name': 'search_public_web',
+     'description': 'جست‌وجوی فقط‌خواندنی اطلاعات عمومی به‌روز خارج از پنل. پرسش را با اطلاعات عمومی و بدون دادهٔ داخلی شرکت، اطلاعات مشتری، مختصات یا رمز بنویس. نتیجه را با لینک منبع و محدودیت گزارش کن.',
+     'parameters': PublicSearch.model_json_schema()}},
+    {'type': 'function', 'function': {'name': 'analyze_catalog_selection',
+     'description': 'گزارش موجودی، قیمت، گردش و فروش برند یا کالای شرکت با هویت واقعی. سؤال و بازهٔ کاربر را حفظ کن؛ این ابزار برای پرسش آموزشی یا اطلاعات عمومی محصول نیست.',
+     'parameters': CatalogSelection.model_json_schema()}},
 ])
 
 REPORT_TOOLS.extend([
@@ -294,7 +323,7 @@ def read_report(a, user):
             for person in people:
                 totals=rows(conn,'''SELECT SUM(total_amount) AS net_sales_irr,COUNT(*) AS documents FROM sales
                     WHERE salesperson_id=:sid AND date>=:begin AND date<:end''',{**p,'sid':person['id']})[0]
-                targets=rows(conn,"SELECT id,title,target_amount,start_date,end_date,product_focus FROM targets WHERE salesperson_id=:sid AND status='active' ORDER BY id DESC LIMIT 10",{'sid':person['id']})
+                targets=rows(conn,"SELECT id,title,target_amount,target_type,start_date,end_date,product_focus FROM targets WHERE salesperson_id=:sid AND status='active' ORDER BY id DESC LIMIT 10",{'sid':person['id']})
                 result.append({**person,**totals,'targets':targets})
             return {**metadata,'people':result,'limited_to':25}
         if a.section == 'customers':
@@ -348,10 +377,25 @@ def read_report(a, user):
     return {'status':'not_available'}
 
 
-def execute_report_tool(name, args, user):
+def execute_report_tool(name, args, user, *, message='', history=()):
     if not isinstance(args,dict) or not user.get('id') or not user.get('role'):
         return {'status':'access_denied'}
     try:
+        if name == 'prepare_sales_targets':
+            from assistant_intake import prepare_sales_targets
+            return prepare_sales_targets(args, user, message, history)
+        if name == 'open_target_template':
+            from assistant_intake import blank_target_template
+            return blank_target_template(args, user)
+        if name == 'prepare_visit_coverage':
+            from assistant_intake import prepare_visit_coverage
+            return prepare_visit_coverage(args, user)
+        if name == 'search_public_web':
+            from agent_center import market_search
+            return market_search(PublicSearch.model_validate(args).model_dump())
+        if name == 'analyze_catalog_selection':
+            from assistant_engine import lookup_catalog_analysis
+            return lookup_catalog_analysis(CatalogSelection.model_validate(args).query, user, history)
         if name == 'specialist_tools':
             from agent_extensions import catalog
             return {'operations':catalog(user)}

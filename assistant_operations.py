@@ -53,7 +53,8 @@ def authorize(operation,user):
 
 def prepare(args,user):
     a=OperationArgs.model_validate(args);authorize(a.operation,user)
-    if len(json.dumps(a.payload,ensure_ascii=False,allow_nan=False))>30000:
+    max_payload = 120000 if a.operation == 'monthly_plan_create' else 30000
+    if len(json.dumps(a.payload,ensure_ascii=False,allow_nan=False)) > max_payload:
         raise HTTPException(422,'شرح عملیات بیش از حد طولانی است.')
     baseline={}
     from assistant_commands import COMMANDS
@@ -106,11 +107,19 @@ def prepare(args,user):
     with engine.begin() as conn:
         ensure(conn)
         import hashlib
-        encoded=json.dumps(payload,ensure_ascii=False,sort_keys=True,allow_nan=False)
+        comparison_payload = payload
+        comparison_expression = 'payload'
+        if a.operation in {'daily_report_submit', 'inventory_order_create'}:
+            # The native route needs a stable replay key, but it is not part of the user's intent.
+            comparison_payload = {
+                **payload, 'body': {key: value for key, value in payload['body'].items() if key != 'submission_key'},
+            }
+            comparison_expression = "payload #- '{body,submission_key}'"
+        encoded=json.dumps(comparison_payload,ensure_ascii=False,sort_keys=True,allow_nan=False)
         digest=hashlib.sha256(encoded.encode()).hexdigest()
         conn.execute(text('SELECT pg_advisory_xact_lock(hashtextextended(:key,0))'),{'key':f'assistant-proposal:{user["id"]}:{digest}'})
-        existing=conn.execute(text('''SELECT id FROM assistant_operation_proposals WHERE actor_id=:actor
-            AND operation=:operation AND payload=CAST(:payload AS JSONB) AND expires_at>NOW()
+        existing=conn.execute(text(f'''SELECT id FROM assistant_operation_proposals WHERE actor_id=:actor
+            AND operation=:operation AND {comparison_expression}=CAST(:payload AS JSONB) AND expires_at>NOW()
             ORDER BY created_at DESC LIMIT 1'''),{'actor':user['id'],'operation':a.operation,'payload':encoded}).scalar()
         if existing:
             return {'status':'operation_preview','proposal_id':str(existing),'saved':False,

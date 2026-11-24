@@ -502,6 +502,7 @@ def reports_target():
             SELECT id, salesperson_id, title, target_amount, start_date, end_date, status
             FROM targets
             WHERE status = 'active'
+              AND COALESCE(target_type, '') <> 'تسویه'
             ORDER BY start_date DESC, id DESC
             LIMIT 1
             """
@@ -580,6 +581,7 @@ def staff_performance():
                 SELECT target_amount, start_date, end_date
                 FROM targets
                 WHERE salesperson_id = :sp_id AND status = 'active'
+                  AND COALESCE(target_type, '') <> 'تسویه'
                 ORDER BY start_date DESC NULLS LAST, id DESC
                 LIMIT 1
                 """,
@@ -1127,7 +1129,7 @@ def dashboard_full(range: str = "month", authorization: str = Header(default=Non
             my_targets_list = [dict(r) for r in target_rows]
             current_month_targets = [
                 t for t in my_targets_list
-                if t.get("start_date")==month_start and t.get("end_date")==month_end
+                if t.get("start_date")==month_start and t.get("end_date")==month_end and t.get("target_type") != "تسویه"
             ]
             target_val = sum(float(t.get("target_amount") or 0) for t in current_month_targets)
 
@@ -1193,7 +1195,8 @@ def dashboard_full(range: str = "month", authorization: str = Header(default=Non
         zero_without_target = int(conn.execute(statement("SELECT COUNT(*) FROM products WHERE is_active = 1 AND stock <= 0 AND COALESCE(min_stock, 0) <= 0")).scalar() or 0)
         t_row = conn.execute(statement("""
             SELECT target_amount, start_date, end_date FROM targets
-            WHERE status = 'active' AND salesperson_id IS NULL ORDER BY id DESC LIMIT 1
+            WHERE status = 'active' AND salesperson_id IS NULL
+              AND COALESCE(target_type, '') <> 'تسویه' ORDER BY id DESC LIMIT 1
         """)).mappings().first()
         target_val = float(t_row["target_amount"] or 0) if t_row else 0.0
         target_period_valid = bool(t_row and t_row["start_date"] == month_start and t_row["end_date"] == month_end)
@@ -1214,6 +1217,7 @@ def dashboard_full(range: str = "month", authorization: str = Header(default=Non
             SELECT salesperson_id, COALESCE(SUM(target_amount), 0) AS target_amount
             FROM targets
             WHERE status = 'active' AND salesperson_id IS NOT NULL
+              AND COALESCE(target_type, '') <> 'تسویه'
               AND start_date = CAST(:month_start AS DATE)::date
               AND end_date = CAST(:month_end AS DATE)
             GROUP BY salesperson_id
@@ -1282,6 +1286,7 @@ def ceo_dashboard():
                 COALESCE(SUM(target_amount),0) AS amount
             FROM targets
             WHERE status='active'
+              AND COALESCE(target_type, '') <> 'تسویه'
         """)).first()
 
 
@@ -1319,7 +1324,7 @@ def get_live_ai_insights(range: str = "month"):
             WHERE date >= CURRENT_DATE - INTERVAL '{days} days'
         """)).mappings().first()
         
-        target_val = conn.execute(text("SELECT target_amount FROM targets WHERE status='active' LIMIT 1")).scalar() or 50000000
+        target_val = conn.execute(text("SELECT target_amount FROM targets WHERE status='active' AND COALESCE(target_type, '') <> 'تسویه' LIMIT 1")).scalar() or 50000000
         total_sales = float(sales_row["total"] or 0)
         achieve = round((total_sales / target_val * 100), 1) if target_val else 0
         
@@ -1722,16 +1727,21 @@ def get_custom_targets(user: dict = Depends(current_user)):
             
             status_color = "red" if percent < 40 else ("yellow" if percent < 80 else "green")
             status_label = "عقب‌افتاده از برنامه" if percent < 40 else ("در حال پیشرفت" if percent < 80 else "تحقق عالی / سبز")
+            if r["target_type"] == "تسویه" or r["product_focus"]:
+                c_sales = percent = None
+                status_color = "gray"
+                status_label = "تحقق نیاز به گزارش وصول مستند دارد" if r["target_type"] == "تسویه" else "تحقق نیاز به گزارش فروش کالای هدف دارد"
 
             results.append({
                 "id": r["id"],
                 "title": r["title"] or "تارگت فروش",
                 "salesperson": r["salesperson_name"],
                 "period": r["period_type"] or "ماهانه",
+                "target_type": r["target_type"],
                 "product_focus": r["product_focus"] or "کل سبد کالایی",
                 "target_amount": t_amt,
                 "current_sales": c_sales,
-                "remaining_amount": max(0, t_amt - c_sales),
+                "remaining_amount": None if c_sales is None else max(0, t_amt - c_sales),
                 "achievement_percent": percent,
                 "bonus": float(r["bonus_reward"] or 0),
                 "color": status_color,
@@ -1777,7 +1787,7 @@ def targets_company():
         current_report_date = conn.execute(text("SELECT CURRENT_DATE")).scalar()
         rows = conn.execute(text(
             "SELECT id, title, target_amount, status, start_date, end_date FROM targets "
-            "WHERE salesperson_id IS NULL ORDER BY id DESC LIMIT 24"
+            "WHERE salesperson_id IS NULL AND COALESCE(target_type, '') <> 'تسویه' ORDER BY id DESC LIMIT 24"
         )).mappings().all()
         ms = conn.execute(text(
             "SELECT COALESCE(SUM(total_amount), 0) FROM sales WHERE date >= date_trunc('month', CURRENT_DATE)"
@@ -1852,7 +1862,15 @@ def record_stop_structured_outcome(
         ).scalar_one_or_none()
         if plan_id is None:
             raise HTTPException(404, "توقف پیدا نشد.")
-        authorize_monthly_plan(session, plan_id, user)
+        authorize_monthly_plan(session, plan_id, user, lock=True)
+        if "expected_stop" in payload:
+            stop = session.execute(text(
+                "SELECT id, plan_id, visit_date, base_source, base_id, objective, outcome_status, "
+                "holoo_preinvoice_code, order_amount_rial, outcome_notes "
+                "FROM monthly_visit_plan_stops WHERE id = :id AND plan_id = :plan_id FOR UPDATE"
+            ), {"id": stop_id, "plan_id": plan_id}).mappings().first()
+            if stop is None or jsonable_encoder(dict(stop)) != payload["expected_stop"]:
+                raise HTTPException(409, "توقف پس از پیش‌نمایش تغییر کرده است؛ پیشنهاد تازه لازم است.")
         result = session.execute(
             text("""
                 UPDATE monthly_visit_plan_stops
@@ -1860,14 +1878,15 @@ def record_stop_structured_outcome(
                     holoo_preinvoice_code = :code,
                     order_amount_rial = :amount,
                     outcome_notes = :notes
-                WHERE id = :sid
+                WHERE id = :sid AND plan_id = :plan_id
             """),
             {
                 "status": payload.get("outcome_status", "completed"),
                 "code": payload.get("holoo_preinvoice_code"),
                 "amount": int(payload.get("order_amount_rial") or 0),
                 "notes": payload.get("outcome_notes", ""),
-                "sid": stop_id
+                "sid": stop_id,
+                "plan_id": plan_id,
             }
         )
         if result.rowcount != 1:

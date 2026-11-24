@@ -33,6 +33,8 @@ def signals(user_ids,user):
             targets=c.execute(text("SELECT id,title,target_amount,start_date,end_date,product_focus,target_type FROM targets WHERE salesperson_id=:sp AND status='active' AND (start_date IS NULL OR start_date<=:today) AND (end_date IS NULL OR end_date>=:cutoff) ORDER BY id DESC LIMIT 51"),{'sp':person['salesperson_id'],'today':today,'cutoff':today-timedelta(days=30)}).mappings().all()
             if len(targets)>50:entry['missing_data'].append('بیش از پنجاه هدف فعال؛ ابتدا اهداف قدیمی را تعیین تکلیف کنید.');targets=[]
             for t in targets:
+                if t['target_type'] == 'تسویه':
+                    entry['targets'].append({'id':t['id'],'title':t['title'],'assessable':False,'reason':'collection_evidence_required'});continue
                 if not t['start_date'] or not t['end_date'] or t['start_date']>t['end_date']:
                     entry['targets'].append({'id':t['id'],'title':t['title'],'assessable':False,'reason':'missing_target_period'});continue
                 # Legacy target_type describes period; explicit numeric-unit targets are not treated as money.

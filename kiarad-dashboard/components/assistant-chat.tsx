@@ -237,7 +237,7 @@ export function AssistantChat() {
               }}
             >
               {m.text}
-              {m.action && /^\/(catalog|person-targets|compensation|assistant-actions)(\?|$)/.test(m.action.href) && !m.action.href.startsWith("//") ? (
+              {m.action && /^\/(catalog|person-targets|compensation|assistant-actions|data-entry|agent-center)(\?|$)/.test(m.action.href) && !m.action.href.startsWith("//") ? (
                 <a href={m.action.href} target="_blank" rel="noopener noreferrer" style={{display:"block",marginTop:12,color:"#7dd3fc",textDecoration:"underline"}}>{m.action.label}</a>
               ) : null}
               {m.sender === "ai" && m.elapsed && m.elapsed > 0 ? (

@@ -39,3 +39,40 @@ class CommandTests(unittest.TestCase):
     def test_invalid_campaign_is_not_prepared(self):
         with self.assertRaises(HTTPException):
             prepare('campaign_create',{'body':{'title':'آزمون','starts_at':'2026-11-10','ends_at':'2026-11-01','target_amount':100,'reward_type':'fixed','reward_value':10}},CEO)
+
+    def test_inventory_order_uses_server_generated_submission_key(self):
+        from uuid import UUID
+
+        schema = catalog(CEO, operation='inventory_order_create')['operations'][0]['body_schema']
+        self.assertNotIn('submission_key', schema['properties'])
+        body = {'erp_code': 'ERP-1', 'snapshot_id': 42, 'policy_revision': 3}
+        prepared, _ = prepare('inventory_order_create', {'body': body}, CEO)
+        self.assertEqual(UUID(prepared['body']['submission_key']).version, 4)
+        with self.assertRaises(HTTPException):
+            prepare('inventory_order_create', {'body': prepared['body']}, CEO)
+
+    def test_inventory_policy_requires_current_revision(self):
+        schema = catalog(CEO, operation='inventory_update_policy')['operations'][0]['body_schema']
+        self.assertIn('expected_revision', schema['required'])
+        spec = COMMANDS['inventory_update_policy']
+        self.assertTrue(path_for(spec, {'erp_code': 'ERP.42'}).endswith('/ERP.42'))
+        with self.assertRaises(HTTPException):
+            path_for(spec, {'erp_code': '../ERP.42'})
+
+    def test_visit_outcome_does_not_accept_verified_presence(self):
+        args = {'path_params': {'stop_id': 12}, 'body': {'outcome_status': 'verified'}}
+        with patch('assistant_commands.before_state') as state, self.assertRaises(HTTPException):
+            prepare('monthly_plan_record_outcome', args, CEO)
+        state.assert_not_called()
+
+    def test_visit_outcome_dispatch_includes_expected_stop(self):
+        args = {'path_params': {'stop_id': 12}, 'body': {
+            'outcome_status': 'order_placed', 'order_amount_rial': 120000,
+        }}
+        before = {'id': 12, 'outcome_status': None}
+        with patch('assistant_commands.before_state', return_value=before), patch('assistant_commands.dispatch') as request:
+            payload, baseline = prepare('monthly_plan_record_outcome', args, CEO)
+            self.assertNotIn('expected_stop', payload['body'])
+            execute('monthly_plan_record_outcome', payload, baseline, CEO)
+        self.assertEqual(request.call_args.args[2]['expected_stop'], before)
+        self.assertEqual(request.call_args.args[2]['order_amount_rial'], 120000)
