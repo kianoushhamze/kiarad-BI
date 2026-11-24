@@ -366,6 +366,7 @@ def call_gpt(msg, ctx, history, role, full_name):
 
         "برای پیدا کردن پرسنل و پایگاهِ برنامهٔ ماهانه، read_panel_module با resource=monthly_visit_plan_options و query شامل بخشی از نام واقعی را بخوان. فهرست برنامه‌ها monthly_visit_plans نیز query نام پرسنل و month شمسی می‌پذیرد. برای اصلاح حین ماه فقط روزهای آیندهٔ بدون شواهد را در پیش‌نویس جدید بنویس؛ تأیید مدیرعامل، روزهای گذشته و کارکرد قبلی را خودکار بدون تغییر حفظ می‌کند. ادعای ناتوانی در اصلاح حین ماه نکن. روز گذشته یا امروز و روزهای دارای شواهد را تغییر نده و نسخهٔ قدیمی را حذف نکن. "
         "برنامهٔ ماهانهٔ ویزیت: با read_panel_module و monthly_visit_plans برای month شمسی فهرست را بخوان، سپس monthly_visit_plan_detail با plan_id واقعی برای توقف‌ها، تداخل و شواهد اجرا. پیش‌نویس را با monthly_plan_create بساز؛ submit فقط ارسال برای بازبینی است. فقط مدیرعامل می‌تواند monthly_plan_review را تأیید کند. کارکرد حقوق جدا از برنامه است؛ برای monthly_plan_workday باید روز پایان‌یافته، ویزیت معتبر و گزارش کار و مقدار صریح کارکرد و دلیل مدیرعامل وجود داشته باشد. از برنامه یا موقعیت، کارکرد واقعی حدس نزن. "
+        "معین اشخاص، مانده طرف حساب، بدهکار یا بستانکار بودن مشتری را با read_business_report در بخش customers و query فقط نام یا کد شخص بخوان. مبلغ و تاریخ را از holoo_person_balance بگیر و ریال را فقط یک بار به تومان تبدیل کن. در پرسش پیرو درباره تاریخ، شخص و گزارش مورد اشاره را از گفتگو پیدا کن؛ تاریخ مانده با تاریخ فاکتور متفاوت است. "
         "برای تارگت کامل prepare_sales_targets را بزن: یک ردیف برای هر برند یا نوع هدف، حتی اگر همه در یک جمله آمده‌اند. نام مشترک و واحد گفته‌شده برای کل فهرست را به همهٔ ردیف‌ها اعمال کن. هدف وصول و تسویه نوع جدا دارد. برای ردیف‌های خام و قابل ویرایش open_target_template را بزن. برای درخواست ساخت برنامهٔ ویزیت بر مبنای شهر، منطقه، تعداد دور یا سفر از prepare_visit_coverage استفاده کن. معنا و مرجع را از جمله و گفت‌وگوی قبلی بگیر، حتی اگر کاربر با بله شروع کند یا نام رسمی عملیات را نگوید. همهٔ شهرهای یک درخواست را با هم بفرست. تعداد دور پوشش همهٔ پایگاه‌ها و تعداد سفر به هر شهرستان را جدا حفظ کن. روز یا شناسهٔ ناگفته اختراع نکن؛ ابزار روز پیشنهاد می‌دهد. "
         "خطای invalid_arguments یعنی ساختار ورودی به اصلاح نیاز دارد؛ ساختار ابزار را بررسی و دوباره امتحان کن. فقط access_denied نشان‌دهندهٔ محدودیت دسترسی است. اگر کاربر مشخصات عمل را داده، پیش‌نمایش را آماده کن؛ تأیید نهایی در صفحهٔ پیشنهاد انجام می‌شود. "
         "برای حساب نقدی treasury_create_account معتبر است. پاسخ مالی شامل منبع، پوشش، محاسبه و پیشنهاد بر پایهٔ شواهد باشد. برای نقدینگی treasury_forecast و treasury_strategy را هم بخوان. مبلغ کسری، موعد، اولویت و دادهٔ لازم را ذکر کن. "
@@ -539,6 +540,47 @@ def lookup_catalog_analysis(question, user, history):
     return {'status': 'needs_information', 'message': 'نام یا کد کالا یا برند موردنظر را مشخص کنید.'}
 
 
+def person_balance_query(question):
+    import re
+
+    question = ' '.join(question.replace('ي', 'ی').replace('ك', 'ک').replace('‌', ' ').split()).rstrip('؟?!. ')
+    match = re.fullmatch(
+        r'(?:مانده(?:[ٔ‌]| ی)? حساب|معین اشخاص(?: مشتری)?)\s+(.+?)'
+        r'(?:\s+(?:در|از|تو) هلو)?'
+        r'\s+(?:چقدره|چقدر است|چقدر هست|چقدر شده|چقدر بدهکاره|رو بگو|را بگو)',
+        question,
+    )
+    return match[1] if match and len(match[1]) <= 100 else None
+
+
+def person_balance_answer(customer_query, user):
+    from assistant_inventory import toman
+    from assistant_reports import ReportArgs, read_report
+
+    if user['role'] != 'ceo' and not role_has_module_permission(user['role'], 'debtors', 'can_read'):
+        return 'گزارش ماندهٔ حساب در محدودهٔ دسترسی شما نیست.'
+    try:
+        report = read_report(ReportArgs(section='customers', query=customer_query), user)
+    except HTTPException as exc:
+        if exc.status_code == 403:
+            return 'گزارش ماندهٔ حساب در محدودهٔ دسترسی شما نیست.'
+        raise
+    if report.get('status') == 'ambiguous':
+        names = '، '.join(f"{item['name']} ({item['code']})" for item in report['candidates'][:5])
+        return f'چند حساب پیدا شد: {names}. نام کامل یا کد مشتری را بفرستید.'
+    if not report.get('customer'):
+        return 'حسابی با این نام یا کد در محدودهٔ دسترسی شما پیدا نشد.'
+    name = report['customer']['name']
+    balance = report.get('holoo_person_balance')
+    if balance is None:
+        return f'ماندهٔ معتبر هلو برای {name} در آخرین همگام‌سازی اعمال‌شده پیدا نشد.'
+    state = {'debtor': 'بدهکار', 'creditor': 'بستانکار', 'zero': 'مانده صفر'}[balance['balance_kind']]
+    return (
+        f'{name}، {toman(abs(balance["signed_balance_irr"]))} ({state}). '
+        f'تاریخ ماندهٔ هلو: {business_date(balance["report_date"])}.'
+    )
+
+
 @router.post("/chat")
 def chat(req: ChatRequest, user: dict = Depends(require_user)):
     if is_staff_management_question(str(user.get("role", "unknown")), req.message):
@@ -569,6 +611,15 @@ def chat(req: ChatRequest, user: dict = Depends(require_user)):
             result = {'answer':'تارگت‌های خودت را می‌توانم بررسی کنم؛ تعریف یا تغییر تارگت نیازمند مدیر است.','mode':'access_limited'}
         save_turn(uid,req.message,result['answer'],role)
         return {**result,'user_role':role}
+    balance_query = person_balance_query(question) if not execution_request else None
+    if question in {'از چه تاریخی', 'برای چه تاریخی', 'تاریخش چیه', 'این مانده مال چه تاریخیه'}:
+        previous = [turn['content'] for turn in load_history(uid, limit=12, role=role) if turn['role'] == 'user']
+        if previous:
+            balance_query = person_balance_query(previous[-1])
+    if balance_query:
+        answer = person_balance_answer(balance_query, user)
+        save_turn(uid, req.message, answer, role)
+        return {'answer': answer, 'mode': 'verified_person_balance', 'user_role': role}
     summary_kind = aggregate_question(question) if not execution_request else None
     if summary_kind:
         module = 'catalog' if summary_kind == 'inventory_value' else 'debtors'
