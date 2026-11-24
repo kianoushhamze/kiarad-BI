@@ -181,7 +181,7 @@ class ReportToolSafetyTests(unittest.TestCase):
         from fastapi import HTTPException
         valid={'title':'تارگت آزمایشی','target_amount':1000,'start_date':'2026-10-01','end_date':'2026-10-20'}
         with patch('operations.engine.begin') as begin:
-            for invalid in ({'target_amount':'NaN'},{'target_amount':-1},{'start_date':'1405/07/01'},{'end_date':'2026-09-01'},{'salesperson_id':True},{'title':''}):
+            for invalid in ({'target_amount':'NaN'},{'target_amount':-1},{'start_date':'1405/13/01'},{'end_date':'2026-09-01'},{'salesperson_id':True},{'title':''}):
                 with self.subTest(invalid=invalid),self.assertRaises(HTTPException) as error:
                     create_person_target({**valid,**invalid},{'role':'ceo','id':1})
                 self.assertEqual(error.exception.status_code,422)

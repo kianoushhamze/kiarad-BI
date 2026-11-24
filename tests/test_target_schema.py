@@ -5,10 +5,25 @@ from unittest.mock import Mock
 
 from sqlalchemy import text
 
-from target_schema import ensure_person_target_columns
+from target_schema import ensure_person_target_columns, normalize_person_target
 
 
 class TargetSchemaSafetyTests(unittest.TestCase):
+    def test_manual_target_accepts_persian_amounts_and_derives_jalali_period(self):
+        values = normalize_person_target({
+            'title': ' هدف تسویه ', 'target_amount': '۱٬۰۰۰٬۰۰۰٬۰۰۰', 'bonus_reward': '',
+            'target_type': 'تسویه', 'start_date': '۱۴۰۵/۰۹/۰۱', 'end_date': '۱۴۰۵/۰۹/۳۰',
+        })
+        self.assertEqual(values['title'], 'هدف تسویه')
+        self.assertEqual(values['target_amount'], '1000000000')
+        self.assertEqual(values['bonus_reward'], '0')
+        self.assertEqual((values['month'], values['year']), (9, 1405))
+        self.assertEqual(values['start_date'], '2026-11-22')
+
+    def test_status_only_patch_does_not_require_dates_for_a_legacy_target(self):
+        self.assertEqual(normalize_person_target({'status':'archived'}, existing={'id':7,'start_date':None}),
+                         {'status':'archived'})
+
     def test_only_adds_the_three_optional_nullable_columns(self):
         conn = Mock()
         ensure_person_target_columns(conn)

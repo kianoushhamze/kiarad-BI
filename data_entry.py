@@ -1,5 +1,5 @@
 """Preview/commit entry for operational records. Never writes to Holoo."""
-from datetime import datetime,timezone,date
+from datetime import datetime,timezone
 from decimal import Decimal
 from hashlib import sha256
 from io import BytesIO
@@ -12,6 +12,7 @@ from db import engine
 from operations import current_user
 from data_sources import FIELDS,ensure_source_storage,save_manual_fields,encoded,restore_holoo_fields
 from treasury_excel import table,number,day,norm,MAX_FILE
+from target_schema import normalize_person_target
 
 router=APIRouter(prefix='/data-entry',tags=['data-entry'])
 # key, Persian label, type, required
@@ -26,7 +27,8 @@ SPECS={
  'targets':{'label':'هدف‌های فروش','module':'personnel','href':'/person-targets','holoo':False,'fields':[
   ('title','عنوان','text',True),('salesperson_id','شناسه پرسنل ـ خالی برای شرکت','id',False),
   ('target_amount','مبلغ هدف','positive_money',True),('bonus_reward','پاداش','money',False),
-  ('start_date','شروع','date',True),('end_date','پایان','date',True),('product_focus','تمرکز کالایی','text',False)]},
+  ('start_date','شروع','date',True),('end_date','پایان','date',True),('product_focus','تمرکز کالایی','text',False),
+  ('target_type','نوع هدف ـ فروش یا تسویه','text',False)]},
  'batches':{'label':'بچ و انقضا','module':'catalog','href':'/catalog','holoo':False,'fields':[
   ('product_code','کد کالا','text',True),('batch_code','شماره بچ','text',True),
   ('expiry_date','تاریخ انقضا','date',True),('quantity','تعداد','positive_number',True),('note','توضیح','text',False)]},
@@ -97,9 +99,10 @@ def normalize_rows(entity,rows,unit):
             if output['holoo_kind'] not in (2,4):raise HTTPException(422,'نوع سند باید فروش ۲ یا برگشت فروش ۴ باشد.')
             key=(output['holoo_kind'],output['holoo_erp_code'])
         elif entity=='targets':
-            if len(output['title'])<2 or output['start_date']>output['end_date'] or (date.fromisoformat(output['end_date'])-date.fromisoformat(output['start_date'])).days>366:
-                raise HTTPException(422,'عنوان و بازهٔ هدف معتبر نیست.')
-            key=(output['title'],output.get('salesperson_id'),output['start_date'],output['end_date'])
+            if output.get('target_type') not in (None, 'فروش', 'تسویه'):
+                raise HTTPException(422, f'ردیف {index}: نوع هدف باید فروش یا تسویه باشد.')
+            normalize_person_target(output)
+            key=(output['title'],output.get('salesperson_id'),output['start_date'],output['end_date'],output.get('target_type') == 'تسویه')
         else:key=(output.get('product_code'),output['batch_code']) if entity=='batches' else output['code']
         if key in seen:raise HTTPException(422,f'ردیف {index}: کلید تکراری در همین ورودی.')
         seen.add(key);normalized.append(output)
@@ -121,8 +124,10 @@ def plan_rows(conn,entity,rows,lock=False):
             sid=values.get('salesperson_id')
             if sid and not conn.execute(text('SELECT id FROM salespersons WHERE id=:id'),{'id':sid}).first():raise HTTPException(422,'شناسهٔ پرسنل هدف پیدا نشد؛ نام شخص حدس زده نمی‌شود.')
             found=conn.execute(text('''SELECT * FROM targets WHERE title=:title
-                AND salesperson_id IS NOT DISTINCT FROM :sid AND start_date=:start AND end_date=:end'''+(' FOR UPDATE' if lock else '')),
-                {'title':values['title'],'sid':sid,'start':values['start_date'],'end':values['end_date']}).mappings().all()
+                AND salesperson_id IS NOT DISTINCT FROM :sid AND start_date=:start AND end_date=:end
+                AND (:kind IS NULL OR (COALESCE(target_type,'')='تسویه')=(:kind='تسویه'))'''+(' FOR UPDATE' if lock else '')),
+                {'title':values['title'],'sid':sid,'start':values['start_date'],'end':values['end_date'],
+                 'kind':values.get('target_type')}).mappings().all()
         else:
             product=conn.execute(text('SELECT id FROM products WHERE code=:code'),{'code':values['product_code']}).scalars().all()
             if len(product)!=1:raise HTTPException(422,'کد کالا در ردیف بچ باید دقیق و یکتا باشد.')
@@ -272,9 +277,10 @@ def commit(entity:str,batch_id:int,data:Confirm,user=Depends(current_user)):
             elif entity=='targets':
                 values={**values,'salesperson_id':values.get('salesperson_id')}
                 if ident is None:
-                    values={'status':'active','period_type':'بازهٔ مشخص','target_type':'فروش','bonus_reward':0,'product_focus':'',**values}
+                    values=normalize_person_target({'period_type':'بازهٔ مشخص','target_type':'فروش',**values})
                     ident=conn.execute(text('INSERT INTO targets ('+', '.join(values)+',created_at) VALUES ('+', '.join(':'+key for key in values)+',NOW()) RETURNING id'),values).scalar_one();created+=1
                 else:
+                    values=normalize_person_target(values, existing=values)
                     conn.execute(text('UPDATE targets SET '+', '.join(f'{key}=:{key}' for key in values)+' WHERE id=:id'),{**values,'id':ident});updated+=1
             else:
                 values.pop('product_code')

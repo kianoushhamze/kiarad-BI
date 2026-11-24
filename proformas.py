@@ -289,6 +289,7 @@ def get_visitors_kpis(user: dict = Depends(current_user)):
                 SELECT target_amount, start_date, end_date
                 FROM targets
                 WHERE salesperson_id = sp.id AND status = 'active'
+                  AND COALESCE(target_type, '') <> 'تسویه'
                   AND target_amount > 0
                   AND start_date IS NOT NULL AND end_date IS NOT NULL
                   AND CURRENT_DATE BETWEEN start_date AND end_date

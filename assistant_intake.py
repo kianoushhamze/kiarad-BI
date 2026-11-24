@@ -13,7 +13,7 @@ from sqlalchemy import text
 
 from assistant_commands import authorize
 from assistant_inventory import ALIASES, normalize
-from assistant_money import DIGITS, explicit_money, parse_money_phrase
+from assistant_money import DIGITS, explicit_money, money_units, parse_money_phrase, quoted_shared_amount
 from assistant_operations import prepare
 from db import engine
 from iran_time import iran_today
@@ -29,13 +29,16 @@ class Target(Strict):
     person: str | None = Field(default=None, min_length=2, max_length=100)
     salesperson_id: int | None = Field(default=None, gt=0)
     company: bool = False
+    kind: Literal['sale', 'settlement'] = 'sale'
     amount_phrase: str = Field(min_length=3, max_length=100)
     reward_phrase: str | None = Field(default=None, min_length=3, max_length=100)
     product_focus: str | None = Field(default=None, max_length=150)
 
 
 class Targets(Strict):
-    month: str = Field(description='ماه شمسی به صورت نام ماه یا سال-ماه. برای ماه جاری، «ماه جاری».', max_length=24)
+    month: str = Field(default='ماه جاری', description='نام ماه یا سال-ماه شمسی. اگر بازه ذکر نشده، پیش‌نمایش برای ماه جاری است.', max_length=24)
+    person: str | None = Field(default=None, min_length=2, max_length=100, description='نام مشترک پرسنل برای تمام ردیف‌هایی که فرد جدا ندارند.')
+    shared_unit: Literal['ریال', 'تومان'] | None = Field(default=None, description='واحد صریح مشترک در جمله، حتی اگر فقط انتهای فهرست آمده باشد.')
     rows: list[Target] = Field(min_length=1, max_length=30)
 
 
@@ -80,6 +83,10 @@ def find_people(people, name):
     if not name:
         return []
     wanted = normalize(name).split()
+    if wanted and wanted[0] in {'خانم', 'آقا', 'اقا', 'آقای', 'اقای', 'جناب', 'دکتر', 'مهندس'}:
+        wanted = wanted[1:]
+    if not wanted:
+        return []
     exact = [person for person in people if normalize(person['name']).split() == wanted]
     if exact:
         return exact
@@ -110,27 +117,34 @@ def _explicit_brand(value):
 def _mentions_target(context, target):
     if target.title:
         return normalize(target.title) in context
-    return any(normalize(label) in context for label in (target.person, target.product_focus) if label) or target.company
+    if target.product_focus:
+        aliases = ALIASES.get(_explicit_brand(target.product_focus), ())
+        return any(normalize(label) in context for label in (target.product_focus, *aliases))
+    return bool(target.person and normalize(target.person) in context) or target.company
 
 
 def prepare_sales_targets(args, user, message, history):
     authorize('enter_targets', user)
     request = Targets.model_validate(args)
-    start, end = month_window(jalali_month(request.month, iran_today()))
+    month = jalali_month(request.month, iran_today())
+    start, end = month_window(month)
     end -= timedelta(days=1)
     # Clarifications can supply amounts or an ID without repeating the title.
     previous = next((turn['content'] for turn in reversed(history) if turn.get('role') == 'user'), '')
     current = normalize(message)
     previous_normalized = normalize(previous)
-    previous_context = any(not _mentions_target(current, row) for row in request.rows)
-    if previous_context and (len(request.rows) != 1 or not _mentions_target(previous_normalized, request.rows[0])):
+    targets = [row if row.person or row.company or not request.person else row.model_copy(update={'person': request.person}) for row in request.rows]
+    previous_context = any(not _mentions_target(current, row) for row in targets)
+    if previous_context and (len(targets) != 1 or not _mentions_target(previous_normalized, targets[0])):
         return {'status': 'needs_information', 'message': 'فقط تارگت همین درخواست را بیاور. اگر کاربر عنوان نداده، فیلد عنوان را خالی بگذار.'}
     amount_source = message if explicit_money(message) else (previous if previous_context else message)
     amounts = explicit_money(amount_source)
+    units = money_units(amount_source)
+    shared_unit = request.shared_unit if units == {request.shared_unit} else None
     with engine.connect() as conn:
         people = [dict(row) for row in conn.execute(text('SELECT id, name FROM salespersons ORDER BY name')).mappings()]
     rows = []
-    for target in request.rows:
+    for target in targets:
         if target.company and (target.person or target.salesperson_id):
             return {'status': 'needs_information', 'message': 'تارگت برای پرسنل است یا کل شرکت؟'}
         person = None
@@ -140,26 +154,30 @@ def prepare_sales_targets(args, user, message, history):
                 return {'status': 'needs_information', 'message': 'نام کامل فرد موردنظر همین تارگت را مشخص کنید.',
                         'candidates': [item['name'] for item in matches[:8]]}
             person = matches[0]
-        ingredients = (target.amount_phrase, target.reward_phrase)
+        phrases = (target.amount_phrase, target.reward_phrase)
         try:
-            parsed = [parse_money_phrase(phrase) if phrase else None for phrase in ingredients]
+            parsed = [parse_money_phrase(phrase, shared_unit) if phrase else None for phrase in phrases]
         except ValueError as exc:
             return {'status': 'needs_information', 'message': str(exc)}
-        if any(value is not None and value not in amounts for value in parsed):
+        if any(value is not None and value not in amounts and not (shared_unit and quoted_shared_amount(amount_source, phrase))
+               for value, phrase in zip(parsed, phrases)):
             return {'status': 'needs_information', 'message': 'مبلغ همین تارگت را عیناً از متن کاربر و همراه واحد بردار.',
                     'explicit_amounts_irr': [str(value) for value in amounts]}
         target_amount, reward = parsed
-        if len(request.rows) == 1 and len(set(amounts)) == 2 and len(set(parsed) & set(amounts)) != 2:
+        if len(targets) == 1 and len(set(amounts)) == 2 and len(set(parsed) & set(amounts)) != 2:
             return {'status': 'needs_information', 'message': 'هر دو مبلغ صریح همین درخواست را در فیلد هدف و پاداش قرار بده.'}
-        if target_amount <= 0 or target_amount > 10**15 or (reward is not None and not 0 <= reward <= 10**15):
+        if target_amount <= 0 or target_amount > 10**15 or (reward is not None and not 0 <= reward < 10**13):
             return {'status': 'needs_information', 'message': 'مبلغ هدف باید مثبت باشد و هدف و پاداش در محدودهٔ مجاز فرم باشند.'}
         title_brand = _explicit_brand(normalize(target.title).removeprefix('تارگت ').removeprefix('هدف '))
         focus_brand = _explicit_brand(target.product_focus)
         if title_brand and focus_brand and title_brand != focus_brand:
             return {'status': 'needs_information', 'message': 'برند در عنوان و کالای هدف متفاوت است. کدام برند برای این تارگت درست است؟'}
-        row = {'title': target.title or (f'تارگت {target.product_focus}' if target.product_focus else 'تارگت فروش'),
+        label = 'تسویه' if target.kind == 'settlement' else 'فروش'
+        row = {'title': target.title or (f'تارگت {label} {target.product_focus}' if target.product_focus else f'تارگت {label}'),
                'target_amount': format(target_amount, 'f'),
                'start_date': start.isoformat(), 'end_date': end.isoformat()}
+        if target.kind == 'settlement':
+            row['target_type'] = 'تسویه'
         if person:
             row['salesperson_id'] = person['id']
         if reward is not None:
@@ -176,7 +194,9 @@ def prepare_sales_targets(args, user, message, history):
         result['message'] = f'پیشنهاد «{row["title"]}» برای {person_label} با مبلغ هدف {amount} ریال آمادهٔ بررسی است.'
         if reward is not None:
             result['message'] += f' پاداش {format(reward, ",f")} ریال است.'
-        result['message'] += ' ثبت پس از تأیید در پنل انجام می‌شود.'
+        result['message'] += f' دورهٔ شمسی {month} است و ثبت پس از تأیید در پنل انجام می‌شود.'
+    elif result.get('status') == 'operation_preview':
+        result['message'] = f'{len(rows)} تارگت برای دورهٔ شمسی {month} آمادهٔ بررسی است. ردیف‌ها با هم پس از تأیید در پنل ثبت می‌شوند.'
     return result
 
 

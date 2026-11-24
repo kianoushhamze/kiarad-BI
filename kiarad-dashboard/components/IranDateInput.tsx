@@ -68,10 +68,8 @@ export function IranDateInput({
     setRawValue(next);
     event.currentTarget.setCustomValidity("");
     const isoDate = jalaliDateInputToIso(next);
-    if (isoDate || !next) {
-      lastEmittedValue.current = isoDate ?? "";
-      onChange?.(isoDate ?? "");
-    }
+    lastEmittedValue.current = isoDate ?? "";
+    onChange?.(lastEmittedValue.current);
   };
 
   const handleBlur = (event: FocusEvent<HTMLInputElement>) => validate(event, rawValue);

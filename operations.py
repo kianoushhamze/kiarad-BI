@@ -2,7 +2,6 @@ import hashlib
 import hmac
 import os
 import secrets
-from decimal import Decimal, InvalidOperation
 from datetime import date, datetime, timedelta, timezone
 from typing import Optional
 
@@ -13,7 +12,7 @@ from sqlalchemy import text
 
 from db import engine
 from iran_time import iran_today, iran_month_bounds
-from target_schema import ensure_person_target_columns
+from target_schema import ensure_person_target_columns, normalize_person_target, validate_target_person
 
 
 router = APIRouter(tags=["operations"])
@@ -405,29 +404,10 @@ def list_person_targets(salesperson_id: int = None, user: dict = Depends(current
 
 @router.post("/targets/person-targets", status_code=201)
 def create_person_target(data: dict, user: dict = Depends(require_manager)):
-    try:
-        amount = Decimal(str(data.get('target_amount')))
-        bonus = Decimal(str(data.get('bonus_reward') or 0))
-        begin = date.fromisoformat(str(data.get('start_date')))
-        end = date.fromisoformat(str(data.get('end_date')))
-        if not amount.is_finite() or not 0 < amount <= Decimal('1e15') or not bonus.is_finite() or not 0 <= bonus < Decimal('1e13') or begin > end or (end-begin).days > 366:
-            raise ValueError()
-        if not isinstance(data.get('title'),str) or not 2 <= len(data['title'].strip()) <= 160:
-            raise ValueError()
-        for key,limit in (('product_focus',150),('period_type',50),('target_type',50)):
-            if key in data and (not isinstance(data[key],str) or len(data[key])>limit):
-                raise ValueError()
-        if data.get('status','active') not in {'active','archived'}:
-            raise ValueError()
-        sid = data.get('salesperson_id')
-        if sid is not None and (isinstance(sid,bool) or not str(sid).isdigit() or int(sid) <= 0):
-            raise ValueError()
-    except (ValueError,TypeError,InvalidOperation):
-        raise HTTPException(422, 'عنوان، مبلغ و پاداش معتبر به ریال و بازهٔ شروع و پایان لازم است.')
+    values = normalize_person_target(data)
     with engine.begin() as conn:
-        if sid is not None and not conn.execute(text('SELECT 1 FROM salespersons WHERE id=:id'),{'id':int(sid)}).scalar():
-            raise HTTPException(422,'ویزیتور معتبر انتخاب کنید.')
-        r = conn.execute(text("""
+        validate_target_person(conn, values)
+        ident = conn.execute(text("""
             INSERT INTO targets
                 (title, target_amount, month, year, target_type, start_date, end_date,
                  status, salesperson_id, period_type, product_focus, bonus_reward, created_at)
@@ -435,41 +415,30 @@ def create_person_target(data: dict, user: dict = Depends(require_manager)):
                 (:title, :target_amount, :month, :year, :target_type, :start_date, :end_date,
                  :status, :salesperson_id, :period_type, :product_focus, :bonus_reward, NOW())
             RETURNING id
-        """), {
-            "title": data.get("title", ""),
-            "target_amount": data.get("target_amount", 0),
-            "month": data.get("month"),
-            "year": data.get("year"),
-            "target_type": data.get("target_type", "ماهانه"),
-            "start_date": data.get("start_date"),
-            "end_date": data.get("end_date"),
-            "status": data.get("status", "active"),
-            "salesperson_id": data.get("salesperson_id"),
-            "period_type": data.get("period_type", ""),
-            "product_focus": data.get("product_focus", ""),
-            "bonus_reward": data.get("bonus_reward", 0),
-        }).first()
-    return {"ok": True, "id": r[0]}
+        """), values).scalar_one()
+    return {"ok": True, "id": ident}
+
+
+@router.get("/targets/person-targets/options")
+def person_target_options(user: dict = Depends(require_manager)):
+    with engine.connect() as conn:
+        people = conn.execute(text("SELECT id, name FROM salespersons ORDER BY name, id")).mappings()
+        return {
+            "salespersons": [dict(row) for row in people],
+            "can_write": role_has_module_permission(user["role"], "personnel", "can_write", connection=conn),
+        }
 
 
 @router.patch("/targets/person-targets/{tid}")
 def update_person_target(tid: int, data: dict, user: dict = Depends(require_manager)):
-    fields = ["title", "target_amount", "month", "year", "target_type",
-              "start_date", "end_date", "status", "salesperson_id",
-              "period_type", "product_focus", "bonus_reward"]
-    sets = []
-    params = {"id": tid}
-    for k in fields:
-        if k in data:
-            sets.append(k + " = :" + k)
-            params[k] = data[k]
-    if not sets:
-        raise HTTPException(status_code=422, detail="no fields")
-    sql = "UPDATE targets SET " + ", ".join(sets) + " WHERE id = :id RETURNING id"
     with engine.begin() as conn:
-        r = conn.execute(text(sql), params).first()
-    if not r:
-        raise HTTPException(status_code=404, detail="not found")
+        existing = conn.execute(text("SELECT * FROM targets WHERE id=:id FOR UPDATE"), {"id": tid}).mappings().first()
+        if not existing:
+            raise HTTPException(404, "تارگت پیدا نشد.")
+        values = normalize_person_target(data, existing=existing)
+        validate_target_person(conn, values)
+        assignments = ", ".join(f"{field} = :{field}" for field in values)
+        conn.execute(text(f"UPDATE targets SET {assignments} WHERE id=:id"), {**values, "id": tid})
     return {"ok": True}
 
 
@@ -513,7 +482,10 @@ def my_target_summary(user: dict = Depends(current_user)):
             SELECT COALESCE(SUM(target_amount),0)
             FROM targets
             WHERE salesperson_id = :spid AND status = 'active'
-        """), {"spid": spid}).scalar() or 0
+              AND COALESCE(target_type, '') <> 'تسویه'
+              AND (start_date IS NULL OR start_date < :month_end)
+              AND (end_date IS NULL OR end_date >= :month_start)
+        """), {"spid": spid, "month_start": month_start, "month_end": month_end}).scalar() or 0
 
     achievement = 0
     if total_target and total_target > 0:
@@ -730,6 +702,7 @@ def visitors_overview(user: dict = Depends(current_user)):
             LEFT JOIN LATERAL (
                 SELECT target_amount FROM targets
                 WHERE salesperson_id=sp.id AND status='active'
+                  AND COALESCE(target_type, '') <> 'تسویه'
                 ORDER BY start_date DESC NULLS LAST, id DESC LIMIT 1
             ) t ON TRUE
             LEFT JOIN LATERAL (

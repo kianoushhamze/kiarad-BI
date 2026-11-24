@@ -2,8 +2,9 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { DataEntryLink } from "../../components/data-entry-link";
 import { PortalShell } from "../../components/portal-shell";
-import { authFetch } from "../../lib/secure-api";
+import { authFetch, secureApi } from "../../lib/secure-api";
 import { IranDateInput } from "../../components/IranDateInput";
+import { displayMoney, inputMoney, type MoneyUnit } from "../../lib/payroll-contract";
 
 type Target = {
   id: number;
@@ -37,33 +38,42 @@ export default function PersonTargetsPage() {
   const [sps, setSps] = useState<SP[]>([]);
   const [loading, setLoading] = useState(true);
   const [msg, setMsg] = useState("");
+  const [formError, setFormError] = useState("");
   const [editing, setEditing] = useState<TargetDraft | null>(null);
+  const [unit, setUnit] = useState<MoneyUnit>("rial");
   const [saving, setSaving] = useState(false);
   const [filterSp, setFilterSp] = useState<string>("");
   const [role, setRole] = useState("");
   const [managerDataReady, setManagerDataReady] = useState(false);
+  const [canWrite, setCanWrite] = useState(false);
   const draftLoaded = useRef(false);
-  const canManageTargets = role === "ceo" || role === "sales_manager";
+  const managerRole = role === "ceo" || role === "sales_manager";
+  const canManageTargets = managerRole && canWrite;
 
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const [r1, r2] = await Promise.all([
-        authFetch("/targets/person-targets" + (canManageTargets && filterSp ? "?salesperson_id=" + filterSp : "")),
-        canManageTargets ? authFetch("/salespersons") : Promise.resolve(null),
+      const [targets, options] = await Promise.allSettled([
+        secureApi<{items: Target[]}>("/targets/person-targets" + (managerRole && filterSp ? "?salesperson_id=" + filterSp : "")),
+        managerRole ? secureApi<{salespersons: SP[]; can_write: boolean}>("/targets/person-targets/options") : Promise.resolve(null),
       ]);
-      if (r1.ok) {
-        const d = await r1.json();
-        setItems(d.items || []);
+      if (targets.status === "fulfilled") {
+        setItems(targets.value.items || []);
+      } else {
+        setMsg(targets.reason instanceof Error ? targets.reason.message : "فهرست تارگت‌ها دریافت نشد.");
       }
-      if (r2?.ok) {
-        const d = await r2.json();
-        setSps(d.salespersons || []);
+      if (options.status === "fulfilled" && options.value) {
+        setSps(options.value.salespersons);
+        setCanWrite(options.value.can_write);
         setManagerDataReady(true);
+      } else if (options.status === "rejected") {
+        setCanWrite(false);
+        setMsg(options.reason instanceof Error ? options.reason.message : "گزینه‌های ثبت تارگت دریافت نشد.");
       }
-    } catch {}
-    setLoading(false);
-  }, [canManageTargets, filterSp]);
+    } finally {
+      setLoading(false);
+    }
+  }, [managerRole, filterSp]);
 
   useEffect(() => {
     authFetch("/auth/me").then((response) => response.ok ? response.json() : null).then((user) => setRole(user?.role || "")).catch(() => setRole("visitor"));
@@ -92,6 +102,8 @@ export default function PersonTargetsPage() {
       const person = d.salesperson_id === null ? "" : Number(d.salesperson_id);
       if (!Number.isFinite(amount) || amount <= 0 || amount > 1e15 || (person !== "" && !sps.some(s => s.id === person))) throw new Error("invalid");
       if (typeof d.title !== "string" || typeof d.start_date !== "string" || typeof d.end_date !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(d.start_date) || !/^\d{4}-\d{2}-\d{2}$/.test(d.end_date) || d.start_date > d.end_date) throw new Error("invalid");
+      setUnit("rial");
+      setFormError("");
       setEditing({_new:true,title:d.title.slice(0,160),target_amount:amount,salesperson_id:person,start_date:d.start_date,end_date:d.end_date,
         period_type:typeof d.period_type === "string" ? d.period_type.slice(0,50) : "",target_type:"ماهانه",product_focus:typeof d.product_focus === "string" ? d.product_focus.slice(0,150) : "",bonus_reward:0,status:"active"});
       setMsg("پیش‌نویس دستیار؛ هنوز ذخیره نشده. مبلغ به ریال، فرد یا شرکت و بازه را بازبینی کنید.");
@@ -103,6 +115,8 @@ export default function PersonTargetsPage() {
   }, [canManageTargets, managerDataReady, loading, sps]);
 
   const openNew = () => {
+    setUnit("rial");
+    setFormError("");
     setEditing({
       _new: true,
       title: "",
@@ -110,7 +124,7 @@ export default function PersonTargetsPage() {
       target_type: "ماهانه",
       product_focus: "",
       period_type: "",
-      salesperson_id: sps[0]?.id || "",
+      salesperson_id: filterSp || sps[0]?.id || "",
       status: "active",
       bonus_reward: "",
       start_date: "",
@@ -119,48 +133,45 @@ export default function PersonTargetsPage() {
   };
 
   const save = async () => {
-    if (!editing) return;
-    if (!editing.title?.trim() || !Number.isFinite(Number(editing.target_amount)) || Number(editing.target_amount) <= 0 || !editing.start_date || !editing.end_date || editing.start_date > editing.end_date) {
-      setMsg("عنوان، مبلغ مثبت و بازهٔ شروع و پایان معتبر لازم است.");
+    if (!editing || saving) return;
+    const amount = inputMoney(String(editing.target_amount), unit);
+    const bonus = inputMoney(String(editing.bonus_reward ?? ""), unit) || "0";
+    const validMoney = /^\d+(?:\.\d{1,2})?$/;
+    if (!editing.title?.trim() || editing.title.trim().length < 2) {
+      setFormError("عنوان تارگت را کامل وارد کنید.");
+      return;
+    }
+    if (!validMoney.test(amount) || Number(amount) <= 0 || !validMoney.test(bonus)) {
+      setFormError("مبلغ تارگت باید عدد مثبت و پاداش عددی صفر یا بیشتر باشد.");
+      return;
+    }
+    if (!editing.start_date || !editing.end_date || editing.start_date > editing.end_date) {
+      setFormError("تاریخ شمسی شروع و پایان را کامل وارد کنید. پایان نباید پیش از شروع باشد.");
       return;
     }
     setSaving(true);
-    setMsg("");
+    setFormError("");
     try {
-      const payload: Record<string, unknown> = { ...editing };
-      delete payload._new;
-      delete payload.id;
-      delete payload.salesperson_name;
-      const asNumberOrNull = (value: number | string | undefined) => value === "" || value === undefined ? null : Number(value);
-      payload.target_amount = Number(editing.target_amount);
-      payload.salesperson_id = asNumberOrNull(editing.salesperson_id);
-      payload.bonus_reward = asNumberOrNull(editing.bonus_reward);
-      payload.month = asNumberOrNull(editing.month);
-      payload.year = asNumberOrNull(editing.year);
-      payload.start_date = editing.start_date || null;
-      payload.end_date = editing.end_date || null;
-
       const isNew = !!editing._new;
       const url = isNew ? "/targets/person-targets" : "/targets/person-targets/" + editing.id;
-      const method = isNew ? "POST" : "PATCH";
-      const r = await authFetch(url, {
-        method,
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
+      await secureApi(url, {
+        method: isNew ? "POST" : "PATCH",
+        body: JSON.stringify({
+          title: editing.title.trim(), target_amount: amount, bonus_reward: bonus,
+          salesperson_id: editing.salesperson_id ? Number(editing.salesperson_id) : null,
+          start_date: editing.start_date, end_date: editing.end_date,
+          target_type: editing.target_type || "ماهانه", status: editing.status || "active",
+          period_type: editing.period_type || "", product_focus: editing.product_focus || "",
+        }),
       });
-      if (r.ok) {
-        setMsg("ذخیره شد ✓");
-        setEditing(null);
-        load();
-      } else {
-        const e = await r.json().catch(() => ({}));
-        setMsg("خطا: " + (e.detail || r.status));
-      }
+      setMsg("تارگت ذخیره شد.");
+      setEditing(null);
+      void load();
     } catch (e: unknown) {
-      setMsg("خطا: " + (e instanceof Error ? e.message : ""));
+      setFormError(e instanceof Error ? e.message : "ذخیرهٔ تارگت انجام نشد.");
+    } finally {
+      setSaving(false);
     }
-    setSaving(false);
-    setTimeout(() => setMsg(""), 4000);
   };
 
   const remove = async (id: number) => {
@@ -232,7 +243,7 @@ export default function PersonTargetsPage() {
                     {t.bonus_reward ? <div className="mt-1 text-[11px] text-amber-300">💰 پاداش تحقق: {toman(t.bonus_reward)}</div> : null}
                   </div>
                   {canManageTargets ? <div className="flex gap-1">
-                    <button onClick={() => setEditing({ ...t })} className="rounded-lg border border-violet-400/30 bg-violet-500/10 px-2 py-1 text-[10px] text-violet-200">✏️</button>
+                    <button onClick={() => {setUnit("rial"); setFormError(""); setEditing({ ...t });}} className="rounded-lg border border-violet-400/30 bg-violet-500/10 px-2 py-1 text-[10px] text-violet-200">✏️</button>
                     <button onClick={() => toggleStatus(t)} className="rounded-lg border border-amber-400/30 bg-amber-500/10 px-2 py-1 text-[10px] text-amber-200">{t.status === "active" ? "📦" : "✅"}</button>
                     <button onClick={() => remove(t.id)} className="rounded-lg border border-rose-400/30 bg-rose-500/10 px-2 py-1 text-[10px] text-rose-200">🗑️</button>
                   </div> : null}
@@ -243,8 +254,8 @@ export default function PersonTargetsPage() {
         )}
 
         {canManageTargets && editing && (
-          <div className="fixed inset-0 z-50 grid place-items-center bg-black/70 p-4" onClick={() => setEditing(null)}>
-            <div className="w-full max-w-lg rounded-2xl border border-white/10 bg-[#0f1222] p-5" onClick={(e) => e.stopPropagation()}>
+          <div className="fixed inset-0 z-50 grid place-items-center bg-black/70 p-4" onClick={() => {if (!saving) setEditing(null);}}>
+            <form className="w-full max-w-lg rounded-2xl border border-white/10 bg-[#0f1222] p-5" onClick={(e) => e.stopPropagation()} onSubmit={(e) => {e.preventDefault(); void save();}}>
               <h3 className="mb-4 text-sm font-bold text-white">{editing._new ? "افزودن تارگت" : "ویرایش تارگت"}</h3>
               <div className="grid max-h-[70vh] gap-3 overflow-y-auto">
                 <label><span className="mb-1 block text-[10px] text-slate-400">عنوان</span>
@@ -254,16 +265,30 @@ export default function PersonTargetsPage() {
                     <option value="">کل شرکت</option>
                     {sps.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
                   </select></label>
+                <label className="text-xs text-slate-400">واحد مبالغ
+                  <select value={unit} onChange={(e) => {
+                    const next = e.target.value as MoneyUnit;
+                    setEditing({...editing,
+                      target_amount: displayMoney(inputMoney(String(editing.target_amount), unit), next),
+                      bonus_reward: displayMoney(inputMoney(String(editing.bonus_reward ?? ""), unit), next),
+                    });
+                    setUnit(next);
+                  }} className="block w-full rounded-lg border border-white/10 bg-black/20 px-3 py-2 text-xs text-white">
+                    <option value="rial">ریال</option><option value="toman">تومان</option>
+                  </select>
+                </label>
                 <div className="grid grid-cols-2 gap-2">
-                  <label><span className="mb-1 block text-[10px] text-slate-400">مبلغ تارگت (ریال)</span>
-                    <input type="number" value={editing.target_amount} onChange={(e) => setEditing({ ...editing, target_amount: e.target.value })} className="w-full rounded-lg border border-white/10 bg-black/20 px-3 py-2 text-xs text-white outline-none" /></label>
-                  <label><span className="mb-1 block text-[10px] text-slate-400">پاداش (ریال)</span>
-                    <input type="number" value={editing.bonus_reward} onChange={(e) => setEditing({ ...editing, bonus_reward: e.target.value })} className="w-full rounded-lg border border-white/10 bg-black/20 px-3 py-2 text-xs text-white outline-none" /></label>
+                  <label><span className="mb-1 block text-[10px] text-slate-400">مبلغ تارگت ({unit === "rial" ? "ریال" : "تومان"})</span>
+                    <input inputMode="decimal" value={editing.target_amount} onChange={(e) => setEditing({ ...editing, target_amount: e.target.value })} className="w-full rounded-lg border border-white/10 bg-black/20 px-3 py-2 text-xs text-white outline-none" /></label>
+                  <label><span className="mb-1 block text-[10px] text-slate-400">پاداش ({unit === "rial" ? "ریال" : "تومان"})</span>
+                    <input inputMode="decimal" value={editing.bonus_reward ?? ""} onChange={(e) => setEditing({ ...editing, bonus_reward: e.target.value })} className="w-full rounded-lg border border-white/10 bg-black/20 px-3 py-2 text-xs text-white outline-none" /></label>
                 </div>
                 <div className="grid grid-cols-2 gap-2">
                   <label><span className="mb-1 block text-[10px] text-slate-400">نوع تارگت</span>
                     <select value={editing.target_type} onChange={(e) => setEditing({ ...editing, target_type: e.target.value })} className="w-full rounded-lg border border-white/10 bg-black/20 px-3 py-2 text-xs text-white">
                       <option value="ماهانه">ماهانه</option>
+                      <option value="فروش">فروش</option>
+                      <option value="تسویه">تسویه</option>
                       <option value="هفتگی">هفتگی</option>
                       <option value="کالای مانده">کالای مانده</option>
                       <option value="سودده">سودده</option>
@@ -282,11 +307,12 @@ export default function PersonTargetsPage() {
                     <IranDateInput value={editing.end_date || ""} onChange={(value) => setEditing({ ...editing, end_date: value })} className="w-full rounded-lg border border-white/10 bg-black/20 px-3 py-2 text-xs text-white outline-none" /></label>
                 </div>
               </div>
+              {formError && <p role="alert" className="mt-3 rounded-lg bg-rose-500/15 p-3 text-xs text-rose-200">{formError}</p>}
               <div className="mt-5 flex justify-end gap-2">
-                <button onClick={() => setEditing(null)} className="rounded-lg border border-white/10 px-4 py-2 text-xs text-slate-400">انصراف</button>
-                <button onClick={save} disabled={saving} className="rounded-lg bg-violet-600 px-4 py-2 text-xs font-bold text-white disabled:opacity-50">{saving ? "..." : "ذخیره"}</button>
+                <button type="button" onClick={() => setEditing(null)} disabled={saving} className="rounded-lg border border-white/10 px-4 py-2 text-xs text-slate-400">انصراف</button>
+                <button type="submit" disabled={saving} className="rounded-lg bg-violet-600 px-4 py-2 text-xs font-bold text-white disabled:opacity-50">{saving ? "در حال ذخیره…" : "ذخیره"}</button>
               </div>
-            </div>
+            </form>
           </div>
         )}
       </div>

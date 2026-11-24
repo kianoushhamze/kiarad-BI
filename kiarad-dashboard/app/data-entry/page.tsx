@@ -9,6 +9,7 @@ type EntryField={key:string;label:string;type:string;required:boolean};
 type Entity={id:string;label:string;fields:EntryField[];holoo:boolean;href:string};
 type Preview={id:number;entity:string;status:string;row_count:number;rows:{id:number|null;action:string;values:Record<string,unknown>}[]};
 type Refresh={status:string;finished_at?:string|null;sources:{kind:string;count:number;ok:boolean;complete:boolean}[]};
+const rowHasInput=(row:Record<string,string>)=>Object.values(row).some(value=>value.trim()!=="");
 
 export default function DataEntryPage(){
  const [entities,setEntities]=useState<Entity[]>([]),[entity,setEntity]=useState("products");
@@ -54,7 +55,11 @@ export default function DataEntryPage(){
  const prepare=async(event:FormEvent)=>{
   event.preventDefault();if(!selected||busy)return;setBusy(true);setMessage("");setPreview(null);
   try{
-   if(mode==="manual")setPreview(await secureApi<Preview>(`/data-entry/${entity}/manual/preview`,{method:"POST",body:JSON.stringify({unit,rows})}));
+   if(mode==="manual"){
+    const submitted=entity==="targets"?rows.filter(rowHasInput):rows;
+    if(!submitted.length)throw new Error("ابتدا حداقل یک ردیف تارگت را تکمیل کنید.");
+    setPreview(await secureApi<Preview>(`/data-entry/${entity}/manual/preview`,{method:"POST",body:JSON.stringify({unit,rows:submitted})}));
+   }
    else{
     if(!file)throw new Error("فایل اکسل را انتخاب کنید.");
     const body=new FormData();body.append("file",file);body.append("unit",unit);body.append("sheet_name",sheet);
@@ -94,7 +99,10 @@ export default function DataEntryPage(){
     {selected&&<p className="text-xs leading-7 text-slate-400">{selected.holoo?"منبع هلو برای این بخش از دریافت خودکار موجود خوانده می‌شود؛ اولویت فیلدهای دستی جداگانه حفظ می‌شود.":"وب‌سرویس فعلی برای این بخش منبع مستقیم تأییدشده ندارد؛ اطلاعات باید دستی یا از اکسل وارد شوند."} <Link className="text-violet-300 underline" href={selected.href}>باز کردن بخش مرتبط</Link></p>}
     {selected?.holoo&&<div className="rounded-xl border border-white/10 p-3 text-xs leading-7 text-slate-300"><button type="button" onClick={()=>void refreshHoloo()} disabled={busy||refresh?.status==="running"} className={primaryButton}>{refresh?.status==="running"?"دریافت هلو در حال اجراست…":"دریافت تازه از هلو"}</button><p className="mt-2">{refresh?.status==="completed"?"دریافت و تطبیق منابع کامل شد.":refresh?.status==="failed"||refresh?.status==="partial"?"دریافت یا تطبیق کامل نشده است؛ وضعیت سرویس هلو را بررسی کنید.":refresh?.status==="running"?"بستن صفحه دریافت سمت سرور را قطع نمی‌کند.":"دریافت خودکار طبق برنامهٔ میزبان انجام می‌شود؛ این دکمه درخواست دریافت تازه است."}</p>{refresh?.sources.map(source=><p key={source.kind}>{source.count.toLocaleString("fa-IR")} ردیف؛ {source.ok&&source.complete?"پاسخ منبع کامل":"پاسخ منبع ناقص"}</p>)}</div>}
     {mode==="manual"?<>
-     {rows.map((row,index)=><fieldset key={index} disabled={busy} className="rounded-xl border border-white/10 p-4"><legend className="px-2 text-xs">ردیف {(index+1).toLocaleString("fa-IR")}</legend><div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">{selected?.fields.map(field=><label key={field.key} className="text-[11px] text-slate-300">{field.label}{field.required?" *":""}{field.type==="date"?<IranDateInput required={field.required} value={row[field.key]||""} onChange={value=>edit(index,field.key,value)} className={fieldClass}/>:<input required={field.required} value={row[field.key]||""} maxLength={field.key==="note"?1000:150} onChange={e=>edit(index,field.key,e.target.value)} className={fieldClass} inputMode={["text","date"].includes(field.type)?"text":"decimal"}/>}</label>)}</div>{rows.length>1&&<button type="button" onClick={()=>{setRows(rows.filter((_,i)=>i!==index));reset();}} className="mt-3 text-xs text-rose-300">حذف ردیف از پیش‌نویس</button>}</fieldset>)}
+     {rows.map((row,index)=>{
+      const hasRequiredFields=entity!=="targets"||rowHasInput(row);
+      return <fieldset key={index} disabled={busy} className="rounded-xl border border-white/10 p-4"><legend className="px-2 text-xs">ردیف {(index+1).toLocaleString("fa-IR")}</legend><div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">{selected?.fields.map(field=><label key={field.key} className="text-[11px] text-slate-300">{field.label}{field.required?" *":""}{field.type==="date"?<IranDateInput required={hasRequiredFields&&field.required} value={row[field.key]||""} onChange={value=>edit(index,field.key,value)} className={fieldClass}/>:<input required={hasRequiredFields&&field.required} value={row[field.key]||""} maxLength={field.key==="note"?1000:150} onChange={e=>edit(index,field.key,e.target.value)} className={fieldClass} inputMode={["text","date"].includes(field.type)?"text":"decimal"}/>}</label>)}</div>{rows.length>1&&<button type="button" onClick={()=>{setRows(rows.filter((_,i)=>i!==index));reset();}} className="mt-3 text-xs text-rose-300">حذف ردیف از پیش‌نویس</button>}</fieldset>;
+     })}
      <button type="button" disabled={rows.length>=500||busy} onClick={()=>{setRows([...rows,{}]);reset();}} className="text-xs text-violet-300">افزودن ردیف دستی</button>
     </>:<div className="space-y-3"><button type="button" onClick={download} className="text-xs text-violet-300 underline">دریافت قالب همین بخش</button><p className="text-xs leading-6 text-slate-400">فایل با مقادیر ساده، بدون فرمول و با حداکثر پانصد ردیف باشد. کدها را متن نگه دارید. سلول خالی اختیاری، مقدار قبلی را پاک نمی‌کند.</p><input type="file" accept=".xlsx" required onChange={e=>{setFile(e.target.files?.[0]||null);reset();}} className={fieldClass}/><label className="block text-xs">نام شیت ـ خالی برای اولین شیت<input value={sheet} onChange={e=>{setSheet(e.target.value);reset();}} className={fieldClass}/></label></div>}
     <button disabled={busy||!selected} className={primaryButton}>{busy?"در حال بررسی…":"اعتبارسنجی و پیش‌نمایش"}</button>

@@ -5,9 +5,11 @@ from decimal import Decimal,InvalidOperation
 DIGITS=str.maketrans('۰۱۲۳۴۵۶۷۸۹٠١٢٣٤٥٦٧٨٩','01234567890123456789')
 SCALES={'هزار':1000,'میلیون':1000000,'میلیارد':1000000000}
 WORDS={'یک':1,'دو':2,'سه':3,'چهار':4,'پنج':5,'شش':6,'هفت':7,'هشت':8,'نه':9,'ده':10,'یازده':11,'دوازده':12,'سیزده':13,'چهارده':14,'پانزده':15,'شانزده':16,'هفده':17,'هجده':18,'نوزده':19,'بیست':20,'سی':30,'چهل':40,'پنجاه':50,'شصت':60,'هفتاد':70,'هشتاد':80,'نود':90,'صد':100,'دویست':200,'سیصد':300}
-MONEY_FIELDS={'amount','target_amount','price','price2','current_balance','minimum_reserve','bonus_reward','reported_sales_amount','reported_collections_amount'}
+MONEY_FIELDS={'amount','target_amount','price','price2','price_irr','discount_price_irr','current_balance','minimum_reserve','bonus_reward','reported_sales_amount','reported_collections_amount'}
 _NUMBER = r'(?:\d+(?:\.\d+)?|' + '|'.join(sorted(WORDS, key=len, reverse=True)) + r')'
-_MONEY = re.compile(rf'(?<![\w\-−])({_NUMBER})\s*(هزار|میلیون|میلیارد)?\s*(تومان|تومن|ریال)(?!\w)')
+_AMOUNT = rf'({_NUMBER})\s*(هزار|میلیون|میلیارد)?'
+_UNIT = r'(تومان|تومن|ریال)'
+_MONEY = re.compile(rf'(?<![\w\-−]){_AMOUNT}\s*{_UNIT}(?!\w)')
 
 
 def _normalized_money(text):
@@ -24,11 +26,25 @@ def explicit_money(message):
     return [_in_rials(match) for match in _MONEY.finditer(_normalized_money(message))]
 
 
-def parse_money_phrase(phrase):
-    match = _MONEY.fullmatch(_normalized_money(phrase))
+def parse_money_phrase(phrase, shared_unit=None):
+    normalized = _normalized_money(phrase)
+    match = _MONEY.fullmatch(normalized)
+    if match is None and shared_unit:
+        match = _MONEY.fullmatch(f'{normalized} {shared_unit}')
     if match is None:
         raise ValueError('مبلغ را همراه واحد ریال یا تومان مشخص کنید.')
     return _in_rials(match)
+
+
+def money_units(message):
+    return {'تومان' if unit == 'تومن' else unit for unit in re.findall(rf'(?<!\w){_UNIT}(?!\w)', message)}
+
+
+def quoted_shared_amount(message, phrase):
+    snippet = _normalized_money(phrase)
+    return bool(re.fullmatch(_AMOUNT, snippet) and re.search(
+        rf'(?<![\w\-−]){re.escape(snippet)}(?!\w|\.\d|\s*(?:هزار|میلیون|میلیارد)\b)', _normalized_money(message)
+    ))
 
 
 def check_proposed_money(message,operation,payload):

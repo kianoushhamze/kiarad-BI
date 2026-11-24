@@ -7,6 +7,7 @@ from fastapi import HTTPException
 from sqlalchemy import create_engine, text
 
 import assistant_engine
+from assistant_commands import COMMANDS, prepare as prepare_command
 from assistant_intake import blank_target_template, prepare_sales_targets, prepare_visit_coverage
 from assistant_reports import execute_report_tool
 
@@ -21,7 +22,7 @@ class SemanticToolsTests(unittest.TestCase):
         self.addCleanup(self.database.dispose)
         with self.database.begin() as conn:
             conn.execute(text('CREATE TABLE salespersons (id INTEGER, name TEXT)'))
-            conn.execute(text("INSERT INTO salespersons VALUES (6, 'سامان صادق نمونه'), (8, 'مینا نمونه')"))
+            conn.execute(text("INSERT INTO salespersons VALUES (6, 'سامان صادق نمونه'), (8, 'مینا نمونه'), (9, 'نیلوفر راد')"))
 
     def target(self, **extra):
         return {'month': 'اذرماه', 'rows': [{
@@ -54,6 +55,38 @@ class SemanticToolsTests(unittest.TestCase):
         self.assertEqual(result['status'], 'needs_information')
         self.assertIn('برند', conflicting['message'])
         prepare.assert_not_called()
+
+    @patch('assistant_intake.prepare', return_value=PREVIEW.copy())
+    @patch('assistant_intake.iran_today', return_value=date(2026, 11, 24))
+    def test_shared_unit_and_person_in_a_three_brand_request(self, _today, prepare):
+        message = 'برای خانم راد تو آذر از برند سولامور ۱۰۰ میلیون از لوفنته ۱۰۰ میلیون و برای وی ان وی ۲۰۰ میلیون تومن تارگت تعیین کن'
+        args = {'month': 'آذر', 'person': 'خانم راد', 'shared_unit': 'تومان', 'rows': [
+            {'product_focus': 'سولامور', 'amount_phrase': '۱۰۰ میلیون'},
+            {'product_focus': 'لوفنته', 'amount_phrase': '100 میلیون'},
+            {'product_focus': 'وی اند وی', 'amount_phrase': '۲۰۰ میلیون تومن'},
+        ]}
+        with patch('assistant_intake.engine', self.database):
+            result = prepare_sales_targets(args, MANAGER, message, [])
+            invalid = prepare_sales_targets({**args, 'rows': [
+                {'product_focus': 'سولامور', 'amount_phrase': '۱۰۰'}, *args['rows'][1:],
+            ]}, MANAGER, message, [])
+        self.assertEqual(result['status'], 'operation_preview')
+        self.assertEqual(invalid['status'], 'needs_information')
+        rows = prepare.call_args.args[0]['payload']['body']['rows']
+        self.assertEqual([row['salesperson_id'] for row in rows], [9, 9, 9])
+        self.assertEqual([row['target_amount'] for row in rows], ['1000000000', '1000000000', '2000000000'])
+
+    @patch('assistant_intake.prepare', return_value=PREVIEW.copy())
+    @patch('assistant_intake.iran_today', return_value=date(2026, 11, 24))
+    def test_settlement_target_defaults_to_the_current_month(self, _today, prepare):
+        with patch('assistant_intake.engine', self.database):
+            result = prepare_sales_targets({'person': 'آقای سامان نمونه', 'rows': [
+                {'kind': 'settlement', 'amount_phrase': '۱ میلیارد تومن'},
+            ]}, MANAGER, 'برای آقای سامان نمونه ۱ میلیارد تومن تارگت تسویه ایجاد کن', [])
+        row = prepare.call_args.args[0]['payload']['body']['rows'][0]
+        self.assertEqual(row['target_type'], 'تسویه')
+        self.assertEqual(row['target_amount'], '10000000000')
+        self.assertIn('1405-09', result['message'])
 
     def test_twenty_blank_entries_are_a_form_and_require_permissions(self):
         with patch('assistant_intake.prepare') as prepare:
@@ -105,3 +138,19 @@ class SemanticToolsTests(unittest.TestCase):
             data = execute_report_tool('search_public_web', {'query': 'آخرین اخبار اخترشناسی'}, MANAGER)
         search.assert_called_once_with({'query': 'آخرین اخبار اخترشناسی'})
         self.assertEqual(data['sources'][0]['url'], 'https://example.org')
+
+    def test_storefront_patch_preserves_unmentioned_fields(self):
+        with patch('assistant_commands.before_state', return_value={'code':'SKU-1'}):
+            payload, _ = prepare_command('site_product_update', {
+                'path_params': {'code':'SKU-1'}, 'body': {'hidden':True},
+            }, MANAGER)
+        self.assertEqual(payload['body'], {'hidden':True})
+
+    def test_editing_visitor_identity_cannot_include_role_or_password(self):
+        self.assertNotIn('password_hash', COMMANDS['personnel_update_identity']['snapshot'])
+        with patch('assistant_commands.before_state') as read:
+            with self.assertRaises(HTTPException):
+                prepare_command('personnel_update_identity', {
+                    'path_params': {'user_id': 8}, 'body': {'username':'visitor_8','role':'ceo'},
+                }, MANAGER)
+        read.assert_not_called()

@@ -120,7 +120,7 @@ REPORT_TOOLS.extend([
 
 REPORT_TOOLS.extend([
     {'type': 'function', 'function': {'name': 'prepare_sales_targets',
-     'description': 'تهیهٔ پیش‌نمایش تارگت‌های تکمیل‌شده. عنوان صریح و عبارت مبلغ هدف و پاداش را عیناً از درخواست مرتبط بردار. اگر عنوانی نداده، عنوان را حذف کن تا فرم عنوان مناسب بسازد. واحد را خودت تبدیل نکن. نام ویزیتور را بده تا سامانه نام کوتاه یا کامل را به پرسنل واقعی وصل کند. برای یک درخواست جدید، تارگت‌های پیشین را همراه آن نیاور. کالای هدف صریح را حفظ کن؛ اگر با عنوانی که کالا را مشخص می‌کند متناقض است، ابتدا همان تعارض را بپرس.',
+     'description': 'پیش‌نمایش تارگت تکی یا گروهی. اگر چند برند برای یک فرد است نام فرد را در person اصلی و هر برند، نوع و مبلغش را در یک ردیف بگذار. اگر واحد مشترک فقط انتهای فهرست آمده در shared_unit بده و عبارت مبلغ هر ردیف را همان‌گونه که گفته شده نقل کن. «وصول» یا «تسویه» kind=settlement است. ماه نامعلوم در پیش‌نمایش ماه جاری است. اگر عنوانی نداده عنوان را حذف کن. واحد را تبدیل نکن و تارگت قدیمی را با درخواست تازه ادغام نکن. اگر عنوان و کالای هدف متناقض‌اند، همان مورد را بپرس.',
      'parameters': Targets.model_json_schema()}},
     {'type': 'function', 'function': {'name': 'open_target_template',
      'description': 'بازکردن فرم ورود دستی با تعداد مشخص ردیف تارگت خالی و قابل ویرایش. وقتی کاربر می‌خواهد بعداً مقادیر را خودش وارد کند این ابزار را بزن. نام و مبلغ ساختگی لازم نیست.',
@@ -323,7 +323,7 @@ def read_report(a, user):
             for person in people:
                 totals=rows(conn,'''SELECT SUM(total_amount) AS net_sales_irr,COUNT(*) AS documents FROM sales
                     WHERE salesperson_id=:sid AND date>=:begin AND date<:end''',{**p,'sid':person['id']})[0]
-                targets=rows(conn,"SELECT id,title,target_amount,start_date,end_date,product_focus FROM targets WHERE salesperson_id=:sid AND status='active' ORDER BY id DESC LIMIT 10",{'sid':person['id']})
+                targets=rows(conn,"SELECT id,title,target_amount,target_type,start_date,end_date,product_focus FROM targets WHERE salesperson_id=:sid AND status='active' ORDER BY id DESC LIMIT 10",{'sid':person['id']})
                 result.append({**person,**totals,'targets':targets})
             return {**metadata,'people':result,'limited_to':25}
         if a.section == 'customers':

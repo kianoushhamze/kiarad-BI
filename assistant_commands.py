@@ -5,7 +5,7 @@ the same authenticated HTTP route and middleware as the manual panel.
 """
 from datetime import date
 from decimal import Decimal
-from urllib.parse import urlencode
+from urllib.parse import quote, urlencode
 import hashlib
 import json
 import re
@@ -17,6 +17,7 @@ from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy import text
 from db import engine
 from operations import create_token, role_has_module_permission
+from target_schema import PERSON_TARGET_FIELDS, normalize_person_target, validate_target_person
 
 
 MANAGERS={'ceo','sales_manager'}
@@ -24,9 +25,9 @@ FINANCE={'ceo','finance'}
 CATALOG_ROLES=MANAGERS|FINANCE
 
 
-def command(label,module,method,path,roles=MANAGERS,table=None,key=None,fields=None,required=()):
+def command(label,module,method,path,roles=MANAGERS,table=None,key=None,fields=None,required=(),snapshot=None,db_key='id'):
     return dict(label=label,module=module,method=method,path=path,roles=roles,
-                table=table,key=key,fields=fields,required=list(required))
+                table=table,key=key,fields=fields,required=list(required),snapshot=snapshot,db_key=db_key)
 
 
 COMMANDS={
@@ -46,6 +47,8 @@ COMMANDS={
  'catalog_add_batch':command('ثبت بچ و تاریخ انقضای کالا','catalog','POST','/catalog/products/{product_id}/batches',CATALOG_ROLES),
  'catalog_link_channel':command('نگاشت کالا به کانال فروش','catalog','POST','/catalog/products/{product_id}/channels',CATALOG_ROLES),
  'catalog_reserve':command('رزرو موجودی محلی','catalog','POST','/catalog/products/{product_id}/reservations',CATALOG_ROLES),
+ 'catalog_restore_holoo':command('بازگرداندن مقدار کالا از آخرین منبع هلو','catalog','POST','/catalog/products/{product_id}/restore-holoo',CATALOG_ROLES,'products','product_id'),
+ 'inventory_order_review':command('بررسی پیش‌نویس درخواست خرید انبار','catalog','POST','/catalog/intelligence/orders/{order_id}/review',FINANCE,'inventory_order_drafts','order_id'),
  'treasury_create_account':command('ایجاد حساب بانک یا صندوق','treasury','POST','/treasury/accounts',FINANCE),
  'treasury_update_account':command('اصلاح مانده و ذخیرهٔ حساب','treasury','PATCH','/treasury/accounts/{account_id}',FINANCE,'cash_accounts','account_id'),
  'treasury_deactivate_account':command('غیرفعال کردن حساب','treasury','DELETE','/treasury/accounts/{account_id}',FINANCE,'cash_accounts','account_id'),
@@ -63,8 +66,29 @@ COMMANDS={
  'online_save_channel_draft':command('ثبت تنظیمات پیش‌نویس کانال؛ بدون اتصال یا انتشار بیرونی','online-sales','PUT','/integrations/{channel}/draft'),
  'task_progress':command('ثبت پیشرفت کار خودم','tasks','PATCH','/tasks/{task_id}/progress',CATALOG_ROLES|{'visitor','salesperson'},'tasks','task_id'),
  'task_review':command('بررسی گزارش پایان کار','tasks','POST','/tasks/{task_id}/review',MANAGERS,'tasks','task_id'),
- 'personnel_create_profile':command('ایجاد پروفایل پرسنلی','personnel','POST','/salespersons'),
+ 'task_assign_campaign':command('تخصیص یک‌جای وظایف کمپین به پرسنل','tasks','POST','/tasks/campaign-assignments'),
+ 'personnel_create_profile':command('ایجاد پروفایل پرسنلی','manager','POST','/salespersons'),
+ 'personnel_update_identity':command('تغییر نام یا نام کاربری ویزیتور','manager','PATCH','/users/{user_id}',MANAGERS,'users','user_id',
+     fields=['username','full_name'],snapshot=('id','username','full_name','role','salesperson_id','is_active')),
+ 'target_update':command('ویرایش مبلغ، پاداش، بازه، نوع یا باز و بسته‌کردن تارگت','personnel','PATCH','/targets/person-targets/{tid}',MANAGERS,'targets','tid',fields=PERSON_TARGET_FIELDS),
  'target_delete':command('حذف هدف فروش','personnel','DELETE','/targets/person-targets/{tid}',MANAGERS,'targets','tid'),
+ 'site_product_update':command('اصلاح نمایش، دسته‌بندی یا تخفیف کالای فروشگاه','online-sales','PATCH','/site-cms/products/{code}',{'ceo'},'products','code',
+     snapshot=('code','name','price'),db_key='code'),
+ 'site_product_set_price':command('تغییر قیمت محلی کالای فروشگاه','online-sales','POST','/site-cms/products/{code}/price',{'ceo'},'products','code',
+     snapshot=('code','name','price'),db_key='code'),
+ 'site_banner_create':command('ایجاد بنر فروشگاه','online-sales','POST','/site-cms/banners',{'ceo'}),
+ 'site_banner_update':command('ویرایش یا غیرفعال کردن بنر فروشگاه','online-sales','PATCH','/site-cms/banners/{banner_id}',{'ceo'},'site_banners','banner_id'),
+ 'site_banner_delete':command('حذف بنر فروشگاه','online-sales','DELETE','/site-cms/banners/{banner_id}',{'ceo'},'site_banners','banner_id'),
+ 'site_order_status':command('تغییر وضعیت سفارش فروشگاه','online-sales','PATCH','/site-orders/{order_id}/status',MANAGERS,'site_orders','order_id',
+     snapshot=('id','status')),
+ 'marketing_lead_create':command('ثبت مخاطب بالقوهٔ بازاریابی','online-sales','POST','/marketing/leads'),
+ 'marketing_lead_delete':command('حذف مخاطب بالقوهٔ بازاریابی','online-sales','DELETE','/marketing/leads/{lead_id}',MANAGERS,'marketing_leads','lead_id',
+     snapshot=('id','name','city','status')),
+ 'marketing_schedule_content':command('انتقال محتوای بازاریابی به تقویم','online-sales','POST','/marketing/content/{item_id}/to-calendar',MANAGERS,'marketing_content','item_id',
+     snapshot=('id','title')),
+ 'route_physician_create':command('ثبت پزشک در فهرست برنامه‌ریزی مسیر','manager','POST','/route-builder/physicians'),
+ 'route_physician_delete':command('حذف پزشک از فهرست برنامه‌ریزی مسیر','manager','DELETE','/route-builder/physicians/{physician_id}',MANAGERS,'physicians','physician_id',
+     snapshot=('id','name','city','specialty')),
  'campaign_create':command('ایجاد کمپین فروش','campaigns','POST','/campaigns',fields=['title','description','starts_at','ends_at','target_amount','reward_type','reward_value','reward_note'],required=['title','starts_at','ends_at','target_amount','reward_type','reward_value']),
  'campaign_close':command('بستن کمپین','campaigns','POST','/campaigns/close',fields=['campaign_id'],required=['campaign_id']),
  'map_assign_route':command('تعیین مسیر ویزیت پرسنل','map','POST','/api/compensation/visit-routes',fields=['user_id','source','base_id','visit_date','stop_order','note'],required=['user_id','source','base_id','visit_date']),
@@ -94,7 +118,8 @@ def authorize(name,user):
     spec=COMMANDS.get(name)
     if not spec:raise HTTPException(422,'این عملیات اجرایی پشتیبانی نمی‌شود.')
     role=user.get('role')
-    if not user.get('id') or role not in spec['roles'] or not role_has_module_permission(role,spec['module'],'can_write'):
+    permission = 'can_delete' if spec['method'] == 'DELETE' else 'can_write'
+    if not user.get('id') or role not in spec['roles'] or not role_has_module_permission(role,spec['module'],permission):
         raise HTTPException(403,'مجوز اجرای این عملیات فعال نیست.')
     return spec
 
@@ -114,7 +139,8 @@ def route_for(spec):
 
 
 def catalog(user,module=None,operation=None):
-    module={'targets':'personnel','contracts':'compensation','inventory':'catalog','customers':'customers','social_calendar':'social'}.get(module,module)
+    module={'targets':'personnel','contracts':'compensation','inventory':'catalog','customers':'customers','social_calendar':'social',
+            'site-cms':'online-sales','marketing':'online-sales','route-builder':'manager'}.get(module,module)
     if operation in COMMANDS:module=COMMANDS[operation]['module']
     if operation and operation not in COMMANDS:
         return {'status':'unknown_operation','message':'نام عملیات را حدس نزن؛ از فهرست زیر انتخاب و ساختار دقیق آن را دریافت کن.',
@@ -154,6 +180,10 @@ def path_for(spec,params):
         elif key=='channel':
             from integrations import CHANNELS
             if value not in CHANNELS:raise HTTPException(422,'کانال معتبر نیست.')
+        elif key=='code':
+            if not isinstance(value, str) or not re.fullmatch(r'[\w.+ -]{1,80}', value) or value in {'.', '..'}:
+                raise HTTPException(422,'کد کالا معتبر نیست.')
+            value = quote(value, safe='')
         elif type(value) is not int or value<=0:raise HTTPException(422,'شناسه باید عدد مثبت و واقعی باشد.')
         clean[key]=value
     return spec['path'].format(**clean)
@@ -162,7 +192,12 @@ def path_for(spec,params):
 def before_state(spec,params,user):
     if not spec['table']:return None
     with engine.connect() as conn:
-        row=conn.execute(text('SELECT * FROM '+spec['table']+' WHERE id=:id'),{'id':params[spec['key']]}).mappings().first()
+        columns = ', '.join(spec['snapshot']) if spec.get('snapshot') else '*'
+        row=conn.execute(text(f"SELECT {columns} FROM {spec['table']} WHERE {spec.get('db_key', 'id')}=:id"),{'id':params[spec['key']]}).mappings().first()
+        product_meta = None
+        if row and spec['path'] == '/site-cms/products/{code}':
+            product_meta = conn.execute(text('SELECT site_category, image_url, hidden, discount_price_irr FROM cms_product_meta WHERE code=:code'),
+                                        {'code':params['code']}).mappings().first()
     if not row:raise HTTPException(404,'رکورد موردنظر پیدا نشد.')
     if spec['module']=='tasks' and user['role'] not in MANAGERS and row['assigned_to']!=user['id']:
         raise HTTPException(403,'این کار متعلق به شما نیست.')
@@ -170,7 +205,12 @@ def before_state(spec,params,user):
         raise HTTPException(403,'این پیش‌فاکتور متعلق به شما نیست.')
     if spec['module']=='crm' and user['role'] not in MANAGERS and row.get('owner_user_id')!=user['id']:
         raise HTTPException(403,'این پیگیری متعلق به شما نیست.')
-    return jsonable_encoder(dict(row))
+    if spec['table']=='users' and user['role'] != 'ceo' and row['role'] not in {'visitor','salesperson'}:
+        raise HTTPException(403,'تغییر حساب مدیریتی فقط در دسترسی مدیرعامل است.')
+    result = dict(row)
+    if product_meta is not None:
+        result['storefront'] = dict(product_meta)
+    return jsonable_encoder(result)
 
 
 def fingerprint(value):
@@ -223,10 +263,12 @@ def prepare(name,payload,user):
     if route.body_field:
         model=route.body_field.field_info.annotation
         fields=set(model.model_fields) if isinstance(model,type) and issubclass(model,BaseModel) else set(spec['fields'] or [])
+        if spec['fields'] is not None:
+            fields &= set(spec['fields'])
         if set(p.body)-fields or any(key not in p.body for key in spec['required']):raise HTTPException(422,'اطلاعات عملیات ناقص است یا فیلد ناشناخته دارد.')
         validated,errors=route.body_field.validate(p.body,{},loc=('body',))
         if errors:raise HTTPException(422,'ساختار اطلاعات با فرم پنل سازگار نیست.')
-        body=jsonable_encoder(validated)
+        body=jsonable_encoder(validated, exclude_unset=True)
         validate_dict(name,body)
         if name == 'monthly_plan_create':
             from monthly_visit_plans import validate_draft
@@ -236,6 +278,11 @@ def prepare(name,payload,user):
         if p.body:raise HTTPException(422,'این عملیات بدنهٔ اطلاعاتی ندارد.')
         body={}
     state=before_state(spec,p.path_params,user)
+    if name == 'target_update':
+        body = normalize_person_target(body, existing=state)
+        if body.get('salesperson_id') is not None:
+            with engine.connect() as conn:
+                validate_target_person(conn, body)
     return {'body':body,'path_params':p.path_params,'query_params':query}, {'before':state,'before_hash':fingerprint(state),'display':{'operation':spec['label']}}
 
 
