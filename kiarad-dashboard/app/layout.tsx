@@ -5,7 +5,7 @@ export const metadata: Metadata = {
   title: "Kiarad BI",
   description: "سامانه هوش تجاری و داشبورد مدیریتی کیاراد",
   appleWebApp: { capable: true, title: "کیاراد", statusBarStyle: "default" },
-  icons: { apple: "/app-icon-192" },
+  icons: { apple: [{ url: "/kiarad-apple-touch-icon.png", sizes: "180x180", type: "image/png" }] },
 };
 export const viewport: Viewport = { width: "device-width", initialScale: 1, themeColor: "#08070b" };
 
