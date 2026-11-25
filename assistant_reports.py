@@ -88,7 +88,7 @@ REPORT_TOOLS = [
      'description': 'انتقال شرح صریح قرارداد کاربر به فرم حقوق همان شخص برای پیشنهاد قواعد و تایید نهایی؛ بدون ذخیره یا تصویب. شناسه شخص را از گزارش تیم دریافت کن؛ نام مبهم یا نرخ نامعلوم را حدس نزن.',
      'parameters': ContractReviewArgs.model_json_schema()}},
     {'type': 'function', 'function': {'name': 'read_business_report',
-     'description': 'گزارش واقعی و مجاز داشبورد: فروش و روند و کالا، مشتری، تیم و تارگت، کارها، پیش‌فاکتور، مسیر، حقوق ماه مشخص، خزانه، تحلیل انبار، پیگیری مشتری، گزارش روزانه، کمپین یا تقویم محتوا. query نام واقعی فارسی/لاتین یا کد؛ ابهام را از کاربر بپرس. گزارش غایب یا خطادار صفر نیست.',
+     'description': 'گزارش واقعی و مجاز داشبورد: فروش و روند و کالا، مشتری، تیم و تارگت، کارها، پیش‌فاکتور، مسیر، حقوق ماه مشخص، خزانه و سود و زیان ثبت‌شده و وضعیت چک‌ها، تحلیل انبار، پیگیری مشتری، گزارش روزانه، کمپین یا تقویم محتوا. query نام واقعی فارسی/لاتین یا کد؛ ابهام را از کاربر بپرس. گزارش غایب یا خطادار صفر نیست.',
      'parameters': ReportArgs.model_json_schema()}},
     {'type': 'function', 'function': {'name': 'prepare_target',
      'description': 'فقط پیش‌نویس تارگت با پیوند فرم بازبینی؛ چیزی ذخیره نمی‌کند. مبلغ و واحد و فرد/شرکت و بازه باید صریح از کاربر معلوم باشند. اگر هرکدام نامعلوم است ابتدا بپرس. ماه جاری شمسی با سرور محاسبه می‌شود. برای فرد ابتدا شناسهٔ یکتای واقعی را از گزارش تیم بگیر.',
@@ -152,7 +152,7 @@ def allowed(user, module):
 def trim(value, max_rows=20):
     """Bound provider payloads; never truncate a ledger and present it as a total."""
     if isinstance(value, dict):
-        return {k: trim(v, max_rows) for k, v in value.items() if k not in {'phone', 'mobile', 'card_number', 'iban', 'bank_account_number', 'history'}}
+        return {k: trim(v, max_rows) for k, v in value.items() if k not in {'phone', 'mobile', 'card_number', 'iban', 'bank_account_number', 'national_id', 'sayad_id', 'history'}}
     if isinstance(value, list):
         return {'rows': [trim(v, max_rows) for v in value[:max_rows]], 'total_rows': len(value), 'limited': len(value)>max_rows}
     return value
@@ -257,9 +257,19 @@ def read_report(a, user):
         if role not in {'ceo','finance'}:
             raise HTTPException(403, 'گزارش مالی شرکت در دسترسی شما نیست.')
         from treasury_strategy import strategy_overview
+        from treasury_accounting import accounting_report
+        end = iran_today()
+        start = iran_month_bounds(end)[0] if a.period == 'current_jalali_month' else end - timedelta(days=a.days-1)
+        if a.month:
+            import jdatetime
+            year, month = map(int, a.month.split('-'))
+            start = jdatetime.date(year, month, 1).togregorian()
+            start, next_month = iran_month_bounds(start)
+            end = next_month - timedelta(days=1)
+        accounting = accounting_report(start, end)
         value = strategy_overview(user)
         keys = ('as_of','current_month','currency','operating_plan','operating_projection','growth','projection','collections','coverage','warnings','actions','definitions','purchase_estimate','excel_estimate','approved_actuals','holoo_snapshot')
-        return trim({k:value[k] for k in keys if k in value})
+        return {**trim({k:value[k] for k in keys if k in value}), "recorded_accounting": trim(accounting)}
     if a.section == 'routes':
         from compensation import list_visit_routes
         target_user = None

@@ -4,19 +4,22 @@ import hashlib
 from io import BytesIO
 import posixpath
 import re
-from typing import Optional
+from typing import Literal, Optional
 from urllib.parse import unquote
 import xml.etree.ElementTree as ET
 from zipfile import BadZipFile, ZipFile
 
 from fastapi import APIRouter, Depends, Header, HTTPException, Query, Request, status
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 from sqlalchemy import text
 
 from db import engine
 from iran_time import iran_today
 from operations import current_user, role_has_module_permission
 from treasury_finance import OPEN_STATUSES, PAYABLE_TYPES, RECEIVABLE_TYPES, month_of, recurring_dates
+
+
+from treasury_accounting import AccountingCategory, AccountingEntry, accounting_report, add_category, add_entry
 
 
 router = APIRouter(prefix="/treasury", tags=["treasury"])
@@ -53,6 +56,44 @@ class CashAccountCreate(TreasuryInput):
     minimum_reserve: float = Field(default=0, ge=0)
 
 
+class CheckDetails(BaseModel):
+    model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
+    account_holder: str = Field(default="", max_length=200)
+    national_id: str = Field(default="", pattern=r"^(?:[0-9]{10})?$")
+    bank_name: str = Field(default="", max_length=120)
+    branch_name: str = Field(default="", max_length=120)
+    sayad_id: str = Field(default="", pattern=r"^(?:[0-9]{16})?$")
+    sayad_registration: Literal["unknown", "registered", "unregistered"] = "unknown"
+    spent_for: str = Field(default="", max_length=300)
+
+    @field_validator("national_id", "sayad_id", mode="before")
+    @classmethod
+    def canonical_digits(cls, value):
+        return re.sub(r"[\s-]", "", value.translate(PERSIAN_DIGITS)) if isinstance(value, str) else value
+
+
+class CheckUpdate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    status: Literal["open", "cleared", "spent", "bounced", "cancelled"]
+    check_details: CheckDetails
+
+    @model_validator(mode="after")
+    def require_spending_destination(self):
+        if self.status == "spent" and not self.check_details.spent_for:
+            raise ValueError("برای چک خرج‌شده، محل مصرف را وارد کنید.")
+        return self
+
+
+def ensure_check_details(conn):
+    if conn.execute(text("""
+        SELECT EXISTS (SELECT 1 FROM pg_attribute
+        WHERE attrelid=to_regclass('financial_documents')
+          AND attname='check_details' AND NOT attisdropped)
+    """)).scalar():
+        return
+    conn.execute(text("ALTER TABLE financial_documents ADD COLUMN IF NOT EXISTS check_details JSONB"))
+
+
 class FinancialDocumentCreate(TreasuryInput):
     document_type: str
     counterparty: str = Field(min_length=2, max_length=200)
@@ -63,6 +104,8 @@ class FinancialDocumentCreate(TreasuryInput):
     customer_id: Optional[int] = None
     notes: Optional[str] = None
     fixed_expense_id: Optional[int] = Field(default=None, gt=0)
+    check: CheckUpdate | None = None
+
 
 
 class FixedExpenseCreate(TreasuryInput):
@@ -314,25 +357,60 @@ def create_financial_document(
 ):
     if data.document_type not in {"receivable", "payable"}:
         raise HTTPException(status_code=422, detail="Invalid document type")
-    values = data.model_dump()
+    values = data.model_dump(exclude={"check"})
+    values["status"] = data.check.status if data.check else "open"
     with engine.begin() as conn:
         conn.execute(text("ALTER TABLE financial_documents ADD COLUMN IF NOT EXISTS fixed_expense_id INTEGER"))
         if data.fixed_expense_id is not None:
             if data.document_type != "payable" or not conn.execute(text("SELECT id FROM fixed_expenses WHERE id=:id AND is_active=1"), {"id": data.fixed_expense_id}).first():
                 raise HTTPException(status_code=422, detail="هزینهٔ مرتبط باید فعال و سند از نوع پرداختنی باشد.")
+        if data.check:
+            ensure_check_details(conn)
+            values["check_details"] = data.check.check_details.model_dump_json()
+        detail_column = ", check_details" if data.check else ""
+        detail_value = ", CAST(:check_details AS JSONB)" if data.check else ""
         row = conn.execute(
-            text("""
+            text(f"""
                 INSERT INTO financial_documents
                     (document_type, counterparty, amount, due_date, status,
-                     collection_probability, reference_number, customer_id, notes, fixed_expense_id, created_at)
+                     collection_probability, reference_number, customer_id, notes, fixed_expense_id, created_at{detail_column})
                 VALUES
-                    (:document_type, :counterparty, :amount, :due_date, 'open',
-                     :collection_probability, :reference_number, :customer_id, :notes, :fixed_expense_id, NOW())
+                    (:document_type, :counterparty, :amount, :due_date, :status,
+                     :collection_probability, :reference_number, :customer_id, :notes, :fixed_expense_id, NOW(){detail_value})
                 RETURNING *
             """),
             values,
         ).mappings().first()
     return dict(row)
+
+
+@router.patch("/checks/{check_id}/details")
+def update_check_details(check_id: int, data: CheckUpdate, _: dict = Depends(require_treasury_access)):
+    with engine.begin() as conn:
+        ensure_check_details(conn)
+        found = conn.execute(text("""
+            UPDATE financial_documents SET status=:status, check_details=CAST(:details AS JSONB)
+            WHERE id=:id AND document_type IN ('receivable', 'payable', 'receivable_check', 'payable_check')
+            RETURNING id
+        """), {"id": check_id, "status": data.status, "details": data.check_details.model_dump_json()}).scalar()
+    if found is None:
+        raise HTTPException(404, "چک یا سند مالی یافت نشد.")
+    return {"id": found}
+
+
+@router.get("/accounting")
+def read_accounting(start: date | None = None, end: date | None = None, _: dict = Depends(require_treasury_access)):
+    return accounting_report(start, end, include_entries=True)
+
+
+@router.post("/accounting/categories", status_code=201)
+def create_accounting_category(data: AccountingCategory, _: dict = Depends(require_treasury_access)):
+    return add_category(data)
+
+
+@router.post("/accounting/entries", status_code=201)
+def create_accounting_entry(data: AccountingEntry, user: dict = Depends(require_treasury_access)):
+    return add_entry(data, user["id"])
 
 
 @router.post("/fixed-expenses", status_code=status.HTTP_201_CREATED)
