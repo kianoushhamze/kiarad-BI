@@ -428,6 +428,7 @@ def create_financial_document(
 
 @router.patch("/checks/{check_id}/details")
 def update_check_details(check_id: int, data: CheckEdit, _: dict = Depends(require_treasury_access)):
+    data = CheckEdit.model_validate(data, from_attributes=True)
     with engine.begin() as conn:
         ensure_check_details(conn)
         validate_check_visitor(conn, data.check_details.visitor_user_id)
