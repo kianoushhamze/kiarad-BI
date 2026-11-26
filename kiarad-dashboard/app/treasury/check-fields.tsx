@@ -8,7 +8,7 @@ const fields = {
   account_holder: "صاحب حساب", national_id: "کد ملی صاحب حساب", bank_name: "نام بانک",
   branch_name: "شعبه", sayad_id: "شناسهٔ ۱۶ رقمی صیاد", spent_for: "محل مصرف چک خرج‌شده",
 };
-export type CheckDetails = Partial<Record<keyof typeof fields, string>> & { sayad_registration?: string };
+export type CheckDetails = Partial<Record<keyof typeof fields, string>> & { sayad_registration?: string; visitor_user_id?: number | null };
 
 export function checkPayload(form: FormData) {
   const check_details = Object.fromEntries(Object.keys(fields).map(name => [name, String(form.get(name) ?? "").trim()]));
@@ -23,11 +23,14 @@ export function checkStatusLabel(status: string) {
 export function CheckFields({ details, status, sayadRef }: {
   details?: CheckDetails; status?: string; sayadRef?: RefObject<HTMLInputElement | null>;
 }) {
+  const statuses = { ...labels };
+  if (status === "overdue") statuses.overdue = "سررسیدگذشته";
+  if (status === "settled") statuses.settled = "تسویه‌شده";
   return <fieldset className="grid gap-2 rounded-xl border border-white/10 p-3 sm:grid-cols-2">
     <legend className="px-2 text-xs">مشخصات چک</legend>
     <label className="text-xs">وضعیت چک
-      <select name="check_status" defaultValue={status === "settled" ? "cleared" : status && status in labels ? status : "open"} className={fieldClass}>
-        {Object.entries(labels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+      <select name="check_status" defaultValue={status && status in statuses ? status : "open"} className={fieldClass}>
+        {Object.entries(statuses).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
       </select>
     </label>
     <label className="text-xs">وضعیت ثبت در صیاد

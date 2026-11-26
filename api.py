@@ -196,6 +196,9 @@ def _required_module(path: str) -> Optional[str]:
     if path.startswith("/operations/customers/") and path.endswith(("/credit", "/ledger")):
         return "debtors"
 
+    if path == "/treasury/my-checks":
+        return "tasks"
+
     prefix_modules = (
         ("/digikala", "online-sales"),
         ("/site-cms", "online-sales"),
