@@ -11,7 +11,7 @@ from zipfile import BadZipFile, ZipFile
 
 from fastapi import APIRouter, Depends, Header, HTTPException, Query, Request, status
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
-from sqlalchemy import text
+from sqlalchemy import bindparam, text
 
 from db import engine
 from iran_time import iran_today
@@ -64,6 +64,7 @@ class CheckDetails(BaseModel):
     branch_name: str = Field(default="", max_length=120)
     sayad_id: str = Field(default="", pattern=r"^(?:[0-9]{16})?$")
     sayad_registration: Literal["unknown", "registered", "unregistered"] = "unknown"
+    visitor_user_id: int | None = Field(default=None, gt=0)
     spent_for: str = Field(default="", max_length=300)
 
     @field_validator("national_id", "sayad_id", mode="before")
@@ -82,6 +83,46 @@ class CheckUpdate(BaseModel):
         if self.status == "spent" and not self.check_details.spent_for:
             raise ValueError("برای چک خرج‌شده، محل مصرف را وارد کنید.")
         return self
+
+
+class CheckEdit(CheckUpdate):
+    status: Literal["open", "overdue", "cleared", "settled", "spent", "bounced", "cancelled"]
+    amount: Decimal | None = Field(default=None, gt=0, allow_inf_nan=False)
+    due_date: date | None = None
+    reference_number: str | None = Field(default=None, max_length=120)
+    counterparty: str | None = Field(default=None, min_length=2, max_length=200)
+
+
+def validate_check_visitor(conn, visitor_user_id: int | None):
+    if visitor_user_id is not None and not conn.execute(text("""
+        SELECT id FROM users WHERE id=:id AND is_active=1 AND role IN ('visitor', 'salesperson')
+        FOR SHARE
+    """), {"id": visitor_user_id}).scalar():
+        raise HTTPException(422, "ویزیتور فعال یافت نشد.")
+
+
+@router.get("/check-visitors")
+def list_check_visitors(_: dict = Depends(require_treasury_access)):
+    with engine.connect() as conn:
+        return [dict(row) for row in conn.execute(text("""
+            SELECT id, full_name FROM users WHERE is_active=1 AND role IN ('visitor', 'salesperson')
+            ORDER BY full_name, id
+        """)).mappings()]
+
+
+@router.get("/my-checks")
+def list_my_checks(user: dict = Depends(current_user)):
+    if user["role"] not in {"visitor", "salesperson"}:
+        raise HTTPException(403, "دسترسی ویزیتور لازم است.")
+    with engine.connect() as conn:
+        return [dict(row) for row in conn.execute(text("""
+            SELECT id, counterparty, amount, due_date, status, document_type
+            FROM financial_documents
+            WHERE to_jsonb(financial_documents)->'check_details'->>'visitor_user_id'=:visitor
+                AND document_type IN ('receivable', 'payable', 'receivable_check', 'payable_check')
+                AND status IN :statuses
+            ORDER BY due_date, id
+        """).bindparams(bindparam("statuses", expanding=True)), {"visitor": str(user["id"]), "statuses": tuple(sorted(OPEN_STATUSES))}).mappings()]
 
 
 def ensure_check_details(conn):
@@ -366,6 +407,7 @@ def create_financial_document(
                 raise HTTPException(status_code=422, detail="هزینهٔ مرتبط باید فعال و سند از نوع پرداختنی باشد.")
         if data.check:
             ensure_check_details(conn)
+            validate_check_visitor(conn, data.check.check_details.visitor_user_id)
             values["check_details"] = data.check.check_details.model_dump_json()
         detail_column = ", check_details" if data.check else ""
         detail_value = ", CAST(:check_details AS JSONB)" if data.check else ""
@@ -385,14 +427,27 @@ def create_financial_document(
 
 
 @router.patch("/checks/{check_id}/details")
-def update_check_details(check_id: int, data: CheckUpdate, _: dict = Depends(require_treasury_access)):
+def update_check_details(check_id: int, data: CheckEdit, _: dict = Depends(require_treasury_access)):
+    data = CheckEdit.model_validate(data, from_attributes=True)
     with engine.begin() as conn:
         ensure_check_details(conn)
+        validate_check_visitor(conn, data.check_details.visitor_user_id)
+        keep_visitor = "visitor_user_id" not in data.check_details.model_fields_set
         found = conn.execute(text("""
-            UPDATE financial_documents SET status=:status, check_details=CAST(:details AS JSONB)
+            UPDATE financial_documents SET status=:status,
+                amount=COALESCE(:amount, amount), due_date=COALESCE(:due_date, due_date),
+                counterparty=COALESCE(:counterparty, counterparty),
+                reference_number=CASE WHEN :update_reference THEN :reference_number ELSE reference_number END,
+                check_details=CASE WHEN :keep_visitor THEN
+                    jsonb_set(CAST(:details AS JSONB), '{visitor_user_id}',
+                        COALESCE(check_details->'visitor_user_id', 'null'::jsonb))
+                    ELSE CAST(:details AS JSONB) END
             WHERE id=:id AND document_type IN ('receivable', 'payable', 'receivable_check', 'payable_check')
             RETURNING id
-        """), {"id": check_id, "status": data.status, "details": data.check_details.model_dump_json()}).scalar()
+        """), {"id": check_id, "status": data.status, "details": data.check_details.model_dump_json(),
+                  "keep_visitor": keep_visitor, "amount": data.amount, "due_date": data.due_date,
+                  "counterparty": data.counterparty, "reference_number": data.reference_number,
+                  "update_reference": "reference_number" in data.model_fields_set}).scalar()
     if found is None:
         raise HTTPException(404, "چک یا سند مالی یافت نشد.")
     return {"id": found}

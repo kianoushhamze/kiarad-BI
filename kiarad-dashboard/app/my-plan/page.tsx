@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { PortalShell, Surface, fieldClass } from "../../components/portal-shell";
 import { secureApi, type SessionUser } from "../../lib/secure-api";
+import { AssignedChecks } from "./assigned-checks";
 import { VisitCoverage } from "../../components/visit-coverage";
 import { IranDateInput } from "../../components/IranDateInput";
 import { formatIranDate, iranTodayIso } from "../../lib/iran-date";
@@ -284,6 +285,7 @@ export default function MyPlanPage() {
         {manager && <label className="flex items-center gap-3 text-sm text-slate-300">انتخاب پرسنل<select className={fieldClass} value={person} onChange={e=>setPerson(e.target.value)}>{people.map(p=><option key={p.id} value={p.id}>{p.full_name}</option>)}</select></label>}
       </div>
       {Object.values(errors).length > 0 && <div role="alert" className="rounded-xl border border-amber-400/20 bg-amber-500/10 p-4 text-sm text-amber-200">{Object.values(errors).join(" ")} اطلاعات ناقص است؛ بخش‌های سالم همچنان نمایش داده می‌شوند.</div>}
+      {!manager && selected && ["salesperson", "visitor"].includes(selected.role) && <AssignedChecks key={selected.id} />}
       {manager && person && <VisitCoverage manager={manager} salespersonId={selected?.salesperson_id} />}
       {loading ? <Surface className="p-8 text-center text-slate-400">در حال دریافت برنامه…</Surface> : <>
         <Surface className="p-5"><div className="flex flex-wrap items-center justify-between gap-3"><div><h2 className="font-bold text-white">{manager ? "برنامهٔ مسیر ویزیت" : "ویزیت‌های امروز"}</h2><p className="mt-2 text-xs text-slate-400">ایستگاه‌ها به‌ترتیب روز نمایش داده می‌شوند و تیک حضور همان روز به‌صورت خودکار کنار آن‌ها می‌آید.</p></div><Link className="text-sm text-violet-300" href="/map?view=bases">ثبت حضور پایگاه ←</Link></div>

@@ -11,6 +11,7 @@ import { TreasuryStrategy } from "../../components/treasury-strategy";
 import { TreasuryAccounting } from "./accounting";
 import { CheckFields, checkPayload, checkStatusLabel, type CheckDetails } from "./check-fields";
 
+type CheckVisitor = { id: number; full_name: string };
 type Account = { id: number; name: string; account_type: string; current_balance: number; minimum_reserve: number };
 type Document = { id: number; document_type: "receivable" | "payable" | "receivable_check" | "payable_check"; counterparty: string; amount: number; due_date: string; status: string; collection_probability: number; reference_number?: string; check_details?: CheckDetails | null };
 type FixedExpense = { id: number; title: string; amount: number; due_day: number };
@@ -46,6 +47,10 @@ const reportPeriodDate = (value?: string) => {
     ? formatIranDate(value.trim()) : value;
 };
 const today = iranTodayIso;
+const documentPageSize = 20;
+const normalizeDocumentQuery = (value: string) => value.trim().toLowerCase()
+  .replace(/[۰-۹٠-٩]/g, digit => String(digit.charCodeAt(0) % 16))
+  .replace(/ي/g, "ی").replace(/ك/g, "ک");
 
 export default function TreasuryPage() {
   const [overview, setOverview] = useState<Overview | null>(null);
@@ -57,7 +62,12 @@ export default function TreasuryPage() {
   const [message, setMessage] = useState("");
   const [importing, setImporting] = useState(false);
   const [executing, setExecuting] = useState<string | null>(null);
+  const [checkVisitors, setCheckVisitors] = useState<CheckVisitor[]>([]);
+  const [checkVisitorsFailed, setCheckVisitorsFailed] = useState(false);
+  const [isCheck, setIsCheck] = useState(true);
   const [scannedCheck, setScannedCheck] = useState<{ sayad: string; serial: string } | null>(null);
+  const [documentQuery, setDocumentQuery] = useState("");
+  const [visibleDocumentCount, setVisibleDocumentCount] = useState(documentPageSize);
   const [editingCheck, setEditingCheck] = useState<Document | null>(null);
   const [showAccounting, setShowAccounting] = useState(false);
   const sayadRef = useRef<HTMLInputElement>(null);
@@ -85,9 +95,27 @@ export default function TreasuryPage() {
     return () => { active = false; };
   }, [load]);
 
+  useEffect(() => {
+    let active = true;
+    void secureApi<CheckVisitor[]>("/treasury/check-visitors").then(visitors => {
+      if (active) setCheckVisitors(visitors);
+    }).catch(() => {
+      if (active) setCheckVisitorsFailed(true);
+    });
+    return () => { active = false; };
+  }, []);
+
   const submit = async (event: FormEvent<HTMLFormElement>, kind: Exclude<ModalKind, null>) => {
     event.preventDefault();
     const form = new FormData(event.currentTarget);
+    const selectedVisitor = form.get("visitor_user_id");
+    const visitorId = selectedVisitor ? Number(selectedVisitor) : null;
+    const currentVisitorId = editingCheck?.check_details?.visitor_user_id ?? null;
+    const check = checkPayload(form);
+    const checkDetails = {
+      ...check.check_details,
+      ...(selectedVisitor !== null && visitorId !== currentVisitorId ? { visitor_user_id: visitorId } : {}),
+    };
     setError("");
     try {
       if (kind === "account") {
@@ -95,9 +123,13 @@ export default function TreasuryPage() {
       } else if (kind === "account-edit" && editingAccount) {
         await secureApi(`/treasury/accounts/${editingAccount.id}`, { method: "PATCH", body: JSON.stringify({ current_balance: Number(form.get("current_balance")), minimum_reserve: Number(form.get("minimum_reserve")) }) });
       } else if (kind === "check-edit" && editingCheck) {
-        await secureApi(`/treasury/checks/${editingCheck.id}/details`, { method: "PATCH", body: JSON.stringify(checkPayload(form)) });
+        await secureApi(`/treasury/checks/${editingCheck.id}/details`, { method: "PATCH", body: JSON.stringify({
+          ...check, check_details: checkDetails, amount: Number(form.get("amount")),
+          due_date: form.get("due_date"), counterparty: String(form.get("counterparty") || "").trim(),
+          reference_number: String(form.get("reference_number") || "").trim() || null,
+        }) });
       } else if (kind === "document") {
-        await secureApi("/treasury/documents", { method: "POST", body: JSON.stringify({ document_type: form.get("document_type"), counterparty: form.get("counterparty"), amount: Number(form.get("amount")), due_date: form.get("due_date"), collection_probability: Number(form.get("collection_probability") || 1), reference_number: form.get("reference_number") || null, notes: form.get("notes") || null, fixed_expense_id: form.get("fixed_expense_id") ? Number(form.get("fixed_expense_id")) : null, check: form.has("is_check") ? checkPayload(form) : null }) });
+        await secureApi("/treasury/documents", { method: "POST", body: JSON.stringify({ document_type: form.get("document_type"), counterparty: form.get("counterparty"), amount: Number(form.get("amount")), due_date: form.get("due_date"), collection_probability: Number(form.get("collection_probability") || 1), reference_number: form.get("reference_number") || null, notes: form.get("notes") || null, fixed_expense_id: form.get("fixed_expense_id") ? Number(form.get("fixed_expense_id")) : null, check: form.has("is_check") ? { ...check, check_details: checkDetails } : null }) });
       } else if (kind === "expense") {
         await secureApi("/treasury/fixed-expenses", { method: "POST", body: JSON.stringify({ title: form.get("title"), amount: Number(form.get("amount")), due_day: Number(form.get("due_day")), notes: form.get("notes") || null }) });
       }
@@ -174,7 +206,12 @@ export default function TreasuryPage() {
   const chart = (forecast?.timeline ?? []).filter((_, index) => index % (forecastDays === 60 ? 5 : 2) === 0);
   const maxAbs = Math.max(...chart.map(point => Math.abs(point.available_after_reserve)), 1);
 
-  return <PortalShell title="خزانه‌داری و پایش نقدینگی" eyebrow="مدیریت مالی" actions={<div className="flex flex-wrap gap-2"><label className="cursor-pointer rounded-xl border border-white/10 px-3 py-2 text-[10px] text-slate-300 hover:bg-white/5">{importing ? "در حال ورود…" : "ورود اکسل بدهکاران"}<input type="file" accept=".xlsx" disabled={importing} onChange={importDebtors} className="hidden" /></label><button onClick={() => setModal("account")} className="rounded-xl border border-white/10 px-3 py-2 text-[10px] text-slate-300">حساب بانکی/نقدی</button><button onClick={() => { setScannedCheck(null); setModal("document"); }} className={primaryButton}>ثبت چک یا سند</button></div>}>
+  const query = normalizeDocumentQuery(documentQuery);
+  const matchingDocuments = (overview?.documents ?? []).filter(document =>
+    normalizeDocumentQuery(`${document.counterparty} ${document.reference_number ?? ""}`).includes(query)
+  );
+
+  return <PortalShell title="خزانه‌داری و پایش نقدینگی" eyebrow="مدیریت مالی" actions={<div className="flex flex-wrap gap-2"><label className="cursor-pointer rounded-xl border border-white/10 px-3 py-2 text-[10px] text-slate-300 hover:bg-white/5">{importing ? "در حال ورود…" : "ورود اکسل بدهکاران"}<input type="file" accept=".xlsx" disabled={importing} onChange={importDebtors} className="hidden" /></label><button onClick={() => setModal("account")} className="rounded-xl border border-white/10 px-3 py-2 text-[10px] text-slate-300">حساب بانکی/نقدی</button><button onClick={() => { setScannedCheck(null); setIsCheck(true); setModal("document"); }} className={primaryButton}>ثبت چک یا سند</button></div>}>
     {(error || message) && <div className={`mb-4 rounded-xl border p-3 text-xs ${error ? "border-rose-500/20 bg-rose-500/10 text-rose-300" : "border-emerald-500/20 bg-emerald-500/10 text-emerald-300"}`}>{error || message}</div>}
 
     <h2 className="mb-4 text-base font-bold text-white">ثبت و عملیات روزانهٔ خزانه</h2>
@@ -207,7 +244,25 @@ export default function TreasuryPage() {
     {overview?.debtor_snapshot && <Surface className="mt-4 overflow-hidden"><div className="flex flex-wrap items-start justify-between gap-3 border-b border-white/[0.06] p-5"><div><h2 className="text-sm font-bold text-white">آخرین تصویر مانده بدهکاران</h2><p className="mt-1 text-[10px] text-slate-500">{overview.debtor_snapshot.source_file} · دوره {reportPeriodDate(overview.debtor_snapshot.report_from_text)} تا {reportPeriodDate(overview.debtor_snapshot.report_to_text)} · {overview.debtor_snapshot.row_count.toLocaleString("fa-IR")} ردیف</p></div><button onClick={() => deleteSnapshot(overview.debtor_snapshot!)} className="rounded-lg border border-rose-500/20 px-3 py-2 text-[9px] text-rose-300">حذف این گزارش</button></div><div className="grid gap-px bg-white/[0.04] sm:grid-cols-2 xl:grid-cols-4">{overview.debtor_snapshot.top_debtors.slice(0, 8).map((debtor, index) => <div key={debtor.id} className="bg-[#0c0e18] p-4"><div className="flex items-center gap-2"><span className="grid h-6 w-6 place-items-center rounded-lg bg-violet-500/10 text-[9px] text-violet-300">{(index + 1).toLocaleString("fa-IR")}</span><div className="min-w-0 flex-1 truncate text-[10px] font-bold text-white">{debtor.counterparty}</div></div><div className="mt-3 flex items-end justify-between"><span className="text-xs font-black text-cyan-300">{money(debtor.balance)}</span><span className="text-[9px] text-slate-600">{debtor.share_percent?.toLocaleString("fa-IR", { maximumFractionDigits: 2 }) ?? "—"}٪</span></div></div>)}</div></Surface>}
 
     <div className="mt-4 grid gap-4 xl:grid-cols-2">
-      <Surface className="overflow-hidden"><Header title="چک‌ها و اسناد دریافتنی/پرداختنی" subtitle="سررسیدگذشته‌ها با هشدار مشخص شده‌اند" /><div className="divide-y divide-white/[0.05]">{overview?.documents.slice(0, 20).map(document => { const overdue = ["open", "overdue", "bounced"].includes(document.status) && document.due_date < today(); return <div key={document.id} className="grid grid-cols-[1fr_auto] gap-3 p-4 text-[10px]"><div><div className="flex items-center gap-2"><b className="text-white">{document.counterparty} {document.check_details && <span className="text-slate-400">· {checkStatusLabel(document.status)}{document.check_details.spent_for ? ` · ${document.check_details.spent_for}` : ""}</span>}</b>{overdue && <span className="rounded-full bg-rose-500/10 px-2 py-0.5 text-[8px] text-rose-300">سررسیدگذشته</span>}</div><div className="mt-1 text-[9px] text-slate-600">{["receivable", "receivable_check"].includes(document.document_type) ? "دریافتنی" : "پرداختنی"} · {persianDate(document.due_date)}{document.reference_number ? ` · شماره ${document.reference_number}` : ""}</div></div><div className="text-left"><div className={["receivable", "receivable_check"].includes(document.document_type) ? "text-emerald-300" : "text-rose-300"}>{money(document.amount)}</div><button type="button" onClick={() => { setEditingCheck(document); setModal("check-edit"); }} className="text-violet-300">مشخصات چک</button>{["open", "overdue", "bounced"].includes(document.status) ? <div className="mt-2 flex gap-2"><button onClick={() => changeDocumentStatus(document, "settled")} className="rounded-lg border border-emerald-500/20 px-2 py-1 text-[8px] text-emerald-300">تسویه</button><button onClick={() => changeDocumentStatus(document, "cancelled")} className="rounded-lg border border-white/10 px-2 py-1 text-[8px] text-slate-500">لغو</button></div> : <span className="mt-2 block text-[8px] text-slate-600">{["settled", "cleared"].includes(document.status) ? "تسویه‌شده" : document.status === "bounced" ? "برگشتی" : "لغوشده"}</span>}</div></div>; })}{!overview?.documents.length && <Empty />}</div></Surface>
+      <Surface className="overflow-hidden"><Header title="چک‌ها و اسناد دریافتنی/پرداختنی" subtitle="سررسیدگذشته‌ها با هشدار مشخص شده‌اند" />
+        <div className="p-4">
+          <label className="block text-xs text-slate-300">جست‌وجوی چک یا سند
+            <input className={fieldClass} type="search" placeholder="طرف حساب یا شمارهٔ چک"
+              value={documentQuery} onChange={event => {
+                setDocumentQuery(event.target.value);
+                setVisibleDocumentCount(documentPageSize);
+              }} />
+          </label>
+        </div>
+        <div className="divide-y divide-white/[0.05]">{matchingDocuments.slice(0, visibleDocumentCount).map(document => { const overdue = ["open", "overdue", "bounced"].includes(document.status) && document.due_date < today(); return <div key={document.id} className="grid grid-cols-[1fr_auto] gap-3 p-4 text-[10px]"><div><div className="flex items-center gap-2"><b className="text-white">{document.counterparty} {document.check_details && <span className="text-slate-400">· {checkStatusLabel(document.status)}{document.check_details.spent_for ? ` · ${document.check_details.spent_for}` : ""}</span>}</b>{overdue && <span className="rounded-full bg-rose-500/10 px-2 py-0.5 text-[8px] text-rose-300">سررسیدگذشته</span>}</div><div className="mt-1 text-[9px] text-slate-600">{["receivable", "receivable_check"].includes(document.document_type) ? "دریافتنی" : "پرداختنی"} · {persianDate(document.due_date)}{document.reference_number ? ` · شماره ${document.reference_number}` : ""}</div></div><div className="text-left"><div className={["receivable", "receivable_check"].includes(document.document_type) ? "text-emerald-300" : "text-rose-300"}>{money(document.amount)}</div><button type="button" onClick={() => { setEditingCheck(document); setModal("check-edit"); }} className="mt-1 rounded-lg border border-violet-400/30 px-2 py-1 text-xs text-violet-200">ویرایش چک</button>{["open", "overdue", "bounced"].includes(document.status) ? <div className="mt-2 flex gap-2"><button onClick={() => changeDocumentStatus(document, "settled")} className="rounded-lg border border-emerald-500/20 px-2 py-1 text-[8px] text-emerald-300">تسویه</button><button onClick={() => changeDocumentStatus(document, "cancelled")} className="rounded-lg border border-white/10 px-2 py-1 text-[8px] text-slate-500">لغو</button></div> : <span className="mt-2 block text-[8px] text-slate-600">{["settled", "cleared"].includes(document.status) ? "تسویه‌شده" : document.status === "bounced" ? "برگشتی" : "لغوشده"}</span>}</div></div>; })}
+        {overview && !matchingDocuments.length && <Empty text={query ? "چک یا سندی پیدا نشد." : undefined} />}
+        </div>
+        {matchingDocuments.length > visibleDocumentCount && <button type="button"
+          onClick={() => setVisibleDocumentCount(count => count + documentPageSize)}
+          className="m-4 rounded-lg border border-white/10 px-3 py-2 text-xs text-slate-200">
+          نمایش موارد بیشتر
+        </button>}
+      </Surface>
 
       <Surface className="overflow-hidden"><Header title="حساب‌ها و هزینه‌های ثابت" subtitle="مبنای ذخیره نقدی و خروجی‌های دوره‌ای" /><div className="p-4"><div className="space-y-2">{overview?.accounts.map(account => <div key={account.id} className="rounded-xl bg-white/[0.035] p-3"><div className="flex justify-between gap-3 text-[10px]"><div><b className="text-white">{account.name}</b><div className="mt-1 text-[9px] text-slate-600">ذخیره: {money(account.minimum_reserve)}</div></div><div className="text-left"><span className="text-emerald-300">{money(account.current_balance)}</span><div className="mt-2 flex gap-2"><button onClick={() => { setEditingAccount(account); setModal("account-edit"); }} className="text-[8px] text-violet-300">اصلاح موجودی</button><button onClick={() => deactivate("accounts", account.id, account.name)} className="text-[8px] text-rose-400">غیرفعال</button></div></div></div></div>)}</div><div className="mt-5 border-t border-white/[0.06] pt-4"><div className="mb-3 text-[10px] font-bold text-slate-300">هزینه‌های ثابت</div>{overview?.fixed_expenses.map(expense => <div key={expense.id} className="mb-2 flex justify-between gap-3 rounded-xl bg-black/15 p-3 text-[10px]"><span className="text-slate-300">{expense.title} · روز {expense.due_day.toLocaleString("fa-IR")} ماه</span><div className="text-left"><span className="text-amber-300">{money(expense.amount)}</span><button onClick={() => deactivate("fixed-expenses", expense.id, expense.title)} className="mt-1 block text-[8px] text-rose-400">غیرفعال</button></div></div>)}{!overview?.accounts.length && !overview?.fixed_expenses.length && <Empty />}</div></div></Surface>
     </div>
@@ -225,10 +280,37 @@ export default function TreasuryPage() {
       {showStrategy && <div className="mt-3"><TreasuryStrategy refreshKey={refreshKey} /></div>}
     </Surface>
     {modal && <Modal title={modal === "account" ? "ثبت حساب بانکی یا نقدی" : modal === "account-edit" ? `اصلاح موجودی ${editingAccount?.name || "حساب"}` : modal === "document" ? "ثبت چک یا سند مالی" : modal === "check-edit" ? "ویرایش مشخصات و وضعیت چک" : "ثبت هزینه ثابت"} close={() => { setModal(null); setEditingAccount(null); setEditingCheck(null); setScannedCheck(null); }}><form onSubmit={event => submit(event, modal)} className="space-y-3">{modal === "account" && <><input name="name" required placeholder="نام حساب یا بانک" className={fieldClass} /><select name="account_type" className={fieldClass}><option value="bank">حساب بانکی</option><option value="cash">صندوق</option><option value="other">سایر</option></select><input name="current_balance" type="number" min="0" required placeholder="موجودی فعلی (ریال)" className={fieldClass} /><input name="minimum_reserve" type="number" min="0" defaultValue="0" placeholder="حداقل ذخیره (ریال)" className={fieldClass} /></>}{modal === "account-edit" && <><label className="block text-[9px] text-slate-500">موجودی فعلی<input name="current_balance" type="number" min="0" required defaultValue={editingAccount?.current_balance} className={`${fieldClass} mt-1`} /></label><label className="block text-[9px] text-slate-500">حداقل ذخیره<input name="minimum_reserve" type="number" min="0" required defaultValue={editingAccount?.minimum_reserve} className={`${fieldClass} mt-1`} /></label></>}{modal === "check-edit" && editingCheck && <>
-      <p className="text-sm">{editingCheck.counterparty} · {fullMoney(editingCheck.amount)}</p>
+      <label className="block text-xs">طرف حساب
+        <input name="counterparty" required minLength={2} maxLength={200} defaultValue={editingCheck.counterparty} className={fieldClass} />
+      </label>
+      <label className="block text-xs">مبلغ (ریال)
+        <input name="amount" type="number" min="1" step="any" required defaultValue={editingCheck.amount} className={fieldClass} />
+      </label>
+      <label className="block text-xs">تاریخ سررسید
+        <IranDateInput name="due_date" required defaultValue={editingCheck.due_date} className={fieldClass} />
+      </label>
+      <label className="block text-xs">شماره چک
+        <input name="reference_number" maxLength={120} defaultValue={editingCheck.reference_number} className={fieldClass} />
+      </label>
+      <CheckVisitorField visitors={checkVisitors} unavailable={checkVisitorsFailed}
+        current={editingCheck.check_details?.visitor_user_id} />
       <CheckFields details={editingCheck.check_details ?? undefined} status={editingCheck.status} />
-    </>}{modal === "document" && <><select name="document_type" className={fieldClass}><option value="receivable">چک/سند دریافتنی</option><option value="payable">چک/سند پرداختنی</option></select><input name="counterparty" required placeholder="طرف حساب" className={fieldClass} /><input name="amount" type="number" min="1" required placeholder="مبلغ (ریال)" className={fieldClass} /><label className="block text-[9px] text-slate-500">تاریخ سررسید<IranDateInput name="due_date" required className={`${fieldClass} mt-1`} /></label><input ref={docRefInputRef} name="reference_number" placeholder="شماره چک/سند" className={fieldClass} /><label className="block text-[10px] text-slate-400">ارتباط با هزینهٔ ثابت؛ فقط سند پرداختنی<select name="fixed_expense_id" className={fieldClass}><option value="">هزینهٔ مستقلی است</option>{overview?.fixed_expenses.map(expense => <option key={expense.id} value={expense.id}>{expense.title}</option>)}</select></label><label className="block text-[9px] text-slate-500">احتمال وصول دریافتنی (از صفر تا یک)<input name="collection_probability" type="number" min="0" max="1" step="0.05" defaultValue="1" className={`${fieldClass} mt-1`} /></label><label className="flex gap-2 text-sm"><input name="is_check" type="checkbox" defaultChecked /> ثبت به‌عنوان چک</label><CheckFields sayadRef={sayadRef} /><div className="rounded-xl border border-white/10 p-3"><p className="mb-2 text-[10px] text-slate-400">اسکن QR چک صیادی — پس از اسکن موفق، سریال خودکار در «شماره چک/سند» پر می‌شود و شناسه در فیلد صیاد درج می‌شود. متن QR روی همین دستگاه پردازش می‌شود.</p><CheckScanner onNumbers={pick => { setScannedCheck(pick); if (pick.serial && docRefInputRef.current) docRefInputRef.current.value = pick.serial; if (pick.sayad && sayadRef.current) sayadRef.current.value = pick.sayad; }} />{scannedCheck && <p className="mt-2 text-[10px] text-emerald-300">خوانده شد — صیاد: {scannedCheck.sayad || "—"} · سریال: {scannedCheck.serial || "—"}</p>}</div><textarea name="notes" rows={2} placeholder="توضیحات" className={fieldClass} /></>}{modal === "expense" && <><input name="title" required placeholder="عنوان هزینه ثابت" className={fieldClass} /><input name="amount" type="number" min="1" required placeholder="مبلغ ماهانه (ریال)" className={fieldClass} /><input name="due_day" type="number" min="1" max="31" required placeholder="روز سررسید در ماه" className={fieldClass} /><textarea name="notes" rows={2} placeholder="توضیحات" className={fieldClass} /></>}<button className={`${primaryButton} w-full`}>ثبت و محاسبه مجدد</button></form></Modal>}
+    </>}{modal === "document" && <><select name="document_type" className={fieldClass}><option value="receivable">چک/سند دریافتنی</option><option value="payable">چک/سند پرداختنی</option></select><input name="counterparty" required placeholder="طرف حساب" className={fieldClass} /><input name="amount" type="number" min="1" required placeholder="مبلغ (ریال)" className={fieldClass} /><label className="block text-[9px] text-slate-500">تاریخ سررسید<IranDateInput name="due_date" required className={`${fieldClass} mt-1`} /></label><input ref={docRefInputRef} name="reference_number" placeholder="شماره چک/سند" className={fieldClass} /><label className="block text-[10px] text-slate-400">ارتباط با هزینهٔ ثابت؛ فقط سند پرداختنی<select name="fixed_expense_id" className={fieldClass}><option value="">هزینهٔ مستقلی است</option>{overview?.fixed_expenses.map(expense => <option key={expense.id} value={expense.id}>{expense.title}</option>)}</select></label><label className="block text-[9px] text-slate-500">احتمال وصول دریافتنی (از صفر تا یک)<input name="collection_probability" type="number" min="0" max="1" step="0.05" defaultValue="1" className={`${fieldClass} mt-1`} /></label><label className="flex gap-2 text-sm"><input name="is_check" type="checkbox" checked={isCheck} onChange={event => setIsCheck(event.target.checked)} /> ثبت به‌عنوان چک</label>{isCheck && <CheckVisitorField visitors={checkVisitors} unavailable={checkVisitorsFailed} />}<CheckFields sayadRef={sayadRef} /><div className="rounded-xl border border-white/10 p-3"><p className="mb-2 text-[10px] text-slate-400">اسکن QR چک صیادی — پس از اسکن موفق، سریال خودکار در «شماره چک/سند» پر می‌شود و شناسه در فیلد صیاد درج می‌شود. متن QR روی همین دستگاه پردازش می‌شود.</p><CheckScanner onNumbers={pick => { setScannedCheck(pick); if (pick.serial && docRefInputRef.current) docRefInputRef.current.value = pick.serial; if (pick.sayad && sayadRef.current) sayadRef.current.value = pick.sayad; }} />{scannedCheck && <p className="mt-2 text-[10px] text-emerald-300">خوانده شد — صیاد: {scannedCheck.sayad || "—"} · سریال: {scannedCheck.serial || "—"}</p>}</div><textarea name="notes" rows={2} placeholder="توضیحات" className={fieldClass} /></>}{modal === "expense" && <><input name="title" required placeholder="عنوان هزینه ثابت" className={fieldClass} /><input name="amount" type="number" min="1" required placeholder="مبلغ ماهانه (ریال)" className={fieldClass} /><input name="due_day" type="number" min="1" max="31" required placeholder="روز سررسید در ماه" className={fieldClass} /><textarea name="notes" rows={2} placeholder="توضیحات" className={fieldClass} /></>}<button className={`${primaryButton} w-full`}>ثبت و محاسبه مجدد</button></form></Modal>}
   </PortalShell>;
+}
+
+function CheckVisitorField({ visitors, unavailable, current }: {
+  visitors: CheckVisitor[]; unavailable: boolean; current?: number | null;
+}) {
+  return <label className="block text-xs">ویزیتور مرتبط
+    <select name="visitor_user_id" defaultValue={current ?? ""} disabled={unavailable} className={fieldClass}>
+      <option value="">بدون ویزیتور</option>
+      {current && !visitors.some(visitor => visitor.id === current) &&
+        <option value={current}>ویزیتور فعلی</option>}
+      {visitors.map(visitor => <option key={visitor.id} value={visitor.id}>{visitor.full_name}</option>)}
+    </select>
+    {unavailable && <span role="alert">فهرست ویزیتورها دریافت نشد.</span>}
+  </label>;
 }
 
 function Metric({ label, value, tone }: { label: string; value: string; tone: string }) { return <Surface className="p-4"><div className="text-[10px] text-slate-500">{label}</div><div className={`mt-3 text-xl font-black ${tone}`}>{value}</div></Surface>; }
